@@ -10,7 +10,7 @@ Auditor — a11y specialist. Audits + fixes React + Vite + Tailwind in `apps/web
 
 ## First Principle
 
-**Native HTML beats ARIA.** `<button>` beats `<div role="button">`. `<dialog>` beats `<div role="dialog">`. Wrong ARIA worse than none — breaks screen readers. Never add ARIA that duplicates implicit semantics (`role="button"` on `<button>`, `role="navigation"` on `<nav>`, etc.).
+**Native HTML beats ARIA.** `<button>` beats `<div role="button">`. `<dialog>` beats `<div role="dialog">`. Wrong ARIA worse than none — breaks screen readers. Never add ARIA duplicating implicit semantics (`role="button"` on `<button>`, `role="navigation"` on `<nav>`, etc.).
 
 ## Semantic HTML & Structure
 
@@ -60,7 +60,7 @@ Focus trapped native by `<dialog>`. Escape closes. Focus returns to trigger on c
 
 ## Forms
 
-- Every input needs programmatic-associated `<label htmlFor>`. `placeholder` NOT a label.
+- Every input needs programmatic-associated `<label htmlFor>`. `placeholder` NOT label.
 - Group radios + checkboxes in `<fieldset>` + `<legend>`.
 - Required: use native `required`; `aria-required` is reinforcement. Asterisk: `aria-hidden="true"` — `required` already announces.
 - **Errors:** `aria-invalid="true"` on field, error text via `aria-describedby`, error visible (not color-only). Specific text ("Enter a valid email"), not generic ("Invalid"). Remove `aria-invalid` when fixed.
@@ -136,7 +136,7 @@ Never convey info by color alone: status pills, form errors, chart series, links
 
 ## Severity & Output
 
-- 🔴 **Critical:** WCAG A/AA fail that blocks user — missing label on interactive element, keyboard trap, focus lost on close, missing alt on informative image, no skip link, color-only info, `aria-live` on conditionally-mounted React node.
+- 🔴 **Critical:** WCAG A/AA fail blocking user — missing label on interactive element, keyboard trap, focus lost on close, missing alt on informative image, no skip link, color-only info, `aria-live` on conditionally-mounted React node.
 - 🟡 **Warning:** Passes AA but suboptimal — missing landmark label, non-canonical ARIA pattern, AAA gap on critical surface, missed `prefers-*` query.
 - 🟢 **Pass:** Meets or exceeds AAA.
 

@@ -26,7 +26,7 @@ RED: failing test first. GREEN: minimal code to pass. REFACTOR: tighten, clean, 
 7. Verify: `npm run lint` + `npm run test`
 
 ## What "Large" Means
-Large if touches more than one layer (e.g. new DB table + API + UI), introduces new module, or requires non-trivial architectural decisions. Doubt? Write PRD.
+Large if touches >1 layer (e.g. new DB table + API + UI), introduces new module, or needs non-trivial architectural decisions. Doubt? Write PRD.
 
 ## Quality Gates
 - [ ] Tests written and passing
