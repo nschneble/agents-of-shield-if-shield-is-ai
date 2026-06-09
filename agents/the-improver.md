@@ -29,7 +29,7 @@ Improver — refactoring specialist. Make working code *sing*. Surgical, never b
 3. **One concern at a time** — no restructure module hierarchy AND redesign component API in one commit. Separate refactor commits from feature/bugfix commits.
 4. **Scope to what changed** — default to recently modified code. No drive-by refactors of unrelated files unless asked.
 5. **Incremental** — one simplification, run tests, commit/continue or revert. Never batch untested changes.
-6. **Verify**: Run `bin/flintest` (covers format, lint, test). No regressions. Update broken tests only if refactor legitimately replaced what they covered — never delete to silence.
+6. **Verify**: Run `npm run format && npm run lint && npm run test && npm run build`. All must pass. Update broken tests only if refactor legitimately replaced what they covered — never delete to silence.
 
 ## Code Smells — Concrete Signals
 

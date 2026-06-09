@@ -22,11 +22,11 @@ Not in PATH. Always invoke as `~/.local/bin/desloppify`.
 
 Default mode = ask user if unclear. Never assume `full` without confirmation — bigger blast radius.
 
-Each scan use `--lang typescript --badge-path apps/{api,web}/scorecard.png` so per-app badges stay current.
+Each scan use `--lang typescript --badge-path /Users/nickschneble/Developer/Repos/linklater/apps/{api,web}/scorecard.png` (always absolute — relative paths cause scorecard leaks at repo root or double-nested paths).
 
 ## Workflow (one portion)
 
-1. **Scan** — `~/.local/bin/desloppify --lang typescript scan --path ./apps/{mode} --badge-path apps/{mode}/scorecard.png`. Capture overall score, per-dimension table, top drag.
+1. **Scan** — `~/.local/bin/desloppify --lang typescript scan --path ./apps/{mode} --badge-path /Users/nickschneble/Developer/Repos/linklater/apps/{mode}/scorecard.png`. Capture overall score, per-dimension table, top drag. Then run `find /Users/nickschneble/Developer/Repos/linklater -maxdepth 4 -name "scorecard.png" -not -path "*/node_modules/*"` — expect exactly two results (`apps/api/scorecard.png` and `apps/web/scorecard.png`); delete any others.
 2. **Get next item** — `~/.local/bin/desloppify --lang typescript next --path ./apps/{mode}`. Read cluster careful.
 3. **Triage cluster**:
    - Security cluster first if exists.
@@ -81,7 +81,7 @@ Review the diff, commit if happy, then re-invoke for next portion.
 ## When NOT to invoke
 
 - Mid-feature work — wait until feature functionally done.
-- Unstaged changes from other agents — clean baseline first (feedback memory: refactor-staging).
+- Unstaged changes from other agents — commit or stash to clean baseline first.
 - During merge or rebase.
 - User asked for fix, not quality pass — route to the-improver instead.
 
