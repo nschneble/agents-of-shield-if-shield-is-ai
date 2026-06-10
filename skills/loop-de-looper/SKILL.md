@@ -175,7 +175,7 @@ Stopping is not failure. Looping past a known blocker is failure.
 - Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway."
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
 - Does NOT silently swap specialist gates for built-in checks. If `ESCALATE` fires from plan, orchestrator invokes specialist — no "I checked it myself."
-- Does NOT flip draft PR to ready-for-review. User decision per `looper-pr` spec.
+- Does NOT flip draft PR to ready-for-review. User decision per `looper-commit` spec.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 
 ## Crew trigger tuning
@@ -193,7 +193,7 @@ Tighter triggers for high-drift domains (palette, auth surface). Looser for clea
 
 ## Voice + style
 
-Reports to user: structured, scannable. Per-wave status line. Crew pass summary. Final state report. Match the lean voice of `looper-pr` and `looper-learn`.
+Reports to user: structured, scannable. Per-wave status line. Crew pass summary. Final state report. Match the lean voice of `looper-commit` and `looper-learn`.
 
 Cite agent outputs verbatim when surfacing blockers — do not paraphrase. Per memory `[[feedback-verify-upstream-gate-claims]]` and `[[feedback-task-tool-availability]]`, orchestrator's job is to surface signal, not summarize away.
 
