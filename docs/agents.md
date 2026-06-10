@@ -111,7 +111,7 @@ accessible UI, and lean DB calls.
 
 ---
 
-## "The Gang"
+## "The Crew"
 
 The Auditor, Chemist, Chronicler, Diamantaire, Improver, and Stickler are
 the six **existing-code agents** invoked on code that already exists.
