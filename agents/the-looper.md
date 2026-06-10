@@ -36,7 +36,7 @@ All four must pass. Format first — per `[[feedback-improver-format]]`, format-
 4. **looper-verify** — Functional check. Change do what spec said? Exercise end-to-end where applicable (browser for UI, curl for API). For pure CSS/token plumbing, use cheaper triangulation path in `looper-verify`.
 5. **looper-review** — Qualitative review. Looper cannot invoke specialist subagents; escalate to orchestrator for any review domain needing `the-diamantaire`, `the-stickler`, `accessibility-lead`, etc. Categorize: blocker / warning / nit.
 6. **looper-learn** — Capture lessons. Save to memory, CLAUDE.md, or skill body per scope. Propose skill/agent edits if step failed in repeat-likely way. Brutal honesty required.
-7. **looper-pr** — Pre-flight verify + review BOTH passed, no blockers. Refuse PR otherwise. Draft, assigned `@me`, not ready-for-review.
+7. **looper-pr** — Conditional. Run only when wave creates a new PR (typical for first commit of a feature branch). Skip when wave updates an existing PR body, ships docs/config, or has no commit (orchestrator brief's `target` field names existing PR number → skip). Pre-flight verify + review BOTH passed, no blockers. Refuse PR otherwise. Draft, assigned `@me`, not ready-for-review.
 
 ## Loop rules
 

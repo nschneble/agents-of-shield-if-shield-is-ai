@@ -30,10 +30,16 @@ No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP
 ## Build procedure
 
 1. Confirm `looper-plan` brief in hand. If brief flagged ESCALATE, confirm `gate outputs` populated from orchestrator-fired specialist. Missing either → STOP, ask orchestrator fill them.
-2. Project use TDD (check CLAUDE.md)? Write failing tests FIRST.
-3. Smallest code change that satisfy spec. No bonus refactors, no unrelated cleanups, no defensive code for hypothetical futures. Three similar lines better than premature abstraction.
-4. New files: use `Write`. Modifications: use `Edit`. Do NOT use `cat > file` via Bash. Bash bypass project write-gates that exist for review.
-5. Run, in order: `format` → `lint` → `test` → `build`. All must pass before done. Project has different sequence in CLAUDE.md or memory `feedback-build`? Follow that.
+2. Determine wave kind from brief:
+   - **Code wave** (source files touched) → steps 3–5 below
+   - **Non-code wave** (PR body, GitHub release, external config, documentation-only) → step 6 below
+3. Project use TDD (check CLAUDE.md)? Write failing tests FIRST.
+4. Smallest code change that satisfy spec. No bonus refactors, no unrelated cleanups, no defensive code for hypothetical futures. Three similar lines better than premature abstraction.
+5. New files: use `Write`. Modifications: use `Edit`. Do NOT use `cat > file` via Bash. Bash bypass project write-gates that exist for review. Then run, in order: `format` → `lint` → `test` → `build`. All must pass before done. Project has different sequence in CLAUDE.md or memory `feedback-build`? Follow that.
+6. **Non-code wave path**:
+   - PR body / GitHub release: use `gh pr edit <N> --body` / `gh release edit` via Bash. No format/lint/test/build (no source touched). Verify via `gh pr view` / `gh release view` in next step.
+   - External config (CI yaml, eslintrc, package.json metadata): use `Edit`. Run config-specific validator only (`gh workflow run --dry`, `eslint --print-config`, `npm pkg fix`). Skip framework-wide format/lint/test/build unless the config affects them.
+   - Documentation-only (.md, README, THEMES.md, ARCHITECTURE.md): use `Edit`. Run `npm run format` + project's markdown linter (markdownlint, vale) if present. Skip test/build (no source compiled).
 
 ## Quality bars
 

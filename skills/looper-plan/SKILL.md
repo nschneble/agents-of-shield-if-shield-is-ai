@@ -31,6 +31,7 @@ For each domain plan supports, run deterministic checks BEFORE handing off to bu
 | Auth / token / permission      | Caller graph via grep — list every consumer of touched API surface                                                                                                                | What public contracts shift? Any external clients (extensions, PATs)? |
 | Performance-sensitive code     | Baseline measurement before change (existing perf test or one-shot benchmark)                                                                                                     | What is the floor we cannot regress past?                             |
 | Test gap (any domain)          | Coverage check on touched files; compare to suite-wide coverage                                                                                                                   | Tests cover the change? Coverage drop indicates gap.                  |
+| Documentation / PR body / config | Markdownlint dry-run, grep for stale references (project file inventory vs claimed inventory in doc), heading-hierarchy check, link integrity (`markdown-link-check`), config validator dry-run (`eslint --print-config`, `gh workflow run --dry`) | Doc claims match current state? Stale references remain? Config parses + downstream consumers read it? |
 
 Plan runs the check, captures the output, cites it. NEVER substitute judgment for unrun checks.
 

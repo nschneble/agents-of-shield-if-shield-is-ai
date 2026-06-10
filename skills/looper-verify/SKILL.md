@@ -41,6 +41,19 @@ When change = "rename CSS variable," "introduce new design token layer," "rethre
 
 If change layers new behavior (new component, animation, layout) on top of token plumbing, fall back to full UI verify path — visual outcome no longer purely function of tokens.
 
+## For documentation / PR-body / config waves specifically
+
+Non-code waves verify by reading back the resource and confirming the change applied. No dev-server, no curl, no DB query.
+
+- **PR body / GitHub release:** `gh pr view <N> --json body | jq -r .body` (or `gh release view`). Confirm:
+  - New body present (not truncated, not encoding-mangled)
+  - Stale references the wave removed are gone (grep against the inventory list plan emitted)
+  - Required sections present (Summary, Test plan, etc per template)
+- **External config (CI yaml, eslintrc, package.json):** read file back, run config validator if present (`gh workflow run --dry`, `eslint --print-config`). Confirm change parses + downstream consumer reads it (run one CI step that consumes the config).
+- **Documentation-only:** read file back, run markdownlint + the grep checks plan staged (stale-ref count, heading-hierarchy, link integrity via `markdown-link-check` if available). For docs that index project state (THEMES.md, CHANGELOG, ARCHITECTURE.md), confirm doc's claims match current code state — e.g. theme count in THEMES.md matches actual theme files on disk.
+
+For all three: NO new behavior to exercise. Verify pass = "the resource now says what plan said it should say, and downstream consumers can still read it."
+
 ## What verify does NOT do
 
 - Does NOT critique code structure → review's job

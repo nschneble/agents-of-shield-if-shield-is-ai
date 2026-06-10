@@ -129,17 +129,22 @@ Reset counters after crew pass clean.
 
 Loop terminates when:
 
-1. **All wave queue items shipped** AND **final crew pass clean** → goal-complete success path
+1. **All wave queue items shipped** AND **final crew pass clean** AND **section 5 empty** → goal-complete success path
 2. **Stop condition fired** at any layer → escalate to user with state report
-3. **Required-not-loopable items remaining** → cannot self-complete; surface to user with explicit list
+3. **All wave queue items shipped** AND **final crew pass clean** AND **section 5 non-empty** → cannot self-complete; surface to user with explicit list
 
-For path 3 (release-readiness goals typically), Loop de Looper reports:
+For path 3 (release-readiness goals typically), order is fixed:
 
-- Loopable waves shipped (list)
-- Required-not-loopable items still blocking (list from scope section 5)
-- Recommended user actions (each line)
+1. Run final crew pass FIRST (against cumulative loopable work)
+2. Then report to user with the bundle:
+   - Loopable waves shipped (list)
+   - Final crew result (pass / pass-with-nits / blockers)
+   - Required-not-loopable items still blocking (list from scope section 5)
+   - Recommended user actions (each line)
 
-User executes those items, returns; Loop de Looper resumes (or declares goal-complete if all clear).
+Final crew runs before surfacing required-not-loopable so user gets verified loopable work + open human gates in one report — not two round-trips.
+
+User executes section-5 items, returns; Loop de Looper declares goal-complete (or resumes if user introduced new state during human gates).
 
 ## State tracking (v1: in-context)
 
