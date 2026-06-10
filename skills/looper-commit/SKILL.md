@@ -5,14 +5,14 @@ description: Final step of every wave. Always commits any code/doc changes. Auto
 
 Last step. Always commits. Conditionally creates PR.
 
-Renamed from `looper-pr` in framework v1.2. Old name was tied to PR creation; reality is the commit is the load-bearing action, PR creation only happens when the branch has no existing PR. Skipping commit because no new PR is needed was a spec bug that lost work in transit.
+Renamed from `looper-pr` in framework v1.2. Old name tied to PR creation; reality: commit is load-bearing action, PR creation only happens when branch has no existing PR. Skipping commit because no new PR needed was spec bug that lost work in transit.
 
 ## When this runs
 
-Every wave runs this as its final step. Two paths:
+Every wave runs this as final step. Two paths:
 
 - **Code wave / doc wave** — staged or unstaged changes exist → commit step runs → PR detection runs
-- **External-state wave** (PR body refresh, GitHub release update, manual baseline approval handoff) — working tree clean → commit step SKIPPED but PR detection still runs (just confirms PR exists for the external change context)
+- **External-state wave** (PR body refresh, GitHub release update, manual baseline approval handoff) — working tree clean → commit step SKIPPED but PR detection still runs (confirms PR exists for external change context)
 
 ## Pre-flight (REQUIRED)
 
@@ -65,7 +65,7 @@ Non-empty output → commit:
    ```
    and capture hash for hand-back.
 
-If commit fails (pre-commit hook failure, signing failure, etc), STOP — fix the underlying issue, re-stage, create a NEW commit. NEVER amend. NEVER bypass hooks (`--no-verify`, `--no-gpg-sign`, etc).
+If commit fails (pre-commit hook failure, signing failure, etc), STOP — fix underlying issue, re-stage, create NEW commit. NEVER amend. NEVER bypass hooks (`--no-verify`, `--no-gpg-sign`, etc).
 
 ## Step 2: PR detection
 
@@ -80,7 +80,7 @@ Three cases:
 | State                  | Action                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------- |
 | Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                               |
-| Has merged / closed PR | Treat as "no PR" — proceed to Step 3 (the closed PR may be unrelated history on this branch)    |
+| Has merged / closed PR | Treat as "no PR" — proceed to Step 3 (closed PR may be unrelated history on this branch)        |
 | No PR found            | Proceed to Step 3                                                                               |
 
 ## Step 3: Create draft PR (only if no existing)
@@ -153,7 +153,7 @@ If push fails (permissions, divergence), STOP — surface to orchestrator. Do NO
 - Does NOT auto-flip draft → ready-for-review (user's call)
 - Does NOT request specific reviewers (user assigns)
 - Does NOT push to main / merge / close issues
-- Does NOT skip pre-flight even if user in hurry. Pre-flight exists to catch loops that snuck past verify + review.
+- Does NOT skip pre-flight even if user in hurry. Pre-flight catches loops that snuck past verify + review.
 - Does NOT skip assigning `@me`. Draft PR without assignee disappears from dashboard, easy to forget.
 - Does NOT amend commits. Pre-commit hook failure → fix + new commit, never amend.
 - Does NOT bypass hooks (no `--no-verify`, no `--no-gpg-sign`).
