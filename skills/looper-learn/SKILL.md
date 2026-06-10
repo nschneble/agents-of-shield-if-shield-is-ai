@@ -9,11 +9,12 @@ Suite of looper skills ran. Determine how went, capture reusable lessons.
 
 For each step in loop, ask:
 
-1. **research** — Surface right constraints (WCAG SC + thresholds, security invariants, perf budgets)? Challenge scope correctly? Build re-discover things mid-flight?
-2. **build** — Pre-build domain gates invoked? Change scope creep beyond research plan? Bash bypass guards? Quality bars (no Bash writes, no scope creep, no premature abstraction) honored?
-3. **verify** — Verify catch bugs verify should catch? Or review catch things verify missed? (If yes, verify checklist too thin.)
-4. **review** — How many review iterations? Specialists invoked when domain expertise mattered? Review surface blockers that should pre-flight in research/build?
-5. **pr** — PR have everything (screenshots, test plan, ticket link, reviewer notes)?
+1. **research** — Surface right constraints (WCAG SC + thresholds, security invariants, perf budgets)? Challenge scope correctly? Plan/build re-discover things mid-flight?
+2. **plan** — Mechanized predictions ran or fall-through honest? Recovery options pre-staged? Risk register caught what review later surfaced? Plan emit ESCALATE when needed, or substitute judgment silently?
+3. **build** — Plan brief consumed direct or re-derived? Change scope creep beyond plan? Bash bypass guards? Quality bars (no Bash writes, no scope creep, no premature abstraction) honored? Non-code wave path chosen correctly when applicable?
+4. **verify** — Verify catch bugs verify should catch? Or review catch things verify missed? (If yes, verify checklist too thin.) Doc/PR-body/config waves verified by reading resource back, not skipped?
+5. **review** — How many review iterations? Specialists recommended for crew pass when domain expertise mattered? Review surface blockers that should pre-flight in research/plan?
+6. **commit** — Pre-flight gates honored? Commit landed for code/doc waves, skipped cleanly for external-state waves? PR detection correct (existing → just commit; none → draft created)?
 
 ## Save lessons at the right level
 
@@ -23,8 +24,9 @@ Match lesson to right persistence layer:
 | ------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **Memory** (per project)       | One-off project facts, user feedback patterns, surprising project-specific gotchas | "Tuffgal stories must use real user actions, not engineer behaviors"         |
 | **CLAUDE.md** (per project)    | Conventions, standing rules, hard constraints project enforces                     | "Migrations must pass Squawk; start with lock_timeout = '1s'"                |
-| **Skill body** (cross-project) | Patterns that apply to ALL projects this looper runs in                            | "For color work, pull WCAG thresholds in research before build picks values" |
-| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                  | "Web UI requires a11y-lead pre-build gate"                                   |
+| **Skill body** (cross-project) | Patterns that apply to ALL projects this looper runs in                            | "For color work, pull WCAG thresholds in research before plan picks values"  |
+| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                  | "Web UI requires plan ESCALATE → a11y-lead gate"                             |
+| **Loop de Looper body**        | Multi-wave orchestration patterns (crew cadence, queue management, escalation routing) | "For token-retirement waves, plan must run multi-extension orphan grep" |
 
 Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't just leave memory. Memories = evidence; skill edits = fixes.
 

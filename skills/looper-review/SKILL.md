@@ -7,7 +7,9 @@ Qualitative review. Independent from build + verify. Question not "does work" �
 
 ## Invoke specialist reviewers
 
-Domains beyond general eng → orchestrator invoke specialists via Task tool. Skill recommend which + synthesize reports:
+Domains beyond general eng → orchestrator invoke specialists via Task tool. Skill recommend which + synthesize reports.
+
+Under `loop-de-looper`, recommended specialists feed the orchestrator's crew pass mechanism — fired at trigger points (every 4 waves OR 30 cumulative file changes, plus mandatory final crew), not per-wave parallel spawns inside the wave loop. Per-wave review surfaces blockers/warnings/nits; crew pass on cumulative diff catches cross-wave drift that single-wave review can't see.
 
 | Domain                                                 | Reviewer                                  |
 | ------------------------------------------------------ | ----------------------------------------- |
