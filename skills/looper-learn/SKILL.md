@@ -20,20 +20,20 @@ For each step in loop, ask:
 
 Match lesson to right persistence layer:
 
-| Level                          | When to use                                                                        | Example                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Memory** (per project)       | One-off project facts, user feedback patterns, surprising project-specific gotchas | "Tuffgal stories must use real user actions, not engineer behaviors"         |
-| **CLAUDE.md** (per project)    | Conventions, standing rules, hard constraints project enforces                     | "Migrations must pass Squawk; start with lock_timeout = '1s'"                |
-| **Skill body** (cross-project) | Patterns that apply to ALL projects this looper runs in                            | "For color work, pull WCAG thresholds in research before plan picks values"  |
-| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                  | "Web UI requires plan ESCALATE → a11y-lead gate"                             |
-| **Loop de Looper body**        | Multi-wave orchestration patterns (crew cadence, queue management, escalation routing) | "For token-retirement waves, plan must run multi-extension orphan grep" |
+| Level                          | When to use                                                                            | Example                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Memory** (per project)       | One-off project facts, user feedback patterns, surprising project-specific gotchas     | "Tuffgal stories must use real user actions, not engineer behaviors"        |
+| **CLAUDE.md** (per project)    | Conventions, standing rules, hard constraints project enforces                         | "Migrations must pass Squawk; start with lock_timeout = '1s'"               |
+| **Skill body** (cross-project) | Patterns apply to ALL projects looper runs in                                          | "For color work, pull WCAG thresholds in research before plan picks values" |
+| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                      | "Web UI requires plan ESCALATE → a11y-lead gate"                            |
+| **Loop de Looper body**        | Multi-wave orchestration patterns (crew cadence, queue management, escalation routing) | "For token-retirement waves, plan must run multi-extension orphan grep"     |
 
-Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't just leave memory. Memories = evidence; skill edits = fixes.
+Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't leave just memory. Memories = evidence; skill edits = fixes.
 
 ## What NOT to save
 
-- Code patterns derivable from current code (`git blame` or `grep` finds them)
-- Fix recipes (commit / PR carries that)
+- Code patterns derivable from current code (`git blame` or `grep` find them)
+- Fix recipes (commit / PR carry that)
 - Ephemeral task details
 - Anything already in CLAUDE.md or existing memory — update instead of duplicate
 
@@ -46,6 +46,6 @@ Skill caused failure (missing checklist item, vague advice, blind spot) → prop
 
 ## Honest self-assessment
 
-Step repeatedly fails same way across multiple loops → skill needs editing, not another memory. Agent orchestration logic the issue → propose agent edit. Failure environmental (missing tool, missing access) → say plainly, don't paper over.
+Step repeatedly fails same way across multiple loops → skill needs editing, not another memory. Agent orchestration logic the issue → propose agent edit. Failure environmental (missing tool, missing access) → say plain, don't paper over.
 
 Looper improves only when learn brutally honest about what went wrong.
