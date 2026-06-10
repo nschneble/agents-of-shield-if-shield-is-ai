@@ -17,13 +17,13 @@ Produce structured research report. Give looper-build everything need ship witho
 
 For task's domain, pull official sources before community. Use `WebFetch` actually retrieve page — no cite from training data. Training data drifts; WCAG criteria, framework APIs, security advisories all evolve.
 
-| Domain | Primary source |
-|---|---|
-| Accessibility | https://www.w3.org/WAI/WCAG22/Understanding/ — cite specific SC numbers and thresholds |
-| Web platform | https://developer.mozilla.org/ |
-| Framework | The framework's own docs (React, Vue, Vite, Tailwind, NestJS, etc.) — match the installed version |
-| Database | The DB engine's manual (Postgres, MySQL, etc.) |
-| Security | OWASP, CVE database, framework security advisories |
+| Domain        | Primary source                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Accessibility | https://www.w3.org/WAI/WCAG22/Understanding/ — cite specific SC numbers and thresholds            |
+| Web platform  | https://developer.mozilla.org/                                                                    |
+| Framework     | The framework's own docs (React, Vue, Vite, Tailwind, NestJS, etc.) — match the installed version |
+| Database      | The DB engine's manual (Postgres, MySQL, etc.)                                                    |
+| Security      | OWASP, CVE database, framework security advisories                                                |
 
 **Accessibility work — non-negotiable lookups:**
 

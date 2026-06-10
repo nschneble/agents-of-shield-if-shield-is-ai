@@ -53,6 +53,7 @@ If change layers new behavior (new component, animation, layout) on top of token
 PASS / FAIL verdict per acceptance criterion.
 
 For FAIL, cite:
+
 - Which criterion failed
 - Observed behavior vs expected behavior
 - File / line / step where gap is

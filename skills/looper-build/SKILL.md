@@ -11,12 +11,12 @@ Read research report "Pre-build gates required" section. For EACH gate, looper a
 
 Common gates and output:
 
-| Touching | Gate | What it produces |
-|---|---|---|
-| Web UI (.tsx, .jsx, .html, .vue, templates) | `accessibility-agents:accessibility-lead` | ARIA contract, semantic-HTML requirements, focus-management plan |
-| Color tokens, themes, contrast, CVD | `accessibility-agents:accessibility-lead` | Per-bundle contrast thresholds, CVD-safe palette guidance, exclusion lists |
-| Auth, sessions, tokens, permissions | Security review (`the-diamantaire` with security framing) | Threat model, invariants to preserve |
-| Database migration | Migration-safety review | Squawk-clean rules, lock-timeout pattern, NOT VALID + VALIDATE constraint pattern |
+| Touching                                    | Gate                                                      | What it produces                                                                  |
+| ------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Web UI (.tsx, .jsx, .html, .vue, templates) | `accessibility-agents:accessibility-lead`                 | ARIA contract, semantic-HTML requirements, focus-management plan                  |
+| Color tokens, themes, contrast, CVD         | `accessibility-agents:accessibility-lead`                 | Per-bundle contrast thresholds, CVD-safe palette guidance, exclusion lists        |
+| Auth, sessions, tokens, permissions         | Security review (`the-diamantaire` with security framing) | Threat model, invariants to preserve                                              |
+| Database migration                          | Migration-safety review                                   | Squawk-clean rules, lock-timeout pattern, NOT VALID + VALIDATE constraint pattern |
 
 No bypass via Bash. No proceed without gate output in hand. Orchestrator invoke; this skill enforce by refusing proceed without it.
 

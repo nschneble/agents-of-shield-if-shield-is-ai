@@ -19,12 +19,12 @@ For each step in loop, ask:
 
 Match lesson to right persistence layer:
 
-| Level | When to use | Example |
-|---|---|---|
-| **Memory** (per project) | One-off project facts, user feedback patterns, surprising project-specific gotchas | "Tuffgal stories must use real user actions, not engineer behaviors" |
-| **CLAUDE.md** (per project) | Conventions, standing rules, hard constraints project enforces | "Migrations must pass Squawk; start with lock_timeout = '1s'" |
-| **Skill body** (cross-project) | Patterns that apply to ALL projects this looper runs in | "For color work, pull WCAG thresholds in research before build picks values" |
-| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules | "Web UI requires a11y-lead pre-build gate" |
+| Level                          | When to use                                                                        | Example                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Memory** (per project)       | One-off project facts, user feedback patterns, surprising project-specific gotchas | "Tuffgal stories must use real user actions, not engineer behaviors"         |
+| **CLAUDE.md** (per project)    | Conventions, standing rules, hard constraints project enforces                     | "Migrations must pass Squawk; start with lock_timeout = '1s'"                |
+| **Skill body** (cross-project) | Patterns that apply to ALL projects this looper runs in                            | "For color work, pull WCAG thresholds in research before build picks values" |
+| **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                  | "Web UI requires a11y-lead pre-build gate"                                   |
 
 Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't just leave memory. Memories = evidence; skill edits = fixes.
 

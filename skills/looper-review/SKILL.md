@@ -9,14 +9,14 @@ Qualitative review. Independent from build + verify. Question not "does work" �
 
 Domains beyond general eng → orchestrator invoke specialists via Task tool. Skill recommend which + synthesize reports:
 
-| Domain | Reviewer |
-|---|---|
-| General code review | `the-diamantaire` |
-| Convention adherence (style, naming, project patterns) | `the-stickler` |
-| Accessibility (post-build review of shipped UI) | `accessibility-agents:accessibility-lead` |
-| Test coverage and quality | `the-chemist` |
-| Documentation | `the-chronicler` |
-| Refactor / simplification opportunities | `the-improver` |
+| Domain                                                 | Reviewer                                  |
+| ------------------------------------------------------ | ----------------------------------------- |
+| General code review                                    | `the-diamantaire`                         |
+| Convention adherence (style, naming, project patterns) | `the-stickler`                            |
+| Accessibility (post-build review of shipped UI)        | `accessibility-agents:accessibility-lead` |
+| Test coverage and quality                              | `the-chemist`                             |
+| Documentation                                          | `the-chronicler`                          |
+| Refactor / simplification opportunities                | `the-improver`                            |
 
 Invoke specialists parallel where possible. Synthesize findings — not concatenate.
 
@@ -45,6 +45,7 @@ Three categories findings:
 - **💭 Nit** — optional improvement. No action required from loop. Save for next refactor pass.
 
 End with verdict line:
+
 - `ship` — no blockers, warnings acceptable
 - `fix-blockers-then-ship` — blockers exist but surgical fixes
 - `rethink` — approach wrong; findings indicate change need redesign, not patches

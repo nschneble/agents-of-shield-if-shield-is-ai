@@ -50,25 +50,25 @@ Looper cannot invoke subagents. Pre-build domain gates + post-build specialist r
 
 Pre-build gates required by domain:
 
-| Touching | Required gate |
-|---|---|
-| Web UI (HTML, JSX, CSS, .tsx, .vue, server-side templates) | `accessibility-agents:accessibility-lead` |
-| Color tokens, themes, contrast, CVD | `accessibility-agents:accessibility-lead` — pull per-bundle thresholds + palette before picking values |
-| Authentication, sessions, tokens, permissions | Security-framed review (use `the-diamantaire` with security framing) |
-| Database migration | Migration-safety review (Squawk + reviewer) |
-| Performance-sensitive code | Baseline measurement first |
+| Touching                                                   | Required gate                                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Web UI (HTML, JSX, CSS, .tsx, .vue, server-side templates) | `accessibility-agents:accessibility-lead`                                                              |
+| Color tokens, themes, contrast, CVD                        | `accessibility-agents:accessibility-lead` — pull per-bundle thresholds + palette before picking values |
+| Authentication, sessions, tokens, permissions              | Security-framed review (use `the-diamantaire` with security framing)                                   |
+| Database migration                                         | Migration-safety review (Squawk + reviewer)                                                            |
+| Performance-sensitive code                                 | Baseline measurement first                                                                             |
 
 Gate required + orchestrator did not pre-flight: STOP + produce hand-off report telling orchestrator (a) which gate to invoke, (b) what input to pass, (c) what output looper need to resume.
 
 Post-build qualitative review specialists (orchestrator invokes after looper's build):
 
-| Domain | Reviewer |
-|---|---|
-| General code review | `the-diamantaire` |
-| Convention adherence | `the-stickler` |
+| Domain                             | Reviewer                                  |
+| ---------------------------------- | ----------------------------------------- |
+| General code review                | `the-diamantaire`                         |
+| Convention adherence               | `the-stickler`                            |
 | Accessibility (UI changes shipped) | `accessibility-agents:accessibility-lead` |
-| Test coverage | `the-chemist` |
-| Documentation | `the-chronicler` |
+| Test coverage                      | `the-chemist`                             |
+| Documentation                      | `the-chronicler`                          |
 
 ## Orchestrator handoff format
 
