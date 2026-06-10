@@ -13,7 +13,7 @@ Two cases for specialist gate output:
 
 | Case                               | Build behavior                                                                                           |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Plan completed clean (no ESCALATE) | Proceed. Plan mechanized predictions cover deterministic surface; no specialist needed.                |
+| Plan completed clean (no ESCALATE) | Proceed. Plan mechanized predictions cover deterministic surface; no specialist needed.                  |
 | Plan emitted ESCALATE              | Brief MUST include `gate outputs` from specialist (orchestrator pre-flighted). Missing = STOP, escalate. |
 
 Specialist gates relevant when plan ESCALATE (orchestrator job, not build):

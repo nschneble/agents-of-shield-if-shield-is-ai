@@ -51,6 +51,7 @@ Non-empty output → commit:
    - HEREDOC body for multi-line
    - `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` line
 4. Commit:
+
    ```
    git commit -m "$(cat <<'EOF'
    <message body>
@@ -59,6 +60,7 @@ Non-empty output → commit:
    EOF
    )"
    ```
+
 5. Verify commit landed:
    ```
    git log -1 --format=%H
@@ -77,11 +79,11 @@ gh pr view --json number,url,state 2>/dev/null
 
 Three cases:
 
-| State                  | Action                                                                                          |
-| ---------------------- | ----------------------------------------------------------------------------------------------- |
-| Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                               |
-| Has merged / closed PR | Treat as "no PR" — proceed to Step 3 (closed PR may be unrelated history on this branch)        |
-| No PR found            | Proceed to Step 3                                                                               |
+| State                  | Action                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                        |
+| Has merged / closed PR | Treat as "no PR" — proceed to Step 3 (closed PR may be unrelated history on this branch) |
+| No PR found            | Proceed to Step 3                                                                        |
 
 ## Step 3: Create draft PR (only if no existing)
 
@@ -143,6 +145,7 @@ Pass body via HEREDOC to preserve format.
 Default: local commit only, no push. Orchestrator decides push timing per its protocol.
 
 If brief includes explicit `target.push: true`:
+
 - Branch tracks origin: `git push`
 - Branch untracked: `git push -u origin <branch>`
 
