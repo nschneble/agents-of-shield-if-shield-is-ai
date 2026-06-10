@@ -5,24 +5,31 @@ description: Fix bugs and implement features. Trigger when the user says "fix th
 
 Apply research output. Smallest change possible. Quality gates before done.
 
-## Pre-build domain gates (NON-NEGOTIABLE)
+## Pre-build inputs (NON-NEGOTIABLE)
 
-Read research report "Pre-build gates required" section. For EACH gate, looper agent (orchestrator) must invoke subagent via Task tool BEFORE this skill write code. Gate not satisfied? STOP, tell orchestrator invoke it.
+Build proceeds when `looper-plan` brief in hand. Plan absorbed the deterministic portion of pre-build domain gates (mechanized contract tests, Squawk dry-run, caller-graph grep, baseline measurement). Build consumes plan brief direct.
 
-Common gates and output:
+Two cases for specialist gate output:
 
-| Touching                                    | Gate                                                      | What it produces                                                                  |
-| ------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Web UI (.tsx, .jsx, .html, .vue, templates) | `accessibility-agents:accessibility-lead`                 | ARIA contract, semantic-HTML requirements, focus-management plan                  |
-| Color tokens, themes, contrast, CVD         | `accessibility-agents:accessibility-lead`                 | Per-bundle contrast thresholds, CVD-safe palette guidance, exclusion lists        |
-| Auth, sessions, tokens, permissions         | Security review (`the-diamantaire` with security framing) | Threat model, invariants to preserve                                              |
-| Database migration                          | Migration-safety review                                   | Squawk-clean rules, lock-timeout pattern, NOT VALID + VALIDATE constraint pattern |
+| Case                               | Build behavior                                                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Plan completed clean (no ESCALATE) | Proceed. Plan's mechanized predictions cover deterministic surface; no specialist needed.                |
+| Plan emitted ESCALATE              | Brief MUST include `gate outputs` from specialist (orchestrator pre-flighted). Missing = STOP, escalate. |
 
-No bypass via Bash. No proceed without gate output in hand. Orchestrator invoke; this skill enforce by refusing proceed without it.
+Specialist gates relevant when plan ESCALATEs (orchestrator's job, not build's):
+
+| Touching                                                         | Gate                                                      | What it produces                                                           |
+| ---------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Web UI (novel palette, brand-locked, rendering-context judgment) | `accessibility-agents:accessibility-lead`                 | ARIA contract, semantic-HTML requirements, focus-management plan           |
+| Color tokens (all recovery options exhausted)                    | `accessibility-agents:accessibility-lead`                 | Per-bundle contrast thresholds, CVD-safe palette guidance, exclusion lists |
+| Auth, sessions, tokens, permissions (threat model judgment)      | Security review (`the-diamantaire` with security framing) | Threat model, invariants to preserve                                       |
+| Database migration (concurrent-write semantics)                  | Migration-safety review                                   | Lock-timeout pattern, NOT VALID + VALIDATE constraint pattern              |
+
+No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP, escalate. This skill enforces by refusing proceed without `gate outputs` populated when plan brief flags escalation.
 
 ## Build procedure
 
-1. Confirm research report received AND pre-build gate outputs received (where required). Missing? STOP — ask orchestrator fill them.
+1. Confirm `looper-plan` brief in hand. If brief flagged ESCALATE, confirm `gate outputs` populated from orchestrator-fired specialist. Missing either → STOP, ask orchestrator fill them.
 2. Project use TDD (check CLAUDE.md)? Write failing tests FIRST.
 3. Smallest code change that satisfy spec. No bonus refactors, no unrelated cleanups, no defensive code for hypothetical futures. Three similar lines better than premature abstraction.
 4. New files: use `Write`. Modifications: use `Edit`. Do NOT use `cat > file` via Bash. Bash bypass project write-gates that exist for review.

@@ -31,34 +31,36 @@ All four must pass. Format first — per `[[feedback-improver-format]]`, format-
 ## Protocol
 
 1. **looper-research** — Read project context (CLAUDE.md, PRDs, surrounding code, memory). Pull authoritative domain refs via `WebFetch` (WCAG, MDN, framework docs — fetch, no cite from training). Challenge scope if pilot bad or bundle unrelated work.
-2. **looper-build** — Confirm pre-build domain gate outputs received from orchestrator (where required). Smallest change. Run format → lint → test → build before declaring done.
-3. **looper-verify** — Functional check. Change do what spec said? Exercise end-to-end where applicable (browser for UI, curl for API). For pure CSS/token plumbing, use cheaper triangulation path in `looper-verify`.
-4. **looper-review** — Qualitative review. Looper cannot invoke specialist subagents; escalate to orchestrator for any review domain needing `the-diamantaire`, `the-stickler`, `accessibility-lead`, etc. Categorize: blocker / warning / nit.
-5. **looper-learn** — Capture lessons. Save to memory, CLAUDE.md, or skill body per scope. Propose skill/agent edits if step failed in repeat-likely way. Brutal honesty required.
-6. **looper-pr** — Pre-flight verify + review BOTH passed, no blockers. Refuse PR otherwise. Draft, assigned `@me`, not ready-for-review.
+2. **looper-plan** — Convert research constraints into wave-specific brief: exact files, mechanized predictions (run contract tests dry against proposed values), risk register, recovery options pre-staged, exit criteria. Plan absorbs the deterministic portion of specialist judgment. If brief already contains `gate outputs` from a prior dispatch (orchestrator already fired specialist), skip plan and use those values direct.
+3. **looper-build** — Smallest change. Apply plan's recovery options when predicted failures hit. Run format → lint → test → build before declaring done.
+4. **looper-verify** — Functional check. Change do what spec said? Exercise end-to-end where applicable (browser for UI, curl for API). For pure CSS/token plumbing, use cheaper triangulation path in `looper-verify`.
+5. **looper-review** — Qualitative review. Looper cannot invoke specialist subagents; escalate to orchestrator for any review domain needing `the-diamantaire`, `the-stickler`, `accessibility-lead`, etc. Categorize: blocker / warning / nit.
+6. **looper-learn** — Capture lessons. Save to memory, CLAUDE.md, or skill body per scope. Propose skill/agent edits if step failed in repeat-likely way. Brutal honesty required.
+7. **looper-pr** — Pre-flight verify + review BOTH passed, no blockers. Refuse PR otherwise. Draft, assigned `@me`, not ready-for-review.
 
 ## Loop rules
 
-- Repeat 1–3 only on verify fail. Same root cause twice → STOP, report to orchestrator.
-- Repeat 4 only on reviewer-found blockers. New blockers keep appearing → STOP — change may need redesign, not patches.
-- Never skip 5 (learn). Successful runs make reusable lessons too.
-- Never silently sub for domain gate. Gate cannot fire (Task unavailable, specialist unreachable), say so + escalate. Do NOT do specialist's job + pretend gate ran.
+- Repeat 1–4 only on verify fail. Same root cause twice → STOP, report to orchestrator.
+- Repeat 5 only on reviewer-found blockers. New blockers keep appearing → STOP — change may need redesign, not patches.
+- Never skip 6 (learn). Successful runs make reusable lessons too.
+- Never silently sub for domain gate. Plan emits `ESCALATE` line OR gate cannot fire (Task unavailable, specialist unreachable) → say so + escalate. Do NOT do specialist's job + pretend gate ran.
+- Plan-stage escalation: plan emits `ESCALATE: <gate>` → STOP after plan, hand back to orchestrator with escalation request. Orchestrator invokes specialist, re-dispatches with `gate outputs` filled in; resume protocol at step 3 (build).
 
 ## Specialist gates (orchestrator-owned)
 
-Looper cannot invoke subagents. Pre-build domain gates + post-build specialist reviews orchestrator's job. Looper consume output as input.
+Looper cannot invoke subagents. Pre-build specialist gates fired by orchestrator when plan emits `ESCALATE: <gate>`. Plan absorbs the deterministic portion of each domain check (mechanized contract tests, Squawk dry-run, caller-graph grep, baseline measurement). Specialists invoked only for the residual judgment plan cannot mechanize.
 
-Pre-build gates required by domain:
+Pre-build escalations by domain:
 
-| Touching                                                   | Required gate                                                                                          |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Web UI (HTML, JSX, CSS, .tsx, .vue, server-side templates) | `accessibility-agents:accessibility-lead`                                                              |
-| Color tokens, themes, contrast, CVD                        | `accessibility-agents:accessibility-lead` — pull per-bundle thresholds + palette before picking values |
-| Authentication, sessions, tokens, permissions              | Security-framed review (use `the-diamantaire` with security framing)                                   |
-| Database migration                                         | Migration-safety review (Squawk + reviewer)                                                            |
-| Performance-sensitive code                                 | Baseline measurement first                                                                             |
+| Touching                                                   | Plan handles (mechanized)                                                            | Escalate to specialist when                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Web UI (HTML, JSX, CSS, .tsx, .vue, server-side templates) | Contract test dry-run (axe, color contrast)                                          | Novel palette, brand-locked constraint, rendering-context mismatch → `accessibility-agents:accessibility-lead` |
+| Color tokens, themes, contrast, CVD                        | `bundles.contrast.test.ts` + `bundles.distinguishability.test.ts` dry-run via culori | All recovery options fail mechanized check → `accessibility-agents:accessibility-lead`                         |
+| Authentication, sessions, tokens, permissions              | Caller-graph grep, public API surface inventory                                      | Threat-model judgment, external client compatibility → `the-diamantaire` (security framing)                    |
+| Database migration                                         | `npm run lint:migrations` (Squawk) dry-run                                           | Concurrent-write semantics, multi-step migration sequencing → migration-safety review                          |
+| Performance-sensitive code                                 | Baseline measurement                                                                 | Regression budget judgment → orchestrator-defined reviewer                                                     |
 
-Gate required + orchestrator did not pre-flight: STOP + produce hand-off report telling orchestrator (a) which gate to invoke, (b) what input to pass, (c) what output looper need to resume.
+Plan emits ESCALATE without prior orchestrator gate pre-flight: STOP + produce hand-off report telling orchestrator (a) which gate to invoke, (b) what input to pass, (c) what output looper need to resume at step 3 (build).
 
 Post-build qualitative review specialists (orchestrator invokes after looper's build):
 
@@ -75,15 +77,16 @@ Post-build qualitative review specialists (orchestrator invokes after looper's b
 Receive brief, treat sections as authoritative inputs (not hints to override):
 
 - **`scope`** — what loop solving. Match impl; no exceed.
-- **`gate outputs`** — specialist results pre-flighted by orchestrator (palette tables, threat models, contrast thresholds, etc.). Plug in direct; no re-derive.
+- **`gate outputs`** (optional) — specialist results pre-flighted by orchestrator on prior dispatch (palette tables, threat models, contrast thresholds). Present → skip plan step, use values direct. Absent → run plan step.
 - **`constraints`** — write-gates, file paths to avoid, scope ceilings, PR directives.
 - **`target`** — branch name, PR number if updating existing, where to push.
 
 Hand-back to orchestrator:
 
-- **`shipped`** — files changed + summary per file
+- **`shipped`** — files changed + summary per file (empty if STOP fired before build)
 - **`deferred`** — items out of scope, with reason
-- **`gates needed post-build`** — specialists orchestrator should run
+- **`gate needed pre-build`** — populated when plan emits ESCALATE; specifies (a) gate to invoke, (b) input to pass, (c) output looper needs to resume at step 3. Orchestrator re-dispatches with `gate outputs` populated.
+- **`gates needed post-build`** — specialists orchestrator should run after review (crew pass)
 - **`learn`** — new memories / skill edits captured this run
 - **`flags`** — anything worth surfacing that you didn't act on
 
@@ -91,7 +94,8 @@ Hand-back to orchestrator:
 
 Stop + report to orchestrator when:
 
-- Required pre-build gate not pre-flighted → escalate with hand-off report
+- Plan emits `ESCALATE: <gate>` → escalate with `gate needed pre-build` hand-back; do not proceed to build
+- Plan stops on its own (research ambiguous, mechanized infra missing, all recovery options fail) → bubble up plan's stop reason
 - Verify fails twice, same root cause
 - Review surfaces blocker requiring architectural rethink
 - Research surfaces conflicting authoritative sources, no clear arbiter (after `WebFetch` confirms — no escalate before checking)
