@@ -35,6 +35,26 @@ Each domain plan support, run deterministic checks BEFORE handoff to build. Each
 
 Plan run check, capture output, cite. NEVER substitute judgment for unrun checks.
 
+### Alias-chain trace for retirement waves
+
+Retiring a CSS variable, framework token, or any other indirection target requires tracing every CONSUMER of that target — including aliases introduced by prior waves. Per-theme cascade resolution that flowed through the retiring token will collapse to whatever the orchestrator-introduced `:root` default is once per-theme declarations vanish.
+
+Concrete trap from wave 39 / wave 40 of the linklater theme refactor:
+
+- Wave 39 added `--page-gradient-{from,via,to}: var(--text-muted)` etc. at `:root`. Per-theme cascades resolve the alias against each theme's own `--text-muted` declaration. Per-theme tinting preserved with zero per-theme work.
+- Wave 40 brief retired `--text` / `--text-muted` from per-theme files AND replaced `:root` aliases with literal hex. Effect: every theme's gradient collapses to the same `:root` default hex pair. Wave-39 design intent silently lost.
+
+For any retirement wave brief, plan MUST:
+
+1. `git grep "var\(--TOKEN\)"` to enumerate every consumer
+2. For each consumer, trace whether the consumer is itself a token (alias) — if so, every downstream consumer of THAT alias must also be considered
+3. Walk the chain until no consumer is itself a token
+4. Choose explicitly between two paths per retirement:
+   - **Flatten:** Accept the collapse. All downstream resolutions paint the single `:root` default. Cheaper but visually uniform.
+   - **Carry-forward:** Push the resolved values down into per-theme overrides. Preserves per-theme paint. Mechanical (~3 lines × N themes × M modes) but the right call when design intent depends on per-theme variation.
+
+Brief MUST surface the choice. Don't claim "no semantic change" when there is one.
+
 ### Rendering-context check for contrast-pair claims
 
 Any mechanized check that asserts a contrast pair (`token-A vs token-B ≥ ratio`) MUST first verify what actually paints the edge in consumer code. The same visual separation can come from:
