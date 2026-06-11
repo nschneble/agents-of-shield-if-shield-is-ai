@@ -1,6 +1,4 @@
-# 🛡 Agents of S.H.I.E.L.D.
-
-(if S.H.I.E.L.D. is AI)
+# 🛡 Agents of S.H.I.E.L.D. (if S.H.I.E.L.D. is AI)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
