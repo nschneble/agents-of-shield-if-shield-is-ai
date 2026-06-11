@@ -35,6 +35,24 @@ Each domain plan support, run deterministic checks BEFORE handoff to build. Each
 
 Plan run check, capture output, cite. NEVER substitute judgment for unrun checks.
 
+### Grep authority: use `git grep`, not `grep -r`
+
+Any mechanized check that involves "find every consumer of X" or "verify zero consumers of Y" MUST use `git grep`, not `grep -r --include="*.{ext1,ext2}"`. Reasons:
+
+- Bash brace expansion does NOT fire inside quoted strings. `--include="*.{tsx,ts,html}"` passes the literal string `*.{tsx,ts,html}` to grep, which matches nothing — silently scoping the search to zero files and returning a false zero.
+- `git grep` respects `.gitignore` automatically, skipping `node_modules`, `dist`, `.claude/worktrees/`, and other agent-spawned trees that pollute results.
+- `git grep` defaults to ignoring binary files and respects the repo's normalization.
+
+Pattern to use:
+
+```
+git grep -nE "var\(--TOKEN\b" -- 'apps/web/src/**/*.tsx' 'apps/web/src/**/*.ts' 'apps/web/index.html'
+```
+
+Multiple extensions via repeated pathspecs (single-quoted), not via brace expansion.
+
+False-zero consumer claims have shipped broken retirement waves before — plan-stage STOP fires per `[[feedback-verify-upstream-gate-claims]]`, but the cheaper failsafe is to author the grep correctly in the first place. Mechanized predictions section MUST include the actual `git grep` command run + raw output, not paraphrased "verified zero consumers."
+
 ### When no mechanized check applies
 
 Some waves no match any domain — PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all six output sections, but mechanized predictions section become:

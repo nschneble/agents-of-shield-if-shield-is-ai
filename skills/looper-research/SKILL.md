@@ -12,6 +12,7 @@ Produce structured research report. Give looper-plan and looper-build everything
 - Read surrounding code: file being modified, its imports, its callers, its tests
 - Check `package.json` for actual installed framework versions BEFORE reference API/syntax. Training-data version assumptions break (Tailwind v3 vs v4 = recurring trap).
 - Search project memory at `~/.claude/projects/<project>/memory/` — read `MEMORY.md` index, then any relevant `feedback-*` / `project-*` / `reference-*` entries.
+- Caller/consumer surveys MUST use `git grep` — NOT `grep -r --include="*.{ext1,ext2}"` (bash brace expansion fails inside quoted strings, returning silent false zeros). Same rule applies to any "verify zero consumers" claim that lands in the research report. See `looper-plan` "Grep authority" for the canonical pattern.
 
 ## Layer 2: Authoritative domain references
 
