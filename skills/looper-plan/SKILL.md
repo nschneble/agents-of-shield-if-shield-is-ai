@@ -35,6 +35,20 @@ Each domain plan support, run deterministic checks BEFORE handoff to build. Each
 
 Plan run check, capture output, cite. NEVER substitute judgment for unrun checks.
 
+### Rendering-context check for contrast-pair claims
+
+Any mechanized check that asserts a contrast pair (`token-A vs token-B ≥ ratio`) MUST first verify what actually paints the edge in consumer code. The same visual separation can come from:
+
+- `border-[var(--TOKEN)]` — token-A IS the contract subject; assertion is real
+- `box-shadow` / a shadow utility (`border-shadow`, ring, drop-shadow) — there is NO WCAG pair; visual lift only
+- Background-on-background adjacency — perceptual separation, not SC 1.4.11
+
+`git grep` the consumer code for `border-\[var\(--TOKEN\)\]` BEFORE asserting `--TOKEN` against anything. If the consumer paints `border-shadow` or `box-shadow`, the contract subject is wrong — re-frame as perceptual-separation (label as "card-on-X lift" or similar, NOT SC 1.4.11) or drop the contract.
+
+Example trap: a brief asserting `--page-gradient-stop vs --mount-border ≥ 3:1` is unsatisfiable if consumer cards use `border-shadow`. The card edge is shadow, not `--mount-border` — `--mount-border` is never painted on those cards. The contract subject is fictional.
+
+When mechanizing perceptual-separation (background-on-background, shadow-edge-on-X), label it correctly. Don't borrow SC numbers it doesn't earn.
+
 ### Grep authority: use `git grep`, not `grep -r`
 
 Any mechanized check that involves "find every consumer of X" or "verify zero consumers of Y" MUST use `git grep`, not `grep -r --include="*.{ext1,ext2}"`. Reasons:
