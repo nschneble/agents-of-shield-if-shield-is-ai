@@ -7,7 +7,10 @@
 **Trigger:** "Fix this bug" or "implement this feature"
 
 Apply the plan brief as the smallest possible change. Quality gates before
-done. **Pre-build specialist gates are non-negotiable but invoked only when
+done. Confirms the rung plan named. If rung 6 (custom) without
+justification, stops and sends back to planning. If build reveals a lower
+rung that satisfies the requirement, takes it and notes the downgrade.
+**Pre-build specialist gates are non-negotiable but invoked only when
 plan emits `ESCALATE`.** Plan absorbs the deterministic portion of each
 domain check (mechanized contract tests, Squawk dry-run, caller-graph grep,
 baseline measurement). Specialists invoked by the orchestrator only for the
@@ -59,9 +62,10 @@ skill definitions for behavioral constraints.
 **Trigger:** "Plan this wave", "spec the wave", or "what's the brief for this change?"
 
 Tactical brief slotted between research and build. Converts research's
-abstract constraints into a wave-specific contract: exact files,
-mechanized predictions (run contract tests dry against proposed values),
-risk register, recovery options pre-staged, exit criteria. Mechanizes the
+abstract constraints into a wave-specific contract: exact files, **named
+rung** (1=YAGNI → 6=custom; latter requires justification), mechanized
+predictions (run contract tests dry against proposed values), risk
+register, recovery options pre-staged, exit criteria. Mechanizes the
 deterministic portion of specialist judgment so the loop stays autonomous
 unless real judgment is needed. Escalates the residual via explicit
 `ESCALATE: <gate>` lines that the orchestrator routes to specialists

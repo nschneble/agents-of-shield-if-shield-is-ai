@@ -53,7 +53,9 @@ Praises genuinely good decisions.
 
 Refactoring specialist. Surgical, behavior-preserving. DRY but not barren.
 No god files. Hunts for drift between alike components and enforces UI
-fidelity across pages with alike content.
+fidelity across pages with alike content. Walks the **replace, don't
+rebuild** ladder before reshaping custom code: YAGNI → stdlib → platform →
+existing dep → one-liner → minimal custom.
 
 ## The Looper
 
@@ -72,9 +74,11 @@ research input.
 - **Tools:** `Bash, Edit, Read, Write, Task`
 - **When:** When asked to run a desloppify code-quality pass
 
-[Desloppify](https://github.com/peteromallet/desloppify) pass operator. One
-portion at a time: **scan, fix top cluster, rescan, stop.** Never chases
-the score. Hands the tray back before the next portion.
+[Desloppify](https://github.com/peteromallet/desloppify) wave operator.
+Detects project shape and language at invocation. Runs waves: **scan → fix
+clusters → rescan**, looping while score climbs and cluster cap holds.
+Score drop → revert. UI clusters gated through
+`accessibility-agents:accessibility-lead`. Sub-projects run sequentially.
 
 ## The Stickler
 
@@ -90,12 +94,13 @@ class order, testing conventions, and accessibility attributes.
 
 - **File:** `agents/the-turncoat.md`
 - **Tools:** `Bash, Edit, Read, Write`
-- **When:** When agents feel slow, verbose, or over-privileged
+- **When:** When agents or skills feel verbose or over-privileged
 
-Audits and streamlines other agents. Identifies bloat, redundant
+Audits and streamlines other agents AND skills. Identifies bloat, redundant
 instructions, unnecessary tool access, and stale guidance contradicting
-current conventions. Proposes all rewrites before applying. Watches for
-memory-as-behavioral-fix anti-patterns.
+current conventions. Applies the ponytail lens (lowest-viable rung) when
+auditing agents that shape code. Proposes all rewrites before applying.
+Watches for memory-as-behavioral-fix anti-patterns.
 
 ## The Wordsmith
 
@@ -107,7 +112,10 @@ Creative engine. Handles the full range of components, modules, endpoints,
 pages, and full scaffolds. Always researches first. For large features,
 writes a PRD before scaffolding. TDD throughout. Quality gates include
 tests, lint, no god files, proper naming conventions, barrel index,
-accessible UI, and lean DB calls.
+accessible UI, and lean DB calls. **Minimum-viable bias:** walks the ladder
+(YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)
+before code; richer solutions need a named requirement (perf, a11y,
+security, data-loss, trust-boundary).
 
 ---
 
