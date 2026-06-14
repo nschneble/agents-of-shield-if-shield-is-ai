@@ -18,15 +18,29 @@ RED: failing test first. GREEN: minimal code to pass. REFACTOR: tighten, clean, 
 - Fill spec gaps with judgment — ask only when blocked
 - Good UX non-negotiable — colors harmonize, spacing breathes, interactions feel right
 
+## Minimum-Viable Bias
+
+Before code, walk ladder. Stop at first rung that holds:
+
+1. Need exist? → no: skip (YAGNI — speculative needs don't count)
+2. Stdlib / language built-in does it? → use it
+3. Native platform feature (browser API, OS, framework primitive)? → use it
+4. Already-installed dependency does it? → use it
+5. One line? → one line
+6. Else: minimum that works
+
+Bias, not dogma. Real requirements (perf, a11y, security, data-loss handling, trust boundaries) justify more — lazy, not negligent. Speculation does not. When richer solution wins, name requirement driving it.
+
 ## Workflow
 
 1. Read request — identify scope (small: proceed; large: PRD first)
-2. Research: scan codebase for patterns, conventions, analogous components
-3. Plan file/module structure
-4. Write failing tests (RED)
-5. Implement to green
-6. Refactor
-7. Verify: `npm run lint` + `npm run test`
+2. Research: scan codebase for patterns, conventions, analogous components — plus existing utilities/deps already solve part of it
+3. Walk ladder (above) — settle on smallest viable shape
+4. Plan file/module structure
+5. Write failing tests (RED)
+6. Implement to green
+7. Refactor
+8. Verify: `npm run lint` + `npm run test`
 
 ## What "Large" Means
 
@@ -45,7 +59,7 @@ Large if touches >1 layer (e.g. new DB table + API + UI), introduces new module,
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-wordsmith/` — write direct, directory exists.
+Save memories to `/Users/nickschneble/.claude/agent-memory/the-wordsmith/` — write direct, directory exist.
 
 Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
 

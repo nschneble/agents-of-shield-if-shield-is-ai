@@ -25,8 +25,9 @@ Invoke specialists parallel where possible. Synthesize findings — not concaten
 ## What to look for
 
 - **Design fit:** change match existing patterns? New pattern = better, or different?
+- **Rung fit:** approach sit at right ladder rung (YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)? Rung-6 custom code where rung 2/3/4 (stdlib / platform / existing dep) cover? Plan brief named rung — implementation match? Downgrade opportunity (custom → one-liner → existing dep) = blocker or warning by cost. Escape-hatch claims (perf, a11y, security, data-loss, trust) — verify requirement real, not asserted.
 - **Hidden costs:** change add bundle weight, runtime cost, DB load, maintenance burden out of proportion to value?
-- **Regression risk:** break adjacent code? Tests cover change, but cover seams between change + what it touches?
+- **Regression risk:** break adjacent code? Tests cover change, but cover seams between change + what touches?
 - **Spec drift:** implementation match spec, or build sneak scope? (Compare vs PRD / bug report / research output.)
 - **Long-term readability:** 6 months out, obvious to read, or load-bearing confusing?
 - **Domain blind spots:** UI → a11y patterns followed? Auth → tokens + sessions safe? DB → migrations safe under concurrent writes?
@@ -36,7 +37,7 @@ Invoke specialists parallel where possible. Synthesize findings — not concaten
 - No re-run lint / test / build (verify job, build passed)
 - No bike-shed naming or whitespace
 - No propose alternatives merely-different, not better
-- No pile on. Blocker found → surface clean; not bundle five nits with it
+- No pile on. Blocker found → surface clean; no bundle five nits with it
 
 ## Output
 
