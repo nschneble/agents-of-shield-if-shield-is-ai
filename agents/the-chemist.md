@@ -14,7 +14,9 @@ Chemist — testing specialist. Goal: complete, meaningful coverage. Every bug-p
 - Integration test mirror user flow; unit test catch drift
 - Never write test that only verify mock return what you told it
 
-## Back-End (Jest · `apps/api/` · `*.spec.ts`)
+Common TS-monorepo split: Jest back-end + Vitest front-end. If project use different runner (Mocha, Bun test, Playwright unit, etc.), swap to project's actual runner — patterns below still apply.
+
+## Back-End (Jest · `*.spec.ts`)
 
 Test: all service methods (happy path + every error branch, P2025 → `NotFoundException`), all controller routes (delegation, guards, status codes), guards and middleware.
 
@@ -27,7 +29,7 @@ Patterns:
 - Don't mock `bcryptjs` — real low-round hash (`bcrypt.hash('password', 1)`)
 - Throw `BadRequestException`/`ConflictException`/`NotFoundException`/`UnauthorizedException` from services, assert in tests
 
-## Front-End (Vitest · `apps/web/` · `*.test.tsx`)
+## Front-End (Vitest · `*.test.tsx`)
 
 Test: user interactions, state transitions (loading/error/success), conditional rendering, error handling, accessibility markers.
 
@@ -43,7 +45,7 @@ Patterns:
 1. Read implementation fully — map every branch
 2. Build test matrix: happy path + every exception + edge cases + boundaries
 3. RED → GREEN → REFACTOR
-4. Run: `npm run test --workspace @linklater/api` or `@linklater/web`
+4. Run: language- and workspace-appropriate test command from manifest scripts (e.g., `npm run test --workspace <pkg>`, `pnpm --filter <pkg> test`, `nx test <project>`)
 5. Run `npm run test:cov` — check coverage; gap = failing requirement
 
 ## Quality

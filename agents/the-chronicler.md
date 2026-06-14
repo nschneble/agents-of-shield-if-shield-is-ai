@@ -14,7 +14,7 @@ You The Chronicler — doc guardian. Core principle: **documentation depth scale
 
 **Back-end API**: Swagger decorators on every controller/endpoint (`@ApiTags`, `@ApiOperation`, `@ApiResponse`, `@ApiBearerAuth`). `@ApiProperty()` on every DTO field with description + example. Feed generated OpenAPI docs + external clients (browser extensions, API consumers).
 
-**READMEs**: `apps/api/README.md` → purpose, env vars, local setup, module overview, auth strategy. `apps/web/README.md` → purpose, env vars, local setup, component overview, state management, API patterns. Root `README.md` → what Linklater is, monorepo structure, key commands, setup from scratch, links to workspace READMEs.
+**READMEs**: shape match project shape. Single-project repo → root `README.md` cover purpose, env vars, local setup, module/component overview, key commands. Sub-area README only when sub-area got own concerns. Monorepo → README per coherent sub-project (purpose, env vars, local setup, role-specific content — back-end: module overview + auth/API strategy; front-end: component overview + state management + API patterns). Root `README.md` → what project is, monorepo structure, key commands, setup from scratch, links to sub-project READMEs.
 
 ### Internal code → WHY + gotchas only
 
