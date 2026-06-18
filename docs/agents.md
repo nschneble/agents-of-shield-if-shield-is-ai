@@ -45,6 +45,20 @@ Scores each finding 0–100 confidence and discards below 80 so it doesn't
 get caught bike-shedding. Quotes CLAUDE.md verbatim when invoking rules.
 Praises genuinely good decisions.
 
+## The Ghostwriter
+
+- **File:** `agents/the-ghostwriter.md`
+- **Tools:** `Bash, Edit, Read, Write`
+- **When:** When drafting new user-facing text or before committing
+
+Voice and tone guardian. Makes generated text read like Nick wrote it
+across UI copy, error and toast messages, commit subjects, branch names,
+PR titles, and code comments. Owns **voice**, not naming conventions
+(those stay in CLAUDE.md). Bans em-dashes and AI-slop vocabulary, enforces
+real ellipses and straight quotes, and kills commit-linked comment
+archaeology. Drafts 2-3 options in his register so there's nothing to
+rewrite.
+
 ## The Improver
 
 - **File:** `agents/the-improver.md`
@@ -121,8 +135,9 @@ security, data-loss, trust-boundary).
 
 ## "The Crew"
 
-The Auditor, Chemist, Chronicler, Diamantaire, Improver, and Stickler are
-the six **existing-code agents** invoked on code that already exists.
+The Auditor, Chemist, Chronicler, Diamantaire, Ghostwriter, Improver, and
+Stickler are the seven **existing-code agents** invoked on code that
+already exists.
 
 If you run them in series (instead of parallel) then favor this order:
 
@@ -130,8 +145,9 @@ If you run them in series (instead of parallel) then favor this order:
 2. Stickler
 3. Auditor
 4. Chemist
-5. Chronicler
-6. Diamantaire
+5. Ghostwriter
+6. Chronicler
+7. Diamantaire
 
 The Wordsmith builds new things. The Looper runs end-to-end bugfix and
 feature flows via looper skills. The Lunchlady runs incremental
