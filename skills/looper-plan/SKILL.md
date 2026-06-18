@@ -9,7 +9,7 @@ Slot between research and build. Convert research constraints into wave-specific
 
 Research surface constraints abstract ("WCAG 1.4.11 needs 3:1 borders against bundle-bg"). Build need concrete ("THIS wave, 4 token pairs touched, predicted contrast value each, 2 fail + recovery option each").
 
-No plan = build guess (surface palette right, miss contract math) or orchestrator invoke specialist subagent per wave (slow, block autonomy). Plan absorb deterministic portion of specialist judgment into runnable check — keep loop autonomous unless real judgment need.
+No plan = build guess (surface palette right, miss contract math) or orchestrator invoke specialist subagent per wave (slow, block autonomy). Plan absorb deterministic portion of specialist judgment into runnable check; keep loop autonomous unless real judgment need.
 
 ## Inputs
 
@@ -17,18 +17,18 @@ No plan = build guess (surface palette right, miss contract math) or orchestrato
 2. Project CLAUDE.md + nested `.claude/CLAUDE.md`
 3. Project memory at `~/.claude/projects/<project>/memory/`
 4. PRD if exist (default `local/prds/<feature-slug>.md`, else memory `reference-prds`)
-5. Current branch state — `git status`, `git diff HEAD`, recent commits in scope
+5. Current branch state: `git status`, `git diff HEAD`, recent commits in scope
 
 ## Mechanized contract checks (the big idea)
 
-Each domain plan support, run deterministic checks BEFORE handoff to build. Each check answer yes/no with citations — no judgment, no vibes.
+Each domain plan support, run deterministic checks BEFORE handoff to build. Each check answer yes/no with citations; no judgment, no vibes.
 
 | Domain                           | Mechanized check                                                                                                                                                                                                                                   | What it answers                                                                                        |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Color tokens / contrast / CVD    | Dry-run contract tests (`bundles.contrast.test.ts`, `bundles.distinguishability.test.ts`) against proposed token values via culori. WCAG 1.4.3 / 1.4.11 / CVD distinguishability.                                                                  | Will proposed palette pass contract? Which pairs fail? By how much?                                    |
 | Component refactor / migration   | Grep tripwire tests (`chrome-token-migration.test.ts`-style) against proposed file list. Confirm MIGRATED_FILES entries.                                                                                                                           | Does the wave reach the tripwire? Any files miss the registration?                                     |
 | Database migration               | `npm run lint:migrations` (Squawk) dry-run against proposed SQL                                                                                                                                                                                    | Squawk-clean? Which rules fire?                                                                        |
-| Auth / token / permission        | Caller graph via grep — list every consumer of touched API surface                                                                                                                                                                                 | What public contracts shift? Any external clients (extensions, PATs)?                                  |
+| Auth / token / permission        | Caller graph via grep: list every consumer of touched API surface                                                                                                                                                                                 | What public contracts shift? Any external clients (extensions, PATs)?                                  |
 | Performance-sensitive code       | Baseline measurement before change (existing perf test or one-shot benchmark)                                                                                                                                                                      | What is the floor we cannot regress past?                                                              |
 | Test gap (any domain)            | Coverage check on touched files; compare to suite-wide coverage                                                                                                                                                                                    | Tests cover the change? Coverage drop indicates gap.                                                   |
 | Documentation / PR body / config | Markdownlint dry-run, grep for stale references (project file inventory vs claimed inventory in doc), heading-hierarchy check, link integrity (`markdown-link-check`), config validator dry-run (`eslint --print-config`, `gh workflow run --dry`) | Doc claims match current state? Stale references remain? Config parses + downstream consumers read it? |
@@ -37,7 +37,7 @@ Plan run check, capture output, cite. NEVER substitute judgment for unrun checks
 
 ### Alias-chain trace for retirement waves
 
-Retiring CSS variable, framework token, or any indirection target requires tracing every CONSUMER of target — including aliases from prior waves. Per-theme cascade resolution that flowed through retiring token will collapse to whatever orchestrator-introduced `:root` default is once per-theme declarations vanish.
+Retiring CSS variable, framework token, or any indirection target requires tracing every CONSUMER of target, including aliases from prior waves. Per-theme cascade resolution that flowed through retiring token will collapse to whatever orchestrator-introduced `:root` default is once per-theme declarations vanish.
 
 Concrete trap from wave 39 / wave 40 of linklater theme refactor:
 
@@ -47,7 +47,7 @@ Concrete trap from wave 39 / wave 40 of linklater theme refactor:
 Any retirement wave brief, plan MUST:
 
 1. `git grep "var\(--TOKEN\)"` enumerate every consumer
-2. Each consumer, trace whether consumer is itself token (alias) — if so, every downstream consumer of THAT alias must also be considered
+2. Each consumer, trace whether consumer is itself token (alias); if so, every downstream consumer of THAT alias must also be considered
 3. Walk chain until no consumer is itself token
 4. Choose explicitly between two paths per retirement:
    - **Flatten:** Accept collapse. All downstream resolutions paint single `:root` default. Cheaper but visually uniform.
@@ -59,13 +59,13 @@ Brief MUST surface choice. Don't claim "no semantic change" when there is one.
 
 Any mechanized check that assert contrast pair (`token-A vs token-B ≥ ratio`) MUST first verify what actually paints edge in consumer code. Same visual separation come from:
 
-- `border-[var(--TOKEN)]` — token-A IS contract subject; assertion real
-- `box-shadow` / shadow utility (`border-shadow`, ring, drop-shadow) — NO WCAG pair; visual lift only
-- Background-on-background adjacency — perceptual separation, not SC 1.4.11
+- `border-[var(--TOKEN)]`: token-A IS contract subject; assertion real
+- `box-shadow` / shadow utility (`border-shadow`, ring, drop-shadow): NO WCAG pair; visual lift only
+- Background-on-background adjacency: perceptual separation, not SC 1.4.11
 
-`git grep` consumer code for `border-\[var\(--TOKEN\)\]` BEFORE asserting `--TOKEN` against anything. If consumer paints `border-shadow` or `box-shadow`, contract subject wrong — re-frame as perceptual-separation (label "card-on-X lift" or similar, NOT SC 1.4.11) or drop contract.
+`git grep` consumer code for `border-\[var\(--TOKEN\)\]` BEFORE asserting `--TOKEN` against anything. If consumer paints `border-shadow` or `box-shadow`, contract subject wrong; re-frame as perceptual-separation (label "card-on-X lift" or similar, NOT SC 1.4.11) or drop contract.
 
-Example trap: brief asserting `--page-gradient-stop vs --mount-border ≥ 3:1` unsatisfiable if consumer cards use `border-shadow`. Card edge is shadow, not `--mount-border` — `--mount-border` never painted on those cards. Contract subject fictional.
+Example trap: brief asserting `--page-gradient-stop vs --mount-border ≥ 3:1` unsatisfiable if consumer cards use `border-shadow`. Card edge is shadow, not `--mount-border`; `--mount-border` never painted on those cards. Contract subject fictional.
 
 When mechanizing perceptual-separation (background-on-background, shadow-edge-on-X), label correctly. Don't borrow SC numbers it doesn't earn.
 
@@ -73,7 +73,7 @@ When mechanizing perceptual-separation (background-on-background, shadow-edge-on
 
 Any mechanized check involving "find every consumer of X" or "verify zero consumers of Y" MUST use `git grep`, not `grep -r --include="*.{ext1,ext2}"`. Reasons:
 
-- Bash brace expansion does NOT fire inside quoted strings. `--include="*.{tsx,ts,html}"` pass literal string `*.{tsx,ts,html}` to grep, matches nothing — silently scope search to zero files, return false zero.
+- Bash brace expansion does NOT fire inside quoted strings. `--include="*.{tsx,ts,html}"` pass literal string `*.{tsx,ts,html}` to grep, matches nothing; silently scope search to zero files, return false zero.
 - `git grep` respects `.gitignore` automatically, skip `node_modules`, `dist`, `.claude/worktrees/`, other agent-spawned trees that pollute results.
 - `git grep` defaults to ignoring binary files and respects repo normalization.
 
@@ -85,15 +85,15 @@ git grep -nE "var\(--TOKEN\b" -- 'apps/web/src/**/*.tsx' 'apps/web/src/**/*.ts' 
 
 Multiple extensions via repeated pathspecs (single-quoted), not via brace expansion.
 
-False-zero consumer claims shipped broken retirement waves before — plan-stage STOP fires per `[[feedback-verify-upstream-gate-claims]]`, but cheaper failsafe is author grep correctly first place. Mechanized predictions section MUST include actual `git grep` command run + raw output, not paraphrased "verified zero consumers."
+False-zero consumer claims shipped broken retirement waves before; plan-stage STOP fires per `[[feedback-verify-upstream-gate-claims]]`, but cheaper failsafe is author grep correctly first place. Mechanized predictions section MUST include actual `git grep` command run + raw output, not paraphrased "verified zero consumers."
 
 ### When no mechanized check applies
 
-Some waves match no domain — PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all six output sections, but mechanized predictions section become:
+Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all six output sections, but mechanized predictions section become:
 
-> No mechanized check applies — wave touches `<change kind>`, not source under contract-tested domain. Risk register relies on `judgment-required` items only.
+> No mechanized check applies; wave touches `<change kind>`, not source under contract-tested domain. Risk register relies on `judgment-required` items only.
 
-Honest output, not fallback. Other sections (scope, constraints, risk register, recovery options, exit criteria) still mechanize what can — e.g. PR body refresh, grep body against current deferred-items inventory; README rewrite, run markdown lint; config tweak, run config-schema validation.
+Honest output, not fallback. Other sections (scope, constraints, risk register, recovery options, exit criteria) still mechanize what can, e.g. PR body refresh, grep body against current deferred-items inventory; README rewrite, run markdown lint; config tweak, run config-schema validation.
 
 ## Output (hand to looper-build)
 
@@ -103,19 +103,19 @@ Structured brief, six sections:
 
    - Files touched (exact paths) OR change kind if no files touched (`PR body`, `GitHub release`, `external config`, `documentation`)
    - Regions within file (line ranges or function names) when narrower than whole-file
-   - Blast radius estimate. Code waves: files + lines + downstream consumers. Non-file waves: user-visible impact surface (e.g. "PR description on github.com — visible to reviewers + repo browsers", "release notes — visible on releases page + automated changelog feeds").
+   - Blast radius estimate. Code waves: files + lines + downstream consumers. Non-file waves: user-visible impact surface (e.g. "PR description on github.com: visible to reviewers + repo browsers", "release notes: visible on releases page + automated changelog feeds").
 
 2. **Constraints (cited)**
 
-   - Each constraint = one line: `RULE — SOURCE (file:line or URL)`. No paraphrase, cite original
-   - Example: `state-pair CVD JND >= 10 (delta-E 2000) — bundles.distinguishability.test.ts:42`
+   - Each constraint = one line: `RULE – SOURCE (file:line or URL)`. No paraphrase, cite original
+   - Example: `state-pair CVD JND >= 10 (delta-E 2000) – bundles.distinguishability.test.ts:42`
 
 3. **Rung (the ladder, named)**
 
    State minimum-viable rung chosen approach sits at, and why:
    1. YAGNI (skip) 2. Stdlib 3. Platform/framework native 4. Existing installed dep 5. One-liner 6. Minimal custom
    - Rung 6 (custom) requires named justification: perf, a11y, security, data-loss, trust-boundary, OR real requirement from research that no lower rung satisfies. Cite requirement (`research §X` or `file:line`).
-   - One line: `Rung N — <approach in 5 words> — <why this rung>`.
+   - One line: `Rung N – <approach in 5 words> – <why this rung>`.
    - Bias, not rule. Lower rung wins ties; escape hatches must be named.
 
 4. **Mechanized predictions**
@@ -147,7 +147,7 @@ Mechanizable checks cover most cases. Some categories ALWAYS escalate even when 
 - **Rendering-context mismatch.** Mechanized check assume import location = host bundle. Shared components render under DIFFERENT host bundle than import directory. Plan flag suspicion; specialist judge.
 - **Public API contract changes** (auth surface, extension API). Mechanized check catch caller list; specialist review threat model.
 
-When escalation need, plan emit one line per gate: `ESCALATE: <gate name> — <input to pass> — <output looper-build needs to resume>`. Orchestrator route; build stop until orchestrator return gate output.
+When escalation need, plan emit one line per gate: `ESCALATE: <gate name> – <input to pass> – <output looper-build needs to resume>`. Orchestrator route; build stop until orchestrator return gate output.
 
 ## What plan does NOT do
 
@@ -160,7 +160,7 @@ When escalation need, plan emit one line per gate: `ESCALATE: <gate name> — <i
 
 - Research output ambiguous on critical decision (target files, expected behavior) → STOP. Send back to research.
 - Mechanized check infra missing (test file no exist, culori not installed, Squawk config absent) → STOP. Surface infra gap to orchestrator BEFORE proceed.
-- All recovery options fail own predictions → STOP. Escalate to user — palette / architecture decision need, not wave.
+- All recovery options fail own predictions → STOP. Escalate to user; palette / architecture decision need, not wave.
 - Wave scope exceed research-stated blast radius by 2x or more → STOP. Scope challenge per memory `[[feedback-refactor-staging]]`.
 - Specialist gate required AND orchestrator unable to invoke (Task tool absent) → STOP. Hand-off report, do not pretend gate ran. Per memory `[[feedback-task-tool-availability]]`.
 

@@ -44,17 +44,17 @@ No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP
 
 ## Quality bars
 
-- No comments explain WHAT — well-named identifiers carry that. Comments only for non-obvious WHY.
+- No comments explain WHAT; well-named identifiers carry that. Comments only for non-obvious WHY.
 - No god files. Refactor when files cross project threshold (often 100 lines per CLAUDE.md).
 - Follow project style: import order, naming conventions, class-ordering rules (e.g. Tailwind ordering in CLAUDE.md).
 - No untrusted optimization. Chase only proven hot paths.
 - Trust internal code. Validate only at system boundaries (user input, external APIs).
-- No backwards-compat shims for code certain unused — delete.
+- No backwards-compat shims for code certain unused; delete.
 
 ## UI / accessibility specific
 
 - Use semantic HTML before reach for ARIA. ARIA patch, not architecture.
-- Drive styling off DOM attributes via framework variants (e.g. `aria-disabled:`, `data-state=`) — not JS ternaries pick class strings. Lock visual + ARIA state at cascade layer.
+- Drive styling off DOM attributes via framework variants (e.g. `aria-disabled:`, `data-state=`), not JS ternaries pick class strings. Lock visual + ARIA state at cascade layer.
 - Colors: use tokens from gate output. Never eyeball contrast.
 - Borders convey meaning: contrast-check against BOTH bundle bg AND any adjacent surface border touches.
 

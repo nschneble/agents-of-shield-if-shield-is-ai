@@ -3,9 +3,9 @@ name: loop-de-looper
 description: Orchestrator for multi-wave goals. Composes looper-scope (queue) + looper-plan (per-wave brief) + the-looper agent (per-wave executor) + crew (periodic + final). Trigger when the user says "loop de looper", "run all the waves", "autonomous loop", or hands a multi-wave goal expecting hands-off execution.
 ---
 
-Parent orchestrator. Input = raw goal. Output = goal-complete or escalation. Composes existing pieces — no re-invent.
+Parent orchestrator. Input = raw goal. Output = goal-complete or escalation. Composes existing pieces; no re-invent.
 
-Loop de Looper NOT execute waves directly. Dispatches `the-looper` agent per wave; the-looper runs full wave protocol internally (research → plan → build → verify → review → learn). Crew passes scheduled at trigger points by `loop-de-looper` itself. Orchestrator = parent — entity invoking this skill — not separate agent.
+Loop de Looper NOT execute waves directly. Dispatches `the-looper` agent per wave; the-looper runs full wave protocol internally (research → plan → build → verify → review → learn). Crew passes scheduled at trigger points by `loop-de-looper` itself. Orchestrator = parent (entity invoking this skill), not separate agent.
 
 ## Why exists
 
@@ -36,13 +36,13 @@ loop-de-looper(goal)
 └── report exit state to user
 ```
 
-`looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler` — six agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
+`looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`: six agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
 
 ## Inputs
 
-1. **Goal** — raw user input. Single sentence to single paragraph.
-2. **PR context (optional)** — existing PR number if updating draft. `gh pr view <N>` body becomes scope input.
-3. **Resume flag (optional)** — `resume` to continue prior run. Re-runs scope (queue derived from current git state + memory), skips waves whose commit hash already present.
+1. **Goal**: raw user input. Single sentence to single paragraph.
+2. **PR context (optional)**: existing PR number if updating draft. `gh pr view <N>` body becomes scope input.
+3. **Resume flag (optional)**: `resume` to continue prior run. Re-runs scope (queue derived from current git state + memory), skips waves whose commit hash already present.
 
 ## Protocol
 
@@ -108,18 +108,18 @@ Trigger fires → invoke crew (step 3). Threshold tunable per project via CLAUDE
 
 Invoke six crew agents in parallel via Task tool (one Task call per agent, same message):
 
-- `the-auditor` — a11y audit on cumulative diff
-- `the-chemist` — test coverage on cumulative diff
-- `the-chronicler` — doc drift on cumulative diff
-- `the-diamantaire` — expert correctness review
-- `the-improver` — refactor opportunities
-- `the-stickler` — convention conformance
+- `the-auditor`: a11y audit on cumulative diff
+- `the-chemist`: test coverage on cumulative diff
+- `the-chronicler`: doc drift on cumulative diff
+- `the-diamantaire`: expert correctness review
+- `the-improver`: refactor opportunities
+- `the-stickler`: convention conformance
 
 Each agent gets cumulative diff since last crew pass (or since `main` for final crew). Findings categorized:
 
-- **Blocker** — must fix before continuing (interim) or before goal-complete (final)
-- **Warning** — should fix; track count for warning-saturation trigger
-- **Nit** — capture for future scope run; no loop back
+- **Blocker**: must fix before continuing (interim) or before goal-complete (final)
+- **Warning**: should fix; track count for warning-saturation trigger
+- **Nit**: capture for future scope run; no loop back
 
 Blockers found → loop back: produce mini-brief for blocker fixes, invoke `the-looper` for one corrective wave, re-run crew on fix. No "ship anyway" path.
 
@@ -142,7 +142,7 @@ For path 3 (release-readiness goals typically), order fixed:
    - Required-not-loopable items still blocking (list from scope section 5)
    - Recommended user actions (each line)
 
-Final crew runs before surfacing required-not-loopable so user gets verified loopable work + open human gates in one report — not two round-trips.
+Final crew runs before surfacing required-not-loopable so user gets verified loopable work + open human gates in one report, not two round-trips.
 
 User executes section-5 items, returns; Loop de Looper declares goal-complete (or resumes if user introduced new state during human gates).
 
@@ -156,16 +156,16 @@ Resume mode (`/loop-de-looper resume`) re-derives state:
 - Counters: re-derive from git stat output
 - Last crew pass: grep for "crew pass" in recent commit messages
 
-Persistence (v2) — write state JSON to `local/loops/<run-id>.json` after each step. Out of scope for v1.
+Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each step. Out of scope for v1.
 
 ## Stop conditions
 
-- **Scope refuses goal** — open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output to user
-- **Plan stops** — research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
-- **the-looper stops** — verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
-- **Crew finds blocker requiring rollback** — drift past patchable → STOP, escalate to user (no auto-revert commits)
-- **Queue exhausted, required-not-loopable items remain** — surface explicit list, await user action
-- **User intervenes** — any user message during run = stop signal; current wave completes, then halt
+- **Scope refuses goal**: open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output to user
+- **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
+- **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
+- **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
+- **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
+- **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
 Stopping not failure. Looping past known blocker = failure.
 
@@ -174,7 +174,7 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT execute waves directly. Dispatches `the-looper`. No bypass.
 - Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway."
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
-- Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist — no "I checked it myself."
+- Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist; no "I checked it myself."
 - Does NOT flip draft PR to ready-for-review. User decision per `looper-commit` spec.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 
@@ -195,7 +195,7 @@ Tighter triggers for high-drift domains (palette, auth surface). Looser for clea
 
 Reports to user: structured, scannable. Per-wave status line. Crew pass summary. Final state report. Match lean voice of `looper-commit` and `looper-learn`.
 
-Cite agent outputs verbatim when surfacing blockers — no paraphrase. Per memory `[[feedback-verify-upstream-gate-claims]]` and `[[feedback-task-tool-availability]]`, orchestrator's job = surface signal, not summarize away.
+Cite agent outputs verbatim when surfacing blockers; no paraphrase. Per memory `[[feedback-verify-upstream-gate-claims]]` and `[[feedback-task-tool-availability]]`, orchestrator's job = surface signal, not summarize away.
 
 ## Integration prerequisites
 
@@ -203,6 +203,6 @@ Met as of integration pass:
 
 1. ✓ `the-looper` agent: protocol expanded to include plan step (1.5). Hand-back format adds `gate needed pre-build` field for plan-surfaced escalations.
 2. ✓ `looper-build`: pre-build gates section reframed. Plan absorbed deterministic portion; specialists fire only on ESCALATE.
-3. ✓ Crew agents present at `~/Developer/Repos/agents-of-shield-if-shield-is-ai/agents/` — `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`.
+3. ✓ Crew agents present at `~/Developer/Repos/agents-of-shield-if-shield-is-ai/agents/`: `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`.
 
 Loop de Looper ready for end-to-end exercise.

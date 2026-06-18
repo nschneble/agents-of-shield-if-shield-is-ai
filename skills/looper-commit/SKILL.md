@@ -1,6 +1,6 @@
 ---
 name: looper-commit
-description: Final step of every wave. Always commits any code/doc changes. Auto-detects PR state — if branch has existing PR, just commits; if no existing PR, creates draft assigned `@me`. Trigger when the user says "commit this wave", "finalize this wave", "create the PR", or "update the existing PR with this work".
+description: Final step of every wave. Always commits any code/doc changes. Auto-detects PR state: if branch has existing PR, just commits; if no existing PR, creates draft assigned `@me`. Trigger when the user says "commit this wave", "finalize this wave", "create the PR", or "update the existing PR with this work".
 ---
 
 Last step. Always commits. Conditionally creates PR.
@@ -11,8 +11,8 @@ Renamed from `looper-pr` in framework v1.2. Old name tied to PR creation; realit
 
 Every wave runs this as final step. Two paths:
 
-- **Code wave / doc wave** — staged or unstaged changes exist → commit step runs → PR detection runs
-- **External-state wave** (PR body refresh, GitHub release update, manual baseline approval handoff) — working tree clean → commit step SKIPPED but PR detection still runs (confirms PR exists for external change context)
+- **Code wave / doc wave**: staged or unstaged changes exist → commit step runs → PR detection runs
+- **External-state wave** (PR body refresh, GitHub release update, manual baseline approval handoff): working tree clean → commit step SKIPPED but PR detection still runs (confirms PR exists for external change context)
 
 ## Pre-flight (REQUIRED)
 
@@ -21,7 +21,7 @@ Before commit, confirm:
 1. `looper-verify` produced PASS on all acceptance criteria
 2. `looper-review` produced `ship` or `fix-blockers-then-ship` with NO blockers remaining
 3. `format`, `lint`, `test`, `build` all green (or project equivalent; skip irrelevant ones for non-code waves per `looper-build` SKILL.md branching)
-4. No `cat > file` or other Bash-bypass write evidence in diff (`git log` and `git diff` should match — look for files created without normal write-path signal)
+4. No `cat > file` or other Bash-bypass write evidence in diff (`git log` and `git diff` should match; look for files created without normal write-path signal)
 5. `git status` clean of untracked stray files (lunchlady-style scorecard.png leaks per memory `feedback-lunchlady-scorecard-leak`)
 
 Any pre-flight fail → STOP. Tell orchestrator what blocking.
@@ -67,7 +67,7 @@ Non-empty output → commit:
    ```
    and capture hash for hand-back.
 
-If commit fails (pre-commit hook failure, signing failure, etc), STOP — fix underlying issue, re-stage, create NEW commit. NEVER amend. NEVER bypass hooks (`--no-verify`, `--no-gpg-sign`, etc).
+If commit fails (pre-commit hook failure, signing failure, etc), STOP; fix underlying issue, re-stage, create NEW commit. NEVER amend. NEVER bypass hooks (`--no-verify`, `--no-gpg-sign`, etc).
 
 ## Step 2: PR detection
 
@@ -82,7 +82,7 @@ Three cases:
 | State                  | Action                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------- |
 | Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                        |
-| Has merged / closed PR | Treat as "no PR" — proceed to Step 3 (closed PR may be unrelated history on this branch) |
+| Has merged / closed PR | Treat as "no PR"; proceed to Step 3 (closed PR may be unrelated history on this branch) |
 | No PR found            | Proceed to Step 3                                                                        |
 
 ## Step 3: Create draft PR (only if no existing)
@@ -121,7 +121,7 @@ Clear pattern → emulate. Else default to:
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
 - Attach screenshots for UI changes when available (refer to verify's browser run)
 - Include before/after for visual changes
-- Document deferred work explicit — don't hide
+- Document deferred work explicit; don't hide
 
 Create as DRAFT, assign `@me`:
 
@@ -149,7 +149,7 @@ If brief includes explicit `target.push: true`:
 - Branch tracks origin: `git push`
 - Branch untracked: `git push -u origin <branch>`
 
-If push fails (permissions, divergence), STOP — surface to orchestrator. Do NOT `--force`.
+If push fails (permissions, divergence), STOP; surface to orchestrator. Do NOT `--force`.
 
 ## What looper-commit does NOT do
 

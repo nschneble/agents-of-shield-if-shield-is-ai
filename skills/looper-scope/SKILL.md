@@ -3,7 +3,7 @@ name: looper-scope
 description: Decompose a raw goal into an ordered wave queue with termination criteria. Trigger when the user says "scope this work", "plan the waves", or hands a goal to the orchestrator that spans more than one loop.
 ---
 
-Strategic queue producer. Entry point for multi-wave goal. Read goal + existing state, emit ordered list of candidate waves, set exit contract. Refuse vague goals — bounded scope is deliverable.
+Strategic queue producer. Entry point for multi-wave goal. Read goal + existing state, emit ordered list of candidate waves, set exit contract. Refuse vague goals; bounded scope is deliverable.
 
 ## Why scope exists
 
@@ -14,10 +14,10 @@ Scope distinct from plan: scope enumerate waves at goal-level granularity (one l
 ## Inputs
 
 1. Raw goal (user input or orchestrator handoff)
-2. Existing PR description (if updating existing PR — `gh pr view <number>` for body)
+2. Existing PR description (if updating existing PR, `gh pr view <number>` for body)
 3. PRD if exist (default `local/prds/<feature-slug>.md`, else memory `reference-prds`)
-4. Project memory at `~/.claude/projects/<project>/memory/` — read `MEMORY.md`, then any `project-*` entries hinting at "what's left"
-5. Git state — branch, `git log --oneline main..HEAD`, `git status`
+4. Project memory at `~/.claude/projects/<project>/memory/`: read `MEMORY.md`, then any `project-*` entries hinting at "what's left"
+5. Git state: branch, `git log --oneline main..HEAD`, `git status`
 6. File inventory of relevant directories (e.g. for theme refactor, `apps/web/src/components/**` + `apps/web/src/theme/styles/**`)
 
 ## Goal classification (first move)
@@ -26,11 +26,11 @@ Classify goal before decompose. Classification determine decomposition strategy.
 
 | Goal shape                   | Example                                                             | Decomposition strategy                                                                                                            |
 | ---------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Single-wave bugfix**       | "Fix auth race condition in login flow"                             | One wave. Scope still runs — sets exit criteria, flags if staging needed                                                          |
+| **Single-wave bugfix**       | "Fix auth race condition in login flow"                             | One wave. Scope still runs; sets exit criteria, flags if staging needed                                                          |
 | **Feature increment**        | "Add MFA recovery codes"                                            | 1–3 waves usually. Decompose by sub-feature (gen, store, verify, UI)                                                              |
 | **Multi-file refactor**      | "Migrate UserMenu to orbit-tier"                                    | One wave per cluster of co-touching files. Group by host-bundle context, not directory alone                                      |
 | **Cross-cutting initiative** | "Finish the theme refactor", "Harden a11y AAA"                      | Many waves. Order by dependency + risk. Pilot-first per memory `[[feedback-refactor-staging]]`                                    |
-| **Release-readiness**        | "Flip draft PR to ready-for-review", "Wrap up the auth refactor PR" | Small queue (1–3 waves), often doc-heavy. Explicitly enumerate human-gated tasks — they block completion but loops can't run them |
+| **Release-readiness**        | "Flip draft PR to ready-for-review", "Wrap up the auth refactor PR" | Small queue (1–3 waves), often doc-heavy. Explicitly enumerate human-gated tasks; they block completion but loops can't run them |
 | **Open-ended**               | "Improve performance", "Clean up the codebase"                      | REFUSE. Surface to user: needs budget, regression baseline, definition of done                                                    |
 
 Open-ended goals = refusal, not best-effort decomposition. Scope job = bounded queue, not infinite work.
@@ -71,18 +71,18 @@ Eight sections:
 
 5. **Required, not loopable**
 
-   - Items REQUIRED for goal completion but loops can't execute (human approval, third-party action, manual baseline review, user decision). Each line: `<item> — not loopable because <reason>`.
+   - Items REQUIRED for goal completion but loops can't execute (human approval, third-party action, manual baseline review, user decision). Each line: `<item>: not loopable because <reason>`.
    - Goal cannot complete until these clear. Loop de Looper must surface to user explicitly.
    - Empty section fine if goal fully loopable.
 
 6. **Deferred to separate scope run**
 
-   - Things that COULD be in scope but consciously excluded for now, will likely surface in future scope run. Each line cite reason: `<item> — deferred because <reason>`.
+   - Things that COULD be in scope but consciously excluded for now, will likely surface in future scope run. Each line cite reason: `<item>: deferred because <reason>`.
    - Prevent scope creep mid-loop; document conscious choices for future runs to pick up.
 
 7. **Out of goal scope**
 
-   - Things consciously excluded forever from this goal (different PR, different initiative, architectural decision out of scope). Each line: `<item> — out of scope because <reason>`.
+   - Things consciously excluded forever from this goal (different PR, different initiative, architectural decision out of scope). Each line: `<item>: out of scope because <reason>`.
    - Distinguish "will come back to" (deferred) from "won't come back to this goal" (out of scope).
 
 8. **Open questions**
@@ -117,6 +117,6 @@ Skip pilot only when classification = single-wave bugfix or feature increment �
 
 ## Voice + style
 
-Match existing looper skill voice. Cite, don't paraphrase. When candidates derive from memory, PRD, or file inventory, cite source so user can verify. No "I think there might be" hedging — scope either know or refuse.
+Match existing looper skill voice. Cite, don't paraphrase. When candidates derive from memory, PRD, or file inventory, cite source so user can verify. No "I think there might be" hedging; scope either know or refuse.
 
 Queue MUST be re-readable by Loop de Looper with no prior context. Self-contained.

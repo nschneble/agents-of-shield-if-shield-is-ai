@@ -9,12 +9,12 @@ Suite of looper skills ran. Determine how went, capture reusable lessons.
 
 For each step in loop, ask:
 
-1. **research** — Surface right constraints (WCAG SC + thresholds, security invariants, perf budgets)? Challenge scope correctly? Plan/build re-discover things mid-flight?
-2. **plan** — Mechanized predictions ran or fall-through honest? Recovery options pre-staged? Risk register caught what review later surfaced? Plan emit ESCALATE when needed, or substitute judgment silently?
-3. **build** — Plan brief consumed direct or re-derived? Change scope creep beyond plan? Bash bypass guards? Quality bars (no Bash writes, no scope creep, no premature abstraction) honored? Non-code wave path chosen correctly when applicable?
-4. **verify** — Verify catch bugs verify should catch? Or review catch things verify missed? (If yes, verify checklist too thin.) Doc/PR-body/config waves verified by reading resource back, not skipped?
-5. **review** — How many review iterations? Specialists recommended for crew pass when domain expertise mattered? Review surface blockers that should pre-flight in research/plan?
-6. **commit** — Pre-flight gates honored? Commit landed for code/doc waves, skipped cleanly for external-state waves? PR detection correct (existing → just commit; none → draft created)?
+1. **research**: Surface right constraints (WCAG SC + thresholds, security invariants, perf budgets)? Challenge scope correctly? Plan/build re-discover things mid-flight?
+2. **plan**: Mechanized predictions ran or fall-through honest? Recovery options pre-staged? Risk register caught what review later surfaced? Plan emit ESCALATE when needed, or substitute judgment silently?
+3. **build**: Plan brief consumed direct or re-derived? Change scope creep beyond plan? Bash bypass guards? Quality bars (no Bash writes, no scope creep, no premature abstraction) honored? Non-code wave path chosen correctly when applicable?
+4. **verify**: Verify catch bugs verify should catch? Or review catch things verify missed? (If yes, verify checklist too thin.) Doc/PR-body/config waves verified by reading resource back, not skipped?
+5. **review**: How many review iterations? Specialists recommended for crew pass when domain expertise mattered? Review surface blockers that should pre-flight in research/plan?
+6. **commit**: Pre-flight gates honored? Commit landed for code/doc waves, skipped cleanly for external-state waves? PR detection correct (existing → just commit; none → draft created)?
 
 ## Save lessons at the right level
 
@@ -35,14 +35,14 @@ Skill caused failure (missing checklist item, vague advice, blind spot) → prop
 - Code patterns derivable from current code (`git blame` or `grep` find them)
 - Fix recipes (commit / PR carry that)
 - Ephemeral task details
-- Anything already in CLAUDE.md or existing memory — update instead of duplicate
+- Anything already in CLAUDE.md or existing memory: update instead of duplicate
 
 ## Output
 
 - List of new/updated memory files (with paths)
 - List of CLAUDE.md edits (with paths)
 - List of skill or agent edits (with paths)
-- One-paragraph "what this means for next run" — concrete, not vibes
+- One-paragraph "what this means for next run", concrete, not vibes
 
 ## Honest self-assessment
 

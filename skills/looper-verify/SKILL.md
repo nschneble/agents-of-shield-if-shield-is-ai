@@ -18,9 +18,9 @@ Functional verification only. Does change do what spec said? Distinct from revie
 ## For UI changes specifically
 
 - Start `npm run dev` (or project equivalent), click through feature in real browser
-- If visual regression tests exist (Tuffgal, Percy, Chromatic), run them — human approval of baseline diffs owed to user, not auto-claimed
+- If visual regression tests exist (Tuffgal, Percy, Chromatic), run them; human approval of baseline diffs owed to user, not auto-claimed
 - Screenshot or describe what observed. Do NOT claim "works" without seeing it work. Type-check + test pass = correctness; UI verification need eyeballs.
-- Accessibility: keyboard-test feature (Tab/Shift-Tab through focusable elements, Enter/Space to activate). Screen-reader testing owed to post-build a11y-lead review pass, not verify — but flag if focus order or ARIA seem off.
+- Accessibility: keyboard-test feature (Tab/Shift-Tab through focusable elements, Enter/Space to activate). Screen-reader testing owed to post-build a11y-lead review pass, not verify, but flag if focus order or ARIA seem off.
 
 ## For API changes specifically
 
@@ -30,7 +30,7 @@ Functional verification only. Does change do what spec said? Distinct from revie
 
 ## For CSS / token plumbing specifically
 
-Change = "rename CSS variable," "introduce new design token layer," "rethread token through cascade" — no new behavior, only new wiring — dev-server eyeball step add marginal signal over cheaper triangulation:
+Change = "rename CSS variable," "introduce new design token layer," "rethread token through cascade" (no new behavior, only new wiring). Dev-server eyeball step add marginal signal over cheaper triangulation:
 
 1. **Compiled-CSS grep.** After `npm run build` (or framework equivalent) grep emitted CSS for each new/renamed variable. Confirm:
    - Default declarations present
@@ -50,7 +50,7 @@ Non-code waves verify by reading resource back, confirming change applied. No de
   - Stale references wave removed are gone (grep against inventory list plan emitted)
   - Required sections present (Summary, Test plan, etc per template)
 - **External config (CI yaml, eslintrc, package.json):** read file back, run config validator if present (`gh workflow run --dry`, `eslint --print-config`). Confirm change parses + downstream consumer reads it (run one CI step that consumes config).
-- **Documentation-only:** read file back, run markdownlint + grep checks plan staged (stale-ref count, heading-hierarchy, link integrity via `markdown-link-check` if available). Docs that index project state (THEMES.md, CHANGELOG, ARCHITECTURE.md) → confirm doc's claims match current code state — e.g. theme count in THEMES.md matches actual theme files on disk.
+- **Documentation-only:** read file back, run markdownlint + grep checks plan staged (stale-ref count, heading-hierarchy, link integrity via `markdown-link-check` if available). Docs that index project state (THEMES.md, CHANGELOG, ARCHITECTURE.md) → confirm doc's claims match current code state, e.g. theme count in THEMES.md matches actual theme files on disk.
 
 All three: NO new behavior to exercise. Verify pass = "resource now says what plan said it should say, and downstream consumers can still read it."
 
