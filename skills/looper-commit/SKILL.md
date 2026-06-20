@@ -49,14 +49,11 @@ Non-empty output → commit:
 3. Compose message:
    - Title under 70 chars matching project convention from recent commits
    - HEREDOC body for multi-line
-   - `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` line
 4. Commit:
 
    ```
    git commit -m "$(cat <<'EOF'
    <message body>
-
-   Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
    EOF
    )"
    ```
@@ -79,11 +76,11 @@ gh pr view --json number,url,state 2>/dev/null
 
 Three cases:
 
-| State                  | Action                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------- |
-| Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                        |
+| State                  | Action                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| Has open / draft PR    | Done. Log `Wave commits to PR #N (existing)` with URL. No new PR.                       |
 | Has merged / closed PR | Treat as "no PR"; proceed to Step 3 (closed PR may be unrelated history on this branch) |
-| No PR found            | Proceed to Step 3                                                                        |
+| No PR found            | Proceed to Step 3                                                                       |
 
 ## Step 3: Create draft PR (only if no existing)
 
@@ -114,8 +111,6 @@ Clear pattern → emulate. Else default to:
 - Anything non-obvious in the diff
 - Any known issues consciously deferred (with reason)
 - Any architectural decisions worth a second pair of eyes
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
