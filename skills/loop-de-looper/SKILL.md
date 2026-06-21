@@ -77,6 +77,8 @@ If hand-back contains `gate needed pre-build`:
 2. Append specialist output to brief as `gate outputs`
 3. Re-dispatch the-looper with updated brief. the-looper sees `gate outputs` populated, skips plan, resumes at build.
 
+Record each pre-build specialist gate in the wave's gate artifact (see `## Gate artifacts`): which specialist, ran-vs-unavailable, verdict. A specialist gate the-looper *requested* but the orchestrator could not actually invoke (no Task tool) must be logged as `available: false` — never recorded as passed.
+
 Repeat 2b only until escalation cleared. Same specialist gate requested twice for same wave → STOP, escalate to user (palette / architecture decision needed beyond specialist resolve).
 
 Other stop conditions from the-looper (verify fails twice, review verdict `rethink`, etc) bubble up to Loop de Looper. Do NOT swallow.
@@ -123,6 +125,8 @@ Each agent gets cumulative diff since last crew pass (or since `main` for final 
 
 Blockers found → loop back: produce mini-brief for blocker fixes, invoke `the-looper` for one corrective wave, re-run crew on fix. No "ship anyway" path.
 
+After every crew pass, write the gate artifact (see `## Gate artifacts`) BEFORE looping back or resetting counters. The artifact records which crew agents actually ran, whether the Task tool was available, and each verdict — so the pass is auditable on disk, not just narrated in the final report.
+
 Reset counters after crew pass clean.
 
 ### Step 4: Termination
@@ -146,9 +150,38 @@ Final crew runs before surfacing required-not-loopable so user gets verified loo
 
 User executes section-5 items, returns; Loop de Looper declares goal-complete (or resumes if user introduced new state during human gates).
 
+## Gate artifacts
+
+Every gate the loop runs gets a durable on-disk record. A gate you can't audit isn't a gate: when the loop runs unattended (`--dangerously-skip-permissions`, no handback), the artifact is the only way to tell a real review from one the orchestrator merely narrated. Prose in the final report is NOT a substitute. See memory `[[feedback-loop-crew-gate-artifact]]`.
+
+Write to `local/loops/<branch>/gates.jsonl` — one JSON line appended per gate event, never rewritten. The path is branch-keyed so resume runs and parallel branches don't collide; `jsonl` so a crashed run still leaves every prior gate intact.
+
+Each line records:
+
+```json
+{
+  "wave": 4,
+  "kind": "crew",                 // "crew" | "pre-build-specialist"
+  "agent": "the-diamantaire",     // crew member or specialist name
+  "task_tool_available": true,    // false = orchestrator could NOT invoke; see below
+  "ran": true,                    // false when task_tool_available is false
+  "verdict": "MERGE-READY",       // agent's own words, verbatim — no paraphrase
+  "blockers": 0,
+  "summary": "one line, cited from agent output"
+}
+```
+
+Hard rules:
+
+- **`task_tool_available: false` ⇒ `ran: false` ⇒ no verdict.** Per memory `[[feedback-task-tool-availability]]`, the Task tool is sometimes absent in practice. A gate the loop *wanted* to run but could not is logged as unavailable — NEVER as passed, NEVER with an invented verdict. Detect availability, don't assume it.
+- **Verdicts are cited verbatim** from agent output, matching the `## Voice + style` no-paraphrase rule.
+- **Write before acting on the result** — log the crew pass before looping back or resetting counters (step 3), log the specialist gate before re-dispatch (step 2b). A blocker found is still a gate that ran.
+
+The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
+
 ## State tracking (v1: in-context)
 
-Loop de Looper holds queue + counters in parent's working memory. No file persistence.
+Loop de Looper holds queue + counters in parent's working memory. The ONE exception to "no file persistence" is the gate artifact above (`local/loops/<branch>/gates.jsonl`) — counters and queue stay in-context, gate records go to disk because they must outlive the run for audit. Resume mode appends to the existing `gates.jsonl`.
 
 Resume mode (`/loop-de-looper resume`) re-derives state:
 
@@ -175,6 +208,7 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway."
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
 - Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist; no "I checked it myself."
+- Does NOT record a gate as passed when it didn't run. Task tool unavailable or agent never invoked → `gates.jsonl` logs `ran: false`, and the final report says the gate did not run. No invented verdicts, no prose-only gate claims.
 - Does NOT flip draft PR to ready-for-review. User decision per `looper-commit` spec.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 
