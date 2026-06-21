@@ -68,11 +68,13 @@ If commit fails (pre-commit hook failure, signing failure, etc), STOP; fix under
 
 ## Step 2: PR detection
 
-Check if current branch has tracked PR:
+Check if this branch has a tracked PR. Query by explicit branch, not `gh pr view` — `gh pr view` only reads the *current* branch and errors noisily when none exists, which is fragile in detached or non-current-branch contexts:
 
 ```
-gh pr view --json number,url,state 2>/dev/null
+gh pr list --head <branch> --state all --json number,url,state,isDraft
 ```
+
+Empty array → no PR. Non-empty → read `state` of the first entry.
 
 Three cases:
 
@@ -83,6 +85,8 @@ Three cases:
 | No PR found            | Proceed to Step 3                                                                       |
 
 ## Step 3: Create draft PR (only if no existing)
+
+> **Brief semantics.** A brief that says "don't flip to ready-for-review" does NOT suppress this step — draft *creation* and the draft→ready *flip* are different actions (see `## What looper-commit does NOT do`). Only an explicit `pr: skip` directive suppresses creation. In an orchestrated multi-wave run the brief carries `pr: create-on-wave-1` (this step runs, branch must be pushed first) or `pr: existing #N` (Step 2 detects it → this step is skipped, commit lands in the existing PR). Never read "no new PR needed" out of a directive that only forbids the ready flip. See loop-de-looper `## PR lifecycle + push ownership`.
 
 Read recent merged PRs to match codebase style:
 

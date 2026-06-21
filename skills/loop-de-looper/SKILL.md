@@ -25,6 +25,8 @@ loop-de-looper(goal)
 ├── looper-scope(goal)                        → wave queue + exit criteria + required-not-loopable items
 └── for each wave in queue:
     ├── the-looper agent(wave brief)          → runs research → plan → build → verify → review → learn → commit
+    │      ├── wave 1: brief pr=create-on-wave-1, push=true → looper-commit pushes + opens draft PR
+    │      ├── waves 2…N: brief pr=existing #N, push=true   → looper-commit commits into the PR
     │      └── if plan emits ESCALATE:        agent stops, hand-back has `gate needed pre-build`
     │            ├── orchestrator invokes specialist via Task tool
     │            ├── orchestrator appends `gate outputs` to brief
@@ -33,7 +35,8 @@ loop-de-looper(goal)
     └── if crew_trigger():
         └── crew pass(branch state)           → blocker / warning / nit findings; loop back if blockers
 └── final crew pass(cumulative branch)        → before declaring goal-complete
-└── report exit state to user
+└── PR finalization backstop                  → assert PR exists; create if a wave missed it
+└── report exit state to user (incl. PR #/URL)
 ```
 
 `looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`: six agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
@@ -68,6 +71,11 @@ For each wave in queue, in order:
 Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + project target (branch name, PR number).
 
 `the-looper` runs full protocol internally: research → plan → build → verify → review → learn → commit. Returns hand-back report (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `learn`, `flags`).
+
+**Brief authoring — PR + push directives.** Every wave brief carries two SEPARATE flags. Never bundle them into one "No PR, nothing flipped to ready" phrase — that conflation collapses two different actions and orphaned PR creation in a real run (every wave deferred PR to "the end," and the end had no PR action, so none was ever created). See `## PR lifecycle + push ownership`.
+
+- `pr:` — `create-on-wave-1` (default on a fresh multi-wave branch) | `existing #N` (every wave once the PR exists) | `skip` (explicit, rare — throwaway spike). "Don't flip to ready-for-review" is NOT a `pr:` value; the draft is still created.
+- `target.push: true` — on EVERY wave of an orchestrated run. PR creation and a current remote both require the branch pushed. The orchestrator owns push timing (per `looper-commit`); its default-off is for standalone use, so the orchestrator must set this explicitly.
 
 #### 2b. Handle escalation (if any)
 
@@ -127,6 +135,8 @@ Blockers found → loop back: produce mini-brief for blocker fixes, invoke `the-
 
 After every crew pass, write the gate artifact (see `## Gate artifacts`) BEFORE looping back or resetting counters. The artifact records which crew agents actually ran, whether the Task tool was available, and each verdict — so the pass is auditable on disk, not just narrated in the final report.
 
+The crew summary in any report (interim or final) enumerates ALL SIX agents by name with each verdict — even when clean. Listing only the agents that found something silently drops the rest; a reader can't tell "ran, clean" from "never ran" (the-improver was dropped from a clean report once exactly this way). A clean agent is reported as clean, not omitted.
+
 Reset counters after crew pass clean.
 
 ### Step 4: Termination
@@ -136,6 +146,12 @@ Loop terminates when:
 1. **All wave queue items shipped** AND **final crew pass clean** AND **section 5 empty** → goal-complete success path
 2. **Stop condition fired** at any layer → escalate to user with state report
 3. **All wave queue items shipped** AND **final crew pass clean** AND **section 5 non-empty** → cannot self-complete; surface to user with explicit list
+
+**PR finalization (backstop — run on every path before declaring goal-complete or surfacing the report):**
+
+1. Detect the run's PR: `gh pr list --head <branch> --state all --json number,url,state`.
+2. No open/draft PR but committed work exists on the branch → backstop: ensure the branch is pushed (`git push -u origin <branch>`), then create the draft now (`looper-commit` Step 3). The Wave-1 model should already have created it; this catches the run where it didn't. NEVER declare goal-complete with committed work and no PR — that orphans the whole run off-dashboard.
+3. Report the PR #, URL, and draft/ready state in the final state report. "Branch is not a PR" is not an acceptable terminal state for shipped work. Flipping draft → ready stays the user's call (`looper-commit` spec) — creating the draft does not.
 
 For path 3 (release-readiness goals typically), order fixed:
 
@@ -149,6 +165,20 @@ For path 3 (release-readiness goals typically), order fixed:
 Final crew runs before surfacing required-not-loopable so user gets verified loopable work + open human gates in one report, not two round-trips.
 
 User executes section-5 items, returns; Loop de Looper declares goal-complete (or resumes if user introduced new state during human gates).
+
+## PR lifecycle + push ownership
+
+A multi-wave run shares ONE branch and ONE PR. The PR is created ONCE, EARLY — not deferred to "the end." Deferring orphans it: each wave reasons "not my job, the orchestrator opens it at the end," and the termination step historically had no PR action, so no actor ever created it. The run shipped seven green commits and zero PRs.
+
+Model:
+
+1. **Wave 1**, after the first successful commit: the brief carries `pr: create-on-wave-1` + `target.push: true`. `looper-commit` pushes (`git push -u origin <branch>`) and creates the draft PR (its Step 3), assigned `@me`. A real PR # now exists.
+2. **Waves 2…N**: the brief carries `pr: existing #N` + `target.push: true`. `looper-commit` Step 2 detects the open draft and just commits into it (its "has open/draft PR" path); the push keeps the PR current per wave.
+3. **Termination**: PR-finalization backstop (Step 4) asserts the PR exists before goal-complete, and creates it if some earlier wave missed it.
+
+`pr: skip` is the ONLY suppressor of PR creation, and it is explicit + rare. "Don't flip to ready-for-review" is NOT `pr: skip` — the draft is still created; only the draft→ready flip stays the user's call. Collapsing those two is the exact bug this section exists to prevent.
+
+Push is the orchestrator's call BY DESIGN — so the orchestrator must actually make it. An orchestrated run that never pushes can never open a PR: `gh pr create` requires the branch on the remote. `target.push: true` on every wave is not optional in orchestrated mode.
 
 ## Gate artifacts
 
@@ -209,7 +239,9 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
 - Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist; no "I checked it myself."
 - Does NOT record a gate as passed when it didn't run. Task tool unavailable or agent never invoked → `gates.jsonl` logs `ran: false`, and the final report says the gate did not run. No invented verdicts, no prose-only gate claims.
-- Does NOT flip draft PR to ready-for-review. User decision per `looper-commit` spec.
+- Does NOT flip draft PR to ready-for-review. User decision per `looper-commit` spec. But DOES create the draft (wave 1, or termination backstop) — creating ≠ flipping.
+- Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every termination path.
+- Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 
 ## Crew trigger tuning
