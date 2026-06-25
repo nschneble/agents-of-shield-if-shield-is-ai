@@ -1,6 +1,6 @@
 ---
 name: loop-de-looper
-description: Orchestrator for multi-wave goals. Composes looper-scope (queue) + looper-plan (per-wave brief) + the-looper agent (per-wave executor) + crew (periodic + final). Trigger when the user says "loop de looper", "run all the waves", "autonomous loop", or hands a multi-wave goal expecting hands-off execution.
+description: Orchestrator for multi-wave goals. Composes looper-nonbeliever (pre-flight) + looper-scope (queue) + looper-plan (per-wave brief) + the-looper agent (per-wave executor) + crew (periodic + final) + looper-recap (closing summary). Trigger when the user says "loop de looper", "run all the waves", "autonomous loop", or hands a multi-wave goal expecting hands-off execution.
 ---
 
 Parent orchestrator. Input = raw goal. Output = goal-complete or escalation. Composes existing pieces; no re-invent.
@@ -22,7 +22,8 @@ Loop de Looper formalize protocol so parent runs goal → done without per-wave 
 
 ```
 loop-de-looper(goal)
-├── looper-scope(goal)                        → wave queue + exit criteria + required-not-loopable items
+├── looper-nonbeliever(goal, approach)        → interrogate goal vs CLAUDE.md/agents/skills/directives; PROCEED | PROCEED-WITH-NOTES | STOP
+├── looper-scope(goal[, notes])               → wave queue + exit criteria + required-not-loopable items
 └── for each wave in queue:
     ├── the-looper agent(wave brief)          → runs research → plan → build → verify → review → learn → commit
     │      ├── wave 1: brief pr=create-on-wave-1, push=true → looper-commit pushes + opens draft PR
@@ -36,10 +37,11 @@ loop-de-looper(goal)
         └── crew pass(branch state)           → blocker / warning / nit findings; loop back if blockers
 └── final crew pass(cumulative branch)        → before declaring goal-complete
 └── PR finalization backstop                  → assert PR exists; create if a wave missed it
+└── looper-recap(run state)                    → plain-language closing summary (read-only) before terminate
 └── report exit state to user (incl. PR #/URL)
 ```
 
-`looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`: six agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
+`looper-nonbeliever`, `looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper`, `looper-recap` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-improver`, `the-stickler`: six agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
 
 ## Inputs
 
@@ -49,9 +51,21 @@ loop-de-looper(goal)
 
 ## Protocol
 
+### Step 0: Nonbeliever pre-flight (once per run)
+
+Invoke `looper-nonbeliever` via Skill tool. Pass goal + the orchestrator's intended approach (one paragraph: how it means to run this).
+
+Nonbeliever interrogates goal + approach against `CLAUDE.md`, existing agents, existing skills, and active directives. Emits a verdict:
+
+- **PROCEED** → continue to Step 1 unchanged.
+- **PROCEED-WITH-NOTES** → carry the notes (drop a redundant wave, add a gate) into scope input at Step 1.
+- **STOP** → hard contradiction (rule conflict, user-authority decision, required-gate substitution). Surface nonbeliever output to user; do NOT proceed to scope.
+
+Nonbeliever is advisory by design: a challenge being *raised* does not halt the run, only a STOP verdict does. Do NOT improvise around a STOP — same discipline as a scope refusal.
+
 ### Step 1: Scope (once per run)
 
-Invoke `looper-scope` via Skill tool. Pass goal + PR context.
+Invoke `looper-scope` via Skill tool. Pass goal + PR context (+ nonbeliever notes if PROCEED-WITH-NOTES).
 
 Scope produces 8-section output. Loop de Looper validates:
 
@@ -153,6 +167,10 @@ Loop terminates when:
 2. No open/draft PR but committed work exists on the branch → backstop: ensure the branch is pushed (`git push -u origin <branch>`), then create the draft now (`looper-commit` Step 3). The Wave-1 model should already have created it; this catches the run where it didn't. NEVER declare goal-complete with committed work and no PR — that orphans the whole run off-dashboard.
 3. Report the PR #, URL, and draft/ready state in the final state report. "Branch is not a PR" is not an acceptable terminal state for shipped work. Flipping draft → ready stays the user's call (`looper-commit` spec) — creating the draft does not.
 
+**Recap (run on success paths, after final crew + PR finalization, before the exit report):**
+
+Invoke `looper-recap` via Skill tool. Pass run state (`gates.jsonl`, `git log main..HEAD`, scope section 5, PR #/URL/state). Recap emits a plain-language closing summary, read-only — it decides nothing and flips nothing. It layers ON TOP of the structured exit report, not instead of it; the structured report still carries the verbatim gate verdicts. Recap pulls its facts from the same on-disk sources, so a gate logged `ran: false` stays `ran: false` in the recap. Skip recap on the STOP/escalation path — a halted run reports its stop state directly.
+
 For path 3 (release-readiness goals typically), order fixed:
 
 1. Run final crew pass FIRST (against cumulative loopable work)
@@ -223,6 +241,7 @@ Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each ste
 
 ## Stop conditions
 
+- **Nonbeliever STOP verdict**: goal hard-conflicts with CLAUDE.md/directive, smuggles a user-authority decision, or substitutes orchestrator judgment for a required gate → STOP before scope, surface nonbeliever output to user
 - **Scope refuses goal**: open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output to user
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
 - **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
@@ -243,6 +262,8 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every termination path.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
+- Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
+- Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
 
 ## Crew trigger tuning
 

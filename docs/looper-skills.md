@@ -1,4 +1,4 @@
-# [Looper](agents/the-looper.md) skills
+# [Looper](../agents/the-looper.md) skills
 
 ## Looper "build"
 
@@ -113,8 +113,25 @@ tests pass. Doesn't auto-approve visual regression baselines.
 
 ## Orchestration skills
 
-The above skills run per-wave inside `the-looper` agent. Two skills sit
+The above skills run per-wave inside `the-looper` agent. Four skills sit
 above the wave loop to coordinate multi-wave goals:
+
+### Looper "nonbeliever"
+
+**File:** `skills/looper-nonbeliever/SKILL.md`
+
+**Trigger:** "Challenge this", "play devil's advocate", or before scope inside Loop de Looper
+
+Adversarial pre-flight. Runs once, before scope. Forces the orchestrator to
+justify the goal + intended approach against CLAUDE.md, existing agents,
+existing skills, and active directives. Raises challenges across four axes —
+redundancy, contradiction, authority, approach — each citing a real source
+line verbatim. Emits `PROCEED`, `PROCEED-WITH-NOTES` (adjustments fed into
+scope), or `STOP` (hard rule conflict, user-authority decision, or
+required-gate substitution). Advisory by design: a raised challenge doesn't
+halt the run, only a STOP verdict does. One round, then it yields.
+
+Added in framework v1.3.
 
 ### Looper "scope"
 
@@ -139,15 +156,33 @@ Added in framework v1.1.
 
 **Trigger:** "Loop de looper", "run all the waves", or any multi-wave goal expecting hands-off execution
 
-Parent orchestrator. Composes looper-scope (queue) + the-looper (per-wave
-executor) + the crew (periodic + final). The crew runs every 4 waves or
-30 cumulative file changes (whichever first) interim, and once mandatory
-before goal-complete. Blocker on crew loops back into a corrective wave;
-no "ship anyway" path. Termination surfaces the loopable work shipped
-alongside required-not-loopable items so the user gets verified work +
-open human gates in one report.
+Parent orchestrator. Composes looper-nonbeliever (pre-flight) + looper-scope
+(queue) + the-looper (per-wave executor) + the crew (periodic + final) +
+looper-recap (closing summary). The crew runs every 4 waves or 30 cumulative
+file changes (whichever first) interim, and once mandatory before
+goal-complete. Blocker on crew loops back into a corrective wave; no "ship
+anyway" path. Termination surfaces the loopable work shipped alongside
+required-not-loopable items so the user gets verified work + open human gates
+in one report.
 
 Added in framework v1.1.
+
+### Looper "recap"
+
+**File:** `skills/looper-recap/SKILL.md`
+
+**Trigger:** "Recap this", "summarize the run", or at the end of Loop de Looper
+
+Clean, shareable closing summary. Runs once, after the final crew pass,
+before termination. Distills the run into a few plain sentences — what
+changed, which crew gates passed, what landed, what's still on the user —
+readable in 20 seconds and shareable as-is. Read-only: it decides nothing
+and flips nothing, and layers on top of the structured exit report rather
+than replacing it. Facts trace to `gates.jsonl`, git log, and scope's
+required-not-loopable list; a gate logged `ran: false` stays `ran: false`.
+Plain language, not dumbed-down and never glossed.
+
+Added in framework v1.3.
 
 ---
 
@@ -160,9 +195,10 @@ Per wave: Research → Plan → Build → Verify → Review → Learn → Commit
 - Learn captures any lessons
 - Commit lands the wave (and opens a draft PR if no existing PR for the branch)
 
-Across waves: Scope → wave loop × N → final crew → terminate
+Across waves: Nonbeliever → Scope → wave loop × N → final crew → recap → terminate
 
-The [Looper agent](agents/the-looper.md) drives the per-wave skills. Loop
-de Looper orchestrates the multi-wave loop, invokes pre-build specialist
-gates when plan emits `ESCALATE`, schedules crew passes at trigger points,
+The [Looper agent](../agents/the-looper.md) drives the per-wave skills. Loop
+de Looper orchestrates the multi-wave loop: runs the nonbeliever pre-flight
+before scope, invokes pre-build specialist gates when plan emits `ESCALATE`,
+schedules crew passes at trigger points, emits a recap before terminating,
 and reports terminal state to the user.
