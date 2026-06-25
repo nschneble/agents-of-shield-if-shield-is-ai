@@ -22,7 +22,10 @@ Loop de Looper formalize protocol so parent runs goal → done without per-wave 
 
 ```
 loop-de-looper(goal)
-├── looper-nonbeliever(goal, approach)        → interrogate goal vs CLAUDE.md/agents/skills/directives; PROCEED | PROCEED-WITH-NOTES | STOP
+├── looper-nonbeliever(goal, approach)        → interrogate + size goal; verdict PROCEED|NOTES|STOP + sizing inline|single-wave|full
+│      ├── sizing inline       → skip scope + wave loop; do it inline, report (no queue, no crew)
+│      ├── sizing single-wave  → one the-looper dispatch, skip queue + crew cadence
+│      └── sizing full         → continue to scope (default multi-wave path)
 ├── looper-scope(goal[, notes])               → wave queue + exit criteria + required-not-loopable items
 └── for each wave in queue:
     ├── the-looper agent(wave brief)          → runs research → plan → build → verify → review → learn → commit
@@ -37,6 +40,7 @@ loop-de-looper(goal)
         └── crew pass(branch state)           → blocker / warning / nit findings; loop back if blockers
 └── final crew pass(cumulative branch)        → before declaring goal-complete
 └── PR finalization backstop                  → assert PR exists; create if a wave missed it
+└── looper-learn(run mode)                     → diagnose the orchestration (sizing/scope/cadence); WRITE lessons before recap
 └── looper-recap(run state)                    → plain-language closing summary (read-only) before terminate
 └── report exit state to user (incl. PR #/URL)
 ```
@@ -62,6 +66,14 @@ Nonbeliever interrogates goal + approach against `CLAUDE.md`, existing agents, e
 - **STOP** → hard contradiction (rule conflict, user-authority decision, required-gate substitution). Surface nonbeliever output to user; do NOT proceed to scope.
 
 Nonbeliever is advisory by design: a challenge being *raised* does not halt the run, only a STOP verdict does. Do NOT improvise around a STOP — same discipline as a scope refusal.
+
+Nonbeliever also emits a **SIZING** label. On any non-STOP verdict, route on it BEFORE Step 1 — most goals handed here size `full-orchestration`, but a misfiled small ask should not pay full freight:
+
+- **inline** → the goal does not warrant the loop. Skip scope AND the wave loop entirely; make the change inline (or hand back "do this inline"), then go straight to the exit report. No queue, no crew, no recap — there is no multi-wave run to summarize.
+- **single-wave** → dispatch `the-looper` once with a single-wave brief (scope + `target` + PR directives: `pr: create-on-wave-1`, `target.push: true`); the-looper runs its own research → plan → build → verify → review → learn → commit internally. Skip the scope queue and the crew cadence; still run the PR-finalization backstop (Step 4) so the one commit lands on a PR.
+- **full-orchestration** → proceed to Step 1 (scope) as normal. This is the default and the common case.
+
+A STOP halts regardless of sizing. Sizing never overrides a STOP, and it never shrinks a vague goal — nonbeliever sizes unspecified work as STOP, not `inline`.
 
 ### Step 1: Scope (once per run)
 
@@ -167,7 +179,13 @@ Loop terminates when:
 2. No open/draft PR but committed work exists on the branch → backstop: ensure the branch is pushed (`git push -u origin <branch>`), then create the draft now (`looper-commit` Step 3). The Wave-1 model should already have created it; this catches the run where it didn't. NEVER declare goal-complete with committed work and no PR — that orphans the whole run off-dashboard.
 3. Report the PR #, URL, and draft/ready state in the final state report. "Branch is not a PR" is not an acceptable terminal state for shipped work. Flipping draft → ready stays the user's call (`looper-commit` spec) — creating the draft does not.
 
-**Recap (run on success paths, after final crew + PR finalization, before the exit report):**
+**Run-level learn (run on success paths, after PR finalization, BEFORE recap):**
+
+Invoke `looper-learn` via Skill tool in **run mode** (see its `## Run-level diagnosis`). Pass the run trail: `gates.jsonl`, `git log --oneline main..HEAD`, the scope queue, the nonbeliever verdict + sizing. Learn diagnoses the ORCHESTRATION — was the sizing right, did the queue hold, did crew cadence fire at the right drift, did escalation thrash — and writes any lesson to its proper layer (`Loop de Looper body` / `Agent body` rows, or a memory). This is the only step in the run that learns about the *looping itself*; the per-wave learn inside each `the-looper` dispatch can't see past its own wave.
+
+Learn runs BEFORE recap because learn WRITES (skill/agent/memory edits) and recap is READ-ONLY. Recap then narrates the finished run, and MAY cite a learn outcome as a fact ("loop tightened its own crew cadence for this domain") — pulled from learn's output, never invented. Skip run-level learn on the STOP/escalation path: a halted run hasn't finished looping, so diagnose it live in the escalation report instead.
+
+**Recap (run on success paths, after final crew + PR finalization + run-level learn, before the exit report):**
 
 Invoke `looper-recap` via Skill tool. Pass run state (`gates.jsonl`, `git log main..HEAD`, scope section 5, PR #/URL/state). Recap emits a plain-language closing summary, read-only — it decides nothing and flips nothing. It layers ON TOP of the structured exit report, not instead of it; the structured report still carries the verbatim gate verdicts. Recap pulls its facts from the same on-disk sources, so a gate logged `ran: false` stays `ran: false` in the recap. Skip recap on the STOP/escalation path — a halted run reports its stop state directly.
 
@@ -253,8 +271,8 @@ Stopping not failure. Looping past known blocker = failure.
 
 ## What loop-de-looper does NOT do
 
-- Does NOT execute waves directly. Dispatches `the-looper`. No bypass.
-- Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway."
+- Does NOT execute waves directly. Inside a run, every wave goes through `the-looper`. No bypass. (The `inline` sizing is not an exception: there the loop never starts — it hands the one-liner back to the parent and exits, rather than running a wave itself.)
+- Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway." (The `single-wave` sizing skips the crew *cadence* because there is no cumulative multi-wave drift to catch — one commit, one PR backstop. That is a sizing decision made up front by nonbeliever, not a mid-run "ship anyway.")
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
 - Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist; no "I checked it myself."
 - Does NOT record a gate as passed when it didn't run. Task tool unavailable or agent never invoked → `gates.jsonl` logs `ran: false`, and the final report says the gate did not run. No invented verdicts, no prose-only gate claims.
@@ -263,6 +281,7 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
+- Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
 - Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
 
 ## Crew trigger tuning
