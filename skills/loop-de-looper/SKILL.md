@@ -85,6 +85,7 @@ Scope produces 8-section output. Loop de Looper validates:
 - Classification non-REFUSE (open-ended goals → scope refuses → Loop de Looper stops)
 - Wave queue non-empty (empty queue → goal already met → report + stop)
 - `Required, not loopable` items captured (surface to user at end, never silent skip)
+- **Executor-writability pre-flight.** Before queueing waves that write a given directory, confirm `the-looper` (a SUBAGENT) can actually write there. Some projects gate subagent writes to UI dirs (e.g. a `.tsx`/`components/` write-gate or a permission allowlist) — invisible to a main-agent check, since the gate is subagent-scoped. A queue full of waves the executor cannot write turns every wave into an unclearable escalation (the specialist that would "clear" it has no Write tool either — see Step 2b). Probe once (or read project memory for a known gate); if the executor is gated out of the target dir, surface to the user BEFORE burning a pilot dispatch, and consider a non-gated target or a main-agent-build fallback.
 
 Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around scope refusal.
 
@@ -105,7 +106,12 @@ Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + pr
 
 #### 2b. Handle escalation (if any)
 
-If hand-back contains `gate needed pre-build`:
+If hand-back contains `gate needed pre-build`, FIRST classify the gate — they are not all the same kind:
+
+- **Design gate** (a judgment a specialist supplies: palette/contrast values, threat model, ARIA contract). A specialist CLEARS it by producing the missing judgment. Route to the named specialist below.
+- **Tooling gate** (a write-block / permission denial / missing credential the executor hit). A specialist CANNOT clear it — `accessibility-lead` and the review crew have Read/Glob/Grep/Task but **no Write tool**, so invoking one to "clear" a write-gate accomplishes nothing. A tooling gate is a USER decision (exempt the executor, change the target, or accept a main-agent-build fallback). Escalate to the user immediately; do NOT round-trip a specialist that can't resolve it. Log the gate `ran: false` with the tooling reason.
+
+For a design gate:
 
 1. Invoke named specialist (e.g. `accessibility-agents:accessibility-lead`) via Task tool with input the-looper specified
 2. Append specialist output to brief as `gate outputs`
