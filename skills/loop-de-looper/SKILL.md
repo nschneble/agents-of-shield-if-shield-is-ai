@@ -22,7 +22,10 @@ Loop de Looper formalize protocol so parent runs goal → done without per-wave 
 
 ```
 loop-de-looper(goal)
-├── looper-nonbeliever(goal, approach)        → interrogate goal vs CLAUDE.md/agents/skills/directives; PROCEED | PROCEED-WITH-NOTES | STOP
+├── looper-nonbeliever(goal, approach)        → interrogate + size goal; verdict PROCEED|NOTES|STOP + sizing inline|single-wave|full
+│      ├── sizing inline       → skip scope + wave loop; do it inline, report (no queue, no crew)
+│      ├── sizing single-wave  → one the-looper dispatch, skip queue + crew cadence
+│      └── sizing full         → continue to scope (default multi-wave path)
 ├── looper-scope(goal[, notes])               → wave queue + exit criteria + required-not-loopable items
 └── for each wave in queue:
     ├── the-looper agent(wave brief)          → runs research → plan → build → verify → review → learn → commit
@@ -37,6 +40,7 @@ loop-de-looper(goal)
         └── crew pass(branch state)           → blocker / warning / nit findings; loop back if blockers
 └── final crew pass(cumulative branch)        → before declaring goal-complete
 └── PR finalization backstop                  → assert PR exists; create if a wave missed it
+└── looper-learn(run mode)                     → diagnose the orchestration (sizing/scope/cadence); WRITE lessons before recap
 └── looper-recap(run state)                    → plain-language closing summary (read-only) before terminate
 └── report exit state to user (incl. PR #/URL)
 ```
@@ -47,7 +51,7 @@ loop-de-looper(goal)
 
 1. **Goal**: raw user input. Single sentence to single paragraph.
 2. **PR context (optional)**: existing PR number if updating draft. `gh pr view <N>` body becomes scope input.
-3. **Resume flag (optional)**: `resume` to continue prior run. Re-runs scope (queue derived from current git state + memory), skips waves whose commit hash already present.
+3. **Resume flag (optional)**: `resume` to continue prior run. Reads `local/loops/<branch>/run-state.json` as authoritative (queue, counters, PR, last-crew); falls back to git-derive only if that snapshot is missing or corrupt. See `## State tracking`.
 
 ## Protocol
 
@@ -63,6 +67,14 @@ Nonbeliever interrogates goal + approach against `CLAUDE.md`, existing agents, e
 
 Nonbeliever is advisory by design: a challenge being *raised* does not halt the run, only a STOP verdict does. Do NOT improvise around a STOP — same discipline as a scope refusal.
 
+Nonbeliever also emits a **SIZING** label. On any non-STOP verdict, route on it BEFORE Step 1 — most goals handed here size `full-orchestration`, but a misfiled small ask should not pay full freight:
+
+- **inline** → the goal does not warrant the loop. Skip scope AND the wave loop entirely; make the change inline (or hand back "do this inline"), then go straight to the exit report. No queue, no crew, no recap — there is no multi-wave run to summarize.
+- **single-wave** → dispatch `the-looper` once with a single-wave brief (scope + `target` + PR directives: `pr: create-on-wave-1`, `target.push: true`); the-looper runs its own research → plan → build → verify → review → learn → commit internally. Skip the scope queue and the crew cadence; still run the PR-finalization backstop (Step 4) so the one commit lands on a PR.
+- **full-orchestration** → proceed to Step 1 (scope) as normal. This is the default and the common case.
+
+A STOP halts regardless of sizing. Sizing never overrides a STOP, and it never shrinks a vague goal — nonbeliever sizes unspecified work as STOP, not `inline`.
+
 ### Step 1: Scope (once per run)
 
 Invoke `looper-scope` via Skill tool. Pass goal + PR context (+ nonbeliever notes if PROCEED-WITH-NOTES).
@@ -73,6 +85,7 @@ Scope produces 8-section output. Loop de Looper validates:
 - Classification non-REFUSE (open-ended goals → scope refuses → Loop de Looper stops)
 - Wave queue non-empty (empty queue → goal already met → report + stop)
 - `Required, not loopable` items captured (surface to user at end, never silent skip)
+- **Executor-writability pre-flight.** Before queueing waves that write a given directory, confirm `the-looper` (a SUBAGENT) can actually write there. Some projects gate subagent writes to UI dirs (e.g. a `.tsx`/`components/` write-gate or a permission allowlist) — invisible to a main-agent check, since the gate is subagent-scoped. A queue full of waves the executor cannot write turns every wave into an unclearable escalation (the specialist that would "clear" it has no Write tool either — see Step 2b). Probe once (or read project memory for a known gate); if the executor is gated out of the target dir, surface to the user BEFORE burning a pilot dispatch, and consider a non-gated target or a main-agent-build fallback.
 
 Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around scope refusal.
 
@@ -93,7 +106,12 @@ Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + pr
 
 #### 2b. Handle escalation (if any)
 
-If hand-back contains `gate needed pre-build`:
+If hand-back contains `gate needed pre-build`, FIRST classify the gate — they are not all the same kind:
+
+- **Design gate** (a judgment a specialist supplies: palette/contrast values, threat model, ARIA contract). A specialist CLEARS it by producing the missing judgment. Route to the named specialist below.
+- **Tooling gate** (a write-block / permission denial / missing credential the executor hit). A specialist CANNOT clear it — `accessibility-lead` and the review crew have Read/Glob/Grep/Task but **no Write tool**, so invoking one to "clear" a write-gate accomplishes nothing. A tooling gate is a USER decision (exempt the executor, change the target, or accept a main-agent-build fallback). Escalate to the user immediately; do NOT round-trip a specialist that can't resolve it. Log the gate `ran: false` with the tooling reason.
+
+For a design gate:
 
 1. Invoke named specialist (e.g. `accessibility-agents:accessibility-lead`) via Task tool with input the-looper specified
 2. Append specialist output to brief as `gate outputs`
@@ -107,7 +125,7 @@ Other stop conditions from the-looper (verify fails twice, review verdict `rethi
 
 #### 2c. Update counters
 
-Maintain in-context state:
+Maintain run state (persisted — see `## State tracking`):
 
 | Counter                    | Updated when                                                                        |
 | -------------------------- | ----------------------------------------------------------------------------------- |
@@ -115,8 +133,11 @@ Maintain in-context state:
 | `waves_since_crew`         | every wave; reset on crew pass                                                      |
 | `cumulative_files_changed` | sum of `files changed` from `git diff --stat` for shipped waves; reset on crew pass |
 | `last_review_verdict`      | from the-looper's review step                                                       |
+| `total_waves`              | every wave dispatched, queue + corrective (never reset) — budget governor input     |
+| `corrective_waves`         | every crew-blocker fix wave (not a queue item); never reset — budget governor input |
+| `consecutive_no_progress`  | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
 
-Counters in-context only (v1). Resume mode re-derives from git log.
+After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the crew trigger. Order matters: persist before you might STOP, so a governor halt still leaves a resumable snapshot.
 
 #### 2d. Crew trigger check
 
@@ -167,7 +188,13 @@ Loop terminates when:
 2. No open/draft PR but committed work exists on the branch → backstop: ensure the branch is pushed (`git push -u origin <branch>`), then create the draft now (`looper-commit` Step 3). The Wave-1 model should already have created it; this catches the run where it didn't. NEVER declare goal-complete with committed work and no PR — that orphans the whole run off-dashboard.
 3. Report the PR #, URL, and draft/ready state in the final state report. "Branch is not a PR" is not an acceptable terminal state for shipped work. Flipping draft → ready stays the user's call (`looper-commit` spec) — creating the draft does not.
 
-**Recap (run on success paths, after final crew + PR finalization, before the exit report):**
+**Run-level learn (run on success paths, after PR finalization, BEFORE recap):**
+
+Invoke `looper-learn` via Skill tool in **run mode** (see its `## Run-level diagnosis`). Pass the run trail: `gates.jsonl`, `git log --oneline main..HEAD`, the scope queue, the nonbeliever verdict + sizing. Learn diagnoses the ORCHESTRATION — was the sizing right, did the queue hold, did crew cadence fire at the right drift, did escalation thrash — and writes any lesson to its proper layer (`Loop de Looper body` / `Agent body` rows, or a memory). This is the only step in the run that learns about the *looping itself*; the per-wave learn inside each `the-looper` dispatch can't see past its own wave.
+
+Learn runs BEFORE recap because learn WRITES (skill/agent/memory edits) and recap is READ-ONLY. Recap then narrates the finished run, and MAY cite a learn outcome as a fact ("loop tightened its own crew cadence for this domain") — pulled from learn's output, never invented. Skip run-level learn on the STOP/escalation path: a halted run hasn't finished looping, so diagnose it live in the escalation report instead.
+
+**Recap (run on success paths, after final crew + PR finalization + run-level learn, before the exit report):**
 
 Invoke `looper-recap` via Skill tool. Pass run state (`gates.jsonl`, `git log main..HEAD`, scope section 5, PR #/URL/state). Recap emits a plain-language closing summary, read-only — it decides nothing and flips nothing. It layers ON TOP of the structured exit report, not instead of it; the structured report still carries the verbatim gate verdicts. Recap pulls its facts from the same on-disk sources, so a gate logged `ran: false` stays `ran: false` in the recap. Skip recap on the STOP/escalation path — a halted run reports its stop state directly.
 
@@ -227,17 +254,55 @@ Hard rules:
 
 The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
 
-## State tracking (v1: in-context)
+## State tracking
 
-Loop de Looper holds queue + counters in parent's working memory. The ONE exception to "no file persistence" is the gate artifact above (`local/loops/<branch>/gates.jsonl`) — counters and queue stay in-context, gate records go to disk because they must outlive the run for audit. Resume mode appends to the existing `gates.jsonl`.
+Run state lives on disk, NOT only in the parent's working memory. A long unattended run gets context-compacted; queue + counters held only in-context can evaporate, and a resume that re-derives them by grepping commit messages is lossy. The snapshot is authoritative.
 
-Resume mode (`/loop-de-looper resume`) re-derives state:
+Two files under `local/loops/<branch>/`, both branch-keyed so resume and parallel branches don't collide:
 
-- Queue: re-run scope, diff against `git log main..HEAD` to find shipped waves
-- Counters: re-derive from git stat output
-- Last crew pass: grep for "crew pass" in recent commit messages
+- **`gates.jsonl`** — append-only audit log. One line per gate event, never rewritten. Source of truth for *what gates ran*.
+- **`run-state.json`** — mutable position snapshot. Rewritten after every wave and every crew pass. Source of truth for *where in the queue we are*.
 
-Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each step. Out of scope for v1.
+Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
+
+```json
+{
+  "goal": "<scope's goal restatement>",
+  "sizing": "full-orchestration",
+  "queue": [
+    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234" },
+    { "wave": 2, "candidate": "...", "status": "pending", "commit": null }
+  ],
+  "counters": {
+    "waves_shipped": 1, "waves_since_crew": 1, "cumulative_files_changed": 6,
+    "last_review_verdict": "clean",
+    "total_waves": 1, "corrective_waves": 0, "consecutive_no_progress": 0
+  },
+  "last_crew_wave": 0,
+  "pr": { "number": 214, "url": "...", "state": "draft" }
+}
+```
+
+Resume mode (`/loop-de-looper resume`):
+
+- **Primary**: read `run-state.json`. Branch matches + file present → trust it for queue, counters, PR, last-crew. Reconcile `last_crew_wave` against `gates.jsonl` crew entries (jsonl wins on any disagreement about *what ran*).
+- **Fallback only** (file missing / corrupt / pre-snapshot run): re-derive as before — re-run scope, diff `git log main..HEAD` for shipped waves, re-derive counters from git stat, grep commit messages for last crew. Lossy; the snapshot exists so this is the exception, not the path.
+
+## Budget governor
+
+The wave queue is bounded (scope caps it ≤15), but **corrective waves are not** — a crew blocker spawns a fix wave, which can spawn another. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe (wave counts, churn) — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
+
+Evaluated in step 2c after `run-state.json` is written, before the crew trigger:
+
+| Rail                       | Default | Hit → |
+| -------------------------- | ------- | ----- |
+| `max_total_waves`          | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling |
+| `max_corrective_waves`     | 6       | STOP + escalate: too many crew-blocker fixes; drift is structural, not patchable |
+| `consecutive_no_progress`  | 3       | STOP + escalate: 3 waves running without shipping net-new queue work (thrash) |
+
+Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. The persisted `run-state.json` makes the halt resumable: surface the state report, let the user raise a ceiling or redirect, then `/loop-de-looper resume`.
+
+Defaults are tunable per project — see the single canonical override block in `## Crew trigger + budget tuning`.
 
 ## Stop conditions
 
@@ -246,15 +311,16 @@ Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each ste
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
 - **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
+- **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, or `consecutive_no_progress` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
 - **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
-Stopping not failure. Looping past known blocker = failure.
+Stopping not failure. Looping past known blocker = failure. Looping past a budget rail = failure.
 
 ## What loop-de-looper does NOT do
 
-- Does NOT execute waves directly. Dispatches `the-looper`. No bypass.
-- Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway."
+- Does NOT execute waves directly. Inside a run, every wave goes through `the-looper`. No bypass. (The `inline` sizing is not an exception: there the loop never starts — it hands the one-liner back to the parent and exits, rather than running a wave itself.)
+- Does NOT skip crew passes. Trigger fires → pass runs. No "trust the loop, ship anyway." (The `single-wave` sizing skips the crew *cadence* because there is no cumulative multi-wave drift to catch — one commit, one PR backstop. That is a sizing decision made up front by nonbeliever, not a mid-run "ship anyway.")
 - Does NOT auto-revert commits when crew finds blocker. Surfaces, user decides.
 - Does NOT silently swap specialist gates for built-in checks. `ESCALATE` fires from plan → orchestrator invokes specialist; no "I checked it myself."
 - Does NOT record a gate as passed when it didn't run. Task tool unavailable or agent never invoked → `gates.jsonl` logs `ran: false`, and the final report says the gate did not run. No invented verdicts, no prose-only gate claims.
@@ -262,21 +328,25 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every termination path.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
+- Does NOT loop unbounded. The budget governor caps total waves, corrective waves, and no-progress thrash; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
+- Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
 - Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
 
-## Crew trigger tuning
+## Crew trigger + budget tuning
 
-Defaults: every 4 waves OR 30 cumulative file changes, whichever first.
+Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3` (see `## Budget governor`).
 
-Project can override via CLAUDE.md:
+Single canonical override block in the project CLAUDE.md:
 
 ```
 ## Loop de Looper
 - crew-trigger: waves=N, files=M
+- budget: max-waves=N, max-corrective=N, no-progress=N
 ```
 
-Tighter triggers for high-drift domains (palette, auth surface). Looser for cleanup loops.
+Tighter triggers + budgets for high-drift domains (palette, auth surface) where churn signals a wrong approach early. Looser for long mechanical cleanup loops that legitimately run many waves.
 
 ## Voice + style
 
