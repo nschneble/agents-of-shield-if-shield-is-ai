@@ -51,7 +51,7 @@ loop-de-looper(goal)
 
 1. **Goal**: raw user input. Single sentence to single paragraph.
 2. **PR context (optional)**: existing PR number if updating draft. `gh pr view <N>` body becomes scope input.
-3. **Resume flag (optional)**: `resume` to continue prior run. Re-runs scope (queue derived from current git state + memory), skips waves whose commit hash already present.
+3. **Resume flag (optional)**: `resume` to continue prior run. Reads `local/loops/<branch>/run-state.json` as authoritative (queue, counters, PR, last-crew); falls back to git-derive only if that snapshot is missing or corrupt. See `## State tracking`.
 
 ## Protocol
 
@@ -119,7 +119,7 @@ Other stop conditions from the-looper (verify fails twice, review verdict `rethi
 
 #### 2c. Update counters
 
-Maintain in-context state:
+Maintain run state (persisted — see `## State tracking`):
 
 | Counter                    | Updated when                                                                        |
 | -------------------------- | ----------------------------------------------------------------------------------- |
@@ -127,8 +127,11 @@ Maintain in-context state:
 | `waves_since_crew`         | every wave; reset on crew pass                                                      |
 | `cumulative_files_changed` | sum of `files changed` from `git diff --stat` for shipped waves; reset on crew pass |
 | `last_review_verdict`      | from the-looper's review step                                                       |
+| `total_waves`              | every wave dispatched, queue + corrective (never reset) — budget governor input     |
+| `corrective_waves`         | every crew-blocker fix wave (not a queue item); never reset — budget governor input |
+| `consecutive_no_progress`  | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
 
-Counters in-context only (v1). Resume mode re-derives from git log.
+After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the crew trigger. Order matters: persist before you might STOP, so a governor halt still leaves a resumable snapshot.
 
 #### 2d. Crew trigger check
 
@@ -245,17 +248,55 @@ Hard rules:
 
 The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
 
-## State tracking (v1: in-context)
+## State tracking
 
-Loop de Looper holds queue + counters in parent's working memory. The ONE exception to "no file persistence" is the gate artifact above (`local/loops/<branch>/gates.jsonl`) — counters and queue stay in-context, gate records go to disk because they must outlive the run for audit. Resume mode appends to the existing `gates.jsonl`.
+Run state lives on disk, NOT only in the parent's working memory. A long unattended run gets context-compacted; queue + counters held only in-context can evaporate, and a resume that re-derives them by grepping commit messages is lossy. The snapshot is authoritative.
 
-Resume mode (`/loop-de-looper resume`) re-derives state:
+Two files under `local/loops/<branch>/`, both branch-keyed so resume and parallel branches don't collide:
 
-- Queue: re-run scope, diff against `git log main..HEAD` to find shipped waves
-- Counters: re-derive from git stat output
-- Last crew pass: grep for "crew pass" in recent commit messages
+- **`gates.jsonl`** — append-only audit log. One line per gate event, never rewritten. Source of truth for *what gates ran*.
+- **`run-state.json`** — mutable position snapshot. Rewritten after every wave and every crew pass. Source of truth for *where in the queue we are*.
 
-Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each step. Out of scope for v1.
+Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
+
+```json
+{
+  "goal": "<scope's goal restatement>",
+  "sizing": "full-orchestration",
+  "queue": [
+    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234" },
+    { "wave": 2, "candidate": "...", "status": "pending", "commit": null }
+  ],
+  "counters": {
+    "waves_shipped": 1, "waves_since_crew": 1, "cumulative_files_changed": 6,
+    "last_review_verdict": "clean",
+    "total_waves": 1, "corrective_waves": 0, "consecutive_no_progress": 0
+  },
+  "last_crew_wave": 0,
+  "pr": { "number": 214, "url": "...", "state": "draft" }
+}
+```
+
+Resume mode (`/loop-de-looper resume`):
+
+- **Primary**: read `run-state.json`. Branch matches + file present → trust it for queue, counters, PR, last-crew. Reconcile `last_crew_wave` against `gates.jsonl` crew entries (jsonl wins on any disagreement about *what ran*).
+- **Fallback only** (file missing / corrupt / pre-snapshot run): re-derive as before — re-run scope, diff `git log main..HEAD` for shipped waves, re-derive counters from git stat, grep commit messages for last crew. Lossy; the snapshot exists so this is the exception, not the path.
+
+## Budget governor
+
+The wave queue is bounded (scope caps it ≤15), but **corrective waves are not** — a crew blocker spawns a fix wave, which can spawn another. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe (wave counts, churn) — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
+
+Evaluated in step 2c after `run-state.json` is written, before the crew trigger:
+
+| Rail                       | Default | Hit → |
+| -------------------------- | ------- | ----- |
+| `max_total_waves`          | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling |
+| `max_corrective_waves`     | 6       | STOP + escalate: too many crew-blocker fixes; drift is structural, not patchable |
+| `consecutive_no_progress`  | 3       | STOP + escalate: 3 waves running without shipping net-new queue work (thrash) |
+
+Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. The persisted `run-state.json` makes the halt resumable: surface the state report, let the user raise a ceiling or redirect, then `/loop-de-looper resume`.
+
+Defaults are tunable per project — see the single canonical override block in `## Crew trigger + budget tuning`.
 
 ## Stop conditions
 
@@ -264,10 +305,11 @@ Persistence (v2): write state JSON to `local/loops/<run-id>.json` after each ste
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
 - **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
+- **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, or `consecutive_no_progress` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
 - **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
-Stopping not failure. Looping past known blocker = failure.
+Stopping not failure. Looping past known blocker = failure. Looping past a budget rail = failure.
 
 ## What loop-de-looper does NOT do
 
@@ -280,22 +322,25 @@ Stopping not failure. Looping past known blocker = failure.
 - Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every termination path.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
+- Does NOT loop unbounded. The budget governor caps total waves, corrective waves, and no-progress thrash; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
 - Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
 - Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
 
-## Crew trigger tuning
+## Crew trigger + budget tuning
 
-Defaults: every 4 waves OR 30 cumulative file changes, whichever first.
+Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3` (see `## Budget governor`).
 
-Project can override via CLAUDE.md:
+Single canonical override block in the project CLAUDE.md:
 
 ```
 ## Loop de Looper
 - crew-trigger: waves=N, files=M
+- budget: max-waves=N, max-corrective=N, no-progress=N
 ```
 
-Tighter triggers for high-drift domains (palette, auth surface). Looser for cleanup loops.
+Tighter triggers + budgets for high-drift domains (palette, auth surface) where churn signals a wrong approach early. Looser for long mechanical cleanup loops that legitimately run many waves.
 
 ## Voice + style
 
