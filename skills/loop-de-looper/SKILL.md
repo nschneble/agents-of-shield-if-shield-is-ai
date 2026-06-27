@@ -95,6 +95,8 @@ For each wave in queue, in order:
 
 #### 2a. Dispatch the-looper
 
+**Stale-candidate pre-check (cheap, before the dispatch).** Scope builds the queue ONCE up front; by a later wave an earlier wave may have already renamed, deleted, or fixed what this wave targets. A full `the-looper` dispatch is expensive — don't spend one to hand back "nothing here / file gone." Before dispatching, run a cheap glob/grep: do the candidate's target files still exist, and do they still exhibit the thing the wave addresses? This mirrors ComPilot's two-stage check (a lightweight filter ahead of the costly compiler call). If the candidate is stale → mark the queue item `status: "skipped-stale"` with the reason, log it (`gates.jsonl`, `kind: "stale-skip"`), and move to the next wave. Do NOT escalate — a stale candidate is already-handled work, not a blocker. Distinguish from a real miss: skip only when the target is provably gone or already-satisfied, not merely when a path moved (a moved target is a re-point, still a live wave). A stale-skip is NOT a no-progress event — no `the-looper` ran, so it never touches `consecutive_no_progress`; it's benign queue hygiene, not thrash.
+
 Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + project target (branch name, PR number).
 
 `the-looper` runs full protocol internally: research → plan → build → verify → review → learn → commit. Returns hand-back report (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `learn`, `flags`).
@@ -121,7 +123,29 @@ Record each pre-build specialist gate in the wave's gate artifact (see `## Gate 
 
 Repeat 2b only until escalation cleared. Same specialist gate requested twice for same wave → STOP, escalate to user (palette / architecture decision needed beyond specialist resolve).
 
-Other stop conditions from the-looper (verify fails twice, review verdict `rethink`, etc) bubble up to Loop de Looper. Do NOT swallow.
+**Pre-mandated gates fire up-front, not via a round-trip.** When `looper-scope` already tagged a wave with a required specialist gate (e.g. a mandatory accessibility-lead contract on a hover/press viewer), the orchestrator invokes that specialist BEFORE dispatching `the-looper`, and ships the contract as `gate outputs` in the first brief — so the wave skips plan and builds directly. Do NOT dispatch `the-looper` only to have its plan re-discover the known gate and hand back `gate needed pre-build`; that round-trip burns a full dispatch to surface what scope already declared. The reactive 2b path above is for gates the plan discovers that scope did NOT foresee. If the specialist returns open design decisions that are implementation specifics inside the user's already-stated design (clip strategy, control reuse, caption copy), the orchestrator resolves them on the specialist's recommended defaults — these are not user-authority scope changes. A decision that genuinely re-opens scope (changes what the feature does) still goes to the user.
+
+Other stop conditions from the-looper (verify fails twice, review verdict `rethink`, etc) do NOT bubble straight up — a *retryable* one earns ONE from-scratch retry first (see 2b-retry). Do NOT swallow either way: a retry that fails again bubbles up unchanged.
+
+#### 2b-retry. Stuck-wave retry-from-scratch (one shot, bounded)
+
+Before bubbling a **retryable** the-looper stop up to Step 4, attempt EXACTLY ONE fresh-context re-dispatch. This is the loop-engineering "restart to escape a local optimum" move: an agent stuck after repeated failures escapes more often from a clean restart than from more turns on a rotted context (the ComPilot study's multi-run finding — a from-scratch dialogue beats continued exploration on a wedged one).
+
+**Retryable** (non-deterministic — a fresh attempt can plausibly differ):
+
+- `verify fails twice` on the same root cause
+- review verdict `rethink`
+- a wave that tripped `consecutive_no_progress` (shipped nothing / re-opened the same blocker)
+
+**NOT retryable** (deterministic — a retry hits the same wall and burns a dispatch): tooling gate / write-block / permission denial (2b above), nonbeliever STOP, scope refusal, a budget governor rail, or a design `gate needed pre-build` (that is the 2b specialist path, not a retry). These bubble up immediately.
+
+Mechanics:
+
+1. **Fresh agent, not a resume.** Re-dispatch `the-looper` with NEW context — the whole point is to drop the rotted context and the failed path. A resume re-feeds the dead end and reproduces the failure.
+2. **Directed, not blind.** The retry brief carries a `prior attempt failed:` note — the failure mode in one line (e.g. "verify failed twice on null-deref in `X`; prior approach tiled via `Y`") — and instructs a DIFFERENT strategy. We have the failure signal; use it. Restarting with zero memory of why the last attempt died wastes the retry.
+3. **One shot.** Best-of-2, no more. A second stuck hand-back on the SAME wave bubbles to Step 4 and escalates to the user. No third attempt.
+4. **Log it.** Append a `kind: "wave-retry"` event to `gates.jsonl` (wave, original failure mode, retry outcome) — auditable like any gate. A retry that the orchestrator could not actually dispatch (no Task tool) logs `ran: false`, same discipline as `## Gate artifacts`.
+5. **Counters.** A retry dispatch increments `total_waves` and `wave_retries` (never reset — budget input). It does NOT increment `corrective_waves` (those are crew-blocker fixes, a different cause). A retry that ships net-new work resets `consecutive_no_progress`; a retry that fails again counts toward it.
 
 #### 2c. Update counters
 
@@ -136,6 +160,7 @@ Maintain run state (persisted — see `## State tracking`):
 | `total_waves`              | every wave dispatched, queue + corrective (never reset) — budget governor input     |
 | `corrective_waves`         | every crew-blocker fix wave (not a queue item); never reset — budget governor input |
 | `consecutive_no_progress`  | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
+| `wave_retries`             | +1 on each stuck-wave from-scratch retry dispatch (2b-retry); never reset — budget governor input |
 
 After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the crew trigger. Order matters: persist before you might STOP, so a governor halt still leaves a resumable snapshot.
 
@@ -160,13 +185,15 @@ Invoke six crew agents in parallel via Task tool (one Task call per agent, same 
 - `the-improver`: refactor opportunities
 - `the-stickler`: convention conformance
 
-Each agent gets cumulative diff since last crew pass (or since `main` for final crew). Findings categorized:
+Each agent gets cumulative diff since last crew pass (or, for the final crew, since the run's own first wave commit). Scope the diff to THIS run's commits, NOT blindly `main..HEAD`: a branch handed to the orchestrator mid-flight already carries unrelated pre-run work, so `main..HEAD` drags in commits the run never touched and drowns the crew in out-of-scope findings. Derive the base as the parent of wave 1's commit (`git diff <wave1>^..HEAD`); only a branch forked fresh for this run makes that equal `main..HEAD`. Findings categorized:
 
 - **Blocker**: must fix before continuing (interim) or before goal-complete (final)
 - **Warning**: should fix; track count for warning-saturation trigger
 - **Nit**: capture for future scope run; no loop back
 
 Blockers found → loop back: produce mini-brief for blocker fixes, invoke `the-looper` for one corrective wave, re-run crew on fix. No "ship anyway" path.
+
+Re-crew scope follows the corrective diff, not ceremony. Re-run the agents whose findings the fix targeted (they confirm CLEARED), plus any agent whose domain the corrective diff actually touched. An agent that was clean AND whose domain the fix never entered need not re-run — e.g. a docs+test corrective wave that only deletes a dead attribute from the runtime path doesn't re-summon the correctness/a11y reviewers, provided the byte-identical/behavior-unchanged claim is verified (by the wave's own tests or a finding-agent). State which agents you re-ran and why; do NOT silently drop a clean agent whose domain the fix DID touch.
 
 After every crew pass, write the gate artifact (see `## Gate artifacts`) BEFORE looping back or resetting counters. The artifact records which crew agents actually ran, whether the Task tool was available, and each verdict — so the pass is auditable on disk, not just narrated in the final report.
 
@@ -276,7 +303,8 @@ Different shapes, different jobs: the jsonl is a log you append, the json is a s
   "counters": {
     "waves_shipped": 1, "waves_since_crew": 1, "cumulative_files_changed": 6,
     "last_review_verdict": "clean",
-    "total_waves": 1, "corrective_waves": 0, "consecutive_no_progress": 0
+    "total_waves": 1, "corrective_waves": 0, "consecutive_no_progress": 0,
+    "wave_retries": 0
   },
   "last_crew_wave": 0,
   "pr": { "number": 214, "url": "...", "state": "draft" }
@@ -290,7 +318,7 @@ Resume mode (`/loop-de-looper resume`):
 
 ## Budget governor
 
-The wave queue is bounded (scope caps it ≤15), but **corrective waves are not** — a crew blocker spawns a fix wave, which can spawn another. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe (wave counts, churn) — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
+The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuck-wave retries are not** — a crew blocker spawns a fix wave, which can spawn another, and each retryable stop spends a from-scratch retry. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe (wave counts, churn) — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
 
 Evaluated in step 2c after `run-state.json` is written, before the crew trigger:
 
@@ -299,6 +327,7 @@ Evaluated in step 2c after `run-state.json` is written, before the crew trigger:
 | `max_total_waves`          | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling |
 | `max_corrective_waves`     | 6       | STOP + escalate: too many crew-blocker fixes; drift is structural, not patchable |
 | `consecutive_no_progress`  | 3       | STOP + escalate: 3 waves running without shipping net-new queue work (thrash) |
+| `max_wave_retries`         | 4       | STOP + escalate: too many waves needed a from-scratch retry; the goal is systematically too hard for the executor, not a one-off wedge |
 
 Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. The persisted `run-state.json` makes the halt resumable: surface the state report, let the user raise a ceiling or redirect, then `/loop-de-looper resume`.
 
@@ -309,9 +338,9 @@ Defaults are tunable per project — see the single canonical override block in 
 - **Nonbeliever STOP verdict**: goal hard-conflicts with CLAUDE.md/directive, smuggles a user-authority decision, or substitutes orchestrator judgment for a required gate → STOP before scope, surface nonbeliever output to user
 - **Scope refuses goal**: open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output to user
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
-- **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → STOP, surface agent output
+- **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → ONE from-scratch retry first if the stop is retryable (`## Protocol` 2b-retry); STOP and surface agent output only after the retry also fails (or immediately, for a non-retryable stop)
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
-- **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, or `consecutive_no_progress` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
+- **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, `consecutive_no_progress`, or `max_wave_retries` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
 - **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
@@ -328,7 +357,8 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every termination path.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
-- Does NOT loop unbounded. The budget governor caps total waves, corrective waves, and no-progress thrash; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT loop unbounded. The budget governor caps total waves, corrective waves, no-progress thrash, AND from-scratch retries; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt.
 - Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
 - Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
@@ -336,14 +366,14 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 
 ## Crew trigger + budget tuning
 
-Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3` (see `## Budget governor`).
+Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4` (see `## Budget governor`).
 
 Single canonical override block in the project CLAUDE.md:
 
 ```
 ## Loop de Looper
 - crew-trigger: waves=N, files=M
-- budget: max-waves=N, max-corrective=N, no-progress=N
+- budget: max-waves=N, max-corrective=N, no-progress=N, max-retries=N
 ```
 
 Tighter triggers + budgets for high-drift domains (palette, auth surface) where churn signals a wrong approach early. Looser for long mechanical cleanup loops that legitimately run many waves.
