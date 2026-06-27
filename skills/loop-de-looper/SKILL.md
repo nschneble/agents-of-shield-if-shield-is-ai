@@ -147,6 +147,17 @@ Mechanics:
 4. **Log it.** Append a `kind: "wave-retry"` event to `gates.jsonl` (wave, original failure mode, retry outcome) — auditable like any gate. A retry that the orchestrator could not actually dispatch (no Task tool) logs `ran: false`, same discipline as `## Gate artifacts`.
 5. **Counters.** A retry dispatch increments `total_waves` and `wave_retries` (never reset — budget input). It does NOT increment `corrective_waves` (those are crew-blocker fixes, a different cause). A retry that ships net-new work resets `consecutive_no_progress`; a retry that fails again counts toward it.
 
+#### 2b-flags. Triage cross-file flags before advancing
+
+A wave can SHIP clean yet hand back a `flag` that names a **cross-file incompleteness** — it introduced a reference (to a field, section, contract, or channel in ANOTHER file) that does not exist yet, or left a sibling file needing a matching change. Do NOT let that ride to the crew pass. A flag that says "X references Y, but Y isn't defined" is a known defect the moment it's reported; deferring it converts a one-line fix into a crew BLOCKER plus a full corrective wave plus a re-crew (observed: a ranked-alternates hand-back field referenced by three files but defined in none rode from its wave to the final crew, costing exactly that churn).
+
+On every shipped wave, read the hand-back `flags` before dispatching the next wave:
+
+- **Cross-file incompleteness** (a dangling reference the wave itself created) → action it NOW: if a later queued wave already touches the named file, fold the fix into that wave's brief; otherwise spawn an immediate corrective wave for it. Either way it is resolved before the crew sees it.
+- **Out-of-scope observation** (a pre-existing issue the wave noticed but didn't cause) → capture for a future scope run; do not action mid-run.
+
+The test is causation + reachability: did THIS wave create the dangling reference, and can a queued/cheap wave close it? Yes → triage now. A flag about something the run never touched is not this case.
+
 #### 2c. Update counters
 
 Maintain run state (persisted — see `## State tracking`):
@@ -358,6 +369,7 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 - Does NOT loop unbounded. The budget governor caps total waves, corrective waves, no-progress thrash, AND from-scratch retries; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT defer a wave's cross-file-incompleteness flag to the crew pass. A shipped wave that flags a dangling reference it created (a field/section/contract named but not defined) gets triaged immediately — folded into a later wave's brief or fixed in an immediate corrective — not ridden to the crew where it surfaces as a blocker (`## Protocol` 2b-flags).
 - Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt — reverting to the next pre-ranked plan from `looper-plan` when one exists, improvising only when none does.
 - Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
