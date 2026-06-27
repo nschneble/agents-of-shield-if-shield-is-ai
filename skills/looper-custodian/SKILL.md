@@ -45,15 +45,21 @@ Run in order. A and C and E are purely informational in the issue; B and E carry
 
 ### Phase A — artifact GC (auto, destructive only to scratch)
 
-- Enumerate `local/loops/<branch>/` dirs in each repo. For each, resolve `<branch>`: merged into the default branch **AND** no longer present on the remote → the run is done, GC the dir.
-- A branch still open (PR live, or branch exists) → keep; an in-flight or resumable run owns it.
+- Enumerate `local/loops/<branch>/` dirs in each repo. For each, resolve whether `<branch>`'s work is **merged**, by EITHER signal:
+  - ancestry — `git branch --merged <default>` lists it (its tip is in the default branch), OR
+  - a **merged PR** exists for it — `gh pr list --state merged --head <branch>` returns a row (catches squash-merges, which ancestry misses).
+- **Merged ⇒ reap, regardless of a lingering local branch.** A merged local branch is just un-cleaned-up local cruft — it does NOT own resumable work, so it never blocks the GC. The reap test is *merged*, full stop.
+- **Keep ONLY when work is genuinely in flight:** an **open PR** exists, OR the branch is **not merged by either signal** (unmerged tip + no merged PR). That is the "in-flight or resumable run owns it" case. A lingering *merged* local branch is NOT that case.
+- Squash-merge caveat: if `gh` is unavailable, ancestry alone can't see a squash-merge, so a squash-merged-and-deleted branch reads as unmerged and is conservatively **kept** (never wrongly reaped). Log it as `kept (merge unverifiable — gh absent)` so the miss is visible, not silent.
 - Clear orphaned `run-state.json.tmp` (crash residue) regardless of branch state — the atomic-write contract means a `.tmp` is always disposable.
-- **No grace window.** Reap immediately on merged+deleted. The merge already comprehended the work and `local/` is regenerable scratch — nothing to protect with a delay. The merged+deleted test IS the safety; an open or undeleted branch is never touched.
-- `local/` is gitignored, so this never touches tracked files. Pure scratch hygiene. Log a one-line summary of what was reaped per repo.
+- **No grace window.** Reap immediately once merged. The merge already comprehended the work and `local/` is regenerable scratch — nothing to protect with a delay. The *merged* test IS the safety; an unmerged or open-PR branch is never touched.
+- `local/` is gitignored, so this never touches tracked files. Pure scratch hygiene. Log a one-line summary of what was reaped (and what was kept-and-why) per repo.
 
 ### Phase B — memory audit (auto report, propose-only edits)
 
-- Load `MEMORY.md` index + every memory file under each repo's memory dir.
+- **Deterministic enumeration FIRST.** The orchestrator itself globs each repo's memory dir to build the explicit file list and records `files_total`. Enumeration is NEVER delegated — a subagent's `bash find`/`grep` can silently fail (path quoting, cwd resets) and under-audit without anyone noticing. The orchestrator owns the list; only the per-file *reading* may be delegated.
+- **If delegating the audit** to a subagent (e.g. a large dir like linklater's 60+ files), hand it the **explicit absolute path list** and instruct it to use the **Read tool only** — never bash discovery. The subagent reports back per file so coverage is countable.
+- **Coverage accounting is mandatory.** Track `files_audited` vs `files_total`. If `files_audited < files_total`, the phase verdict is **`partial — N/M audited`**, NEVER "clean". A clean bill is only valid at full coverage. Partial coverage names the unread files and recommends a rerun — a tidy "no findings" that silently skipped 37 files is the exact failure this rule exists to prevent.
 - Detect two conditions:
   - **Duplicates** — two files cover the same fact (same `name` intent, overlapping body). Propose: merge into one, keep the richer.
   - **Contradictions** — a later memory states the opposite of an earlier one (e.g. a feedback memory reversed by a newer correction). Propose: retire the superseded one, leave a `[[link]]` breadcrumb in the survivor.
