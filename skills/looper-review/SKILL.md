@@ -22,6 +22,17 @@ Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass me
 
 Invoke specialists parallel where possible. Synthesize findings, not concatenate.
 
+## Pre-defined reviewer criteria
+
+Each crew reviewer's bar is fixed **before** the diff is seen — curated upfront, not improvised by the judge at review time (VeriLA, arxiv 2503.12651: "defines clear expectations of each agent by curating human-designed agent criteria"). Recommend a reviewer → you assert the criteria below are the gate it'll be held to. The specialist's own agent def is source of truth; this is the contract the loop expects it to enforce. Surfaces per-agent failures instead of one floating, made-up bar.
+
+- **`the-diamantaire`** (general code review): module-boundary violations + business logic delegated out of controllers; god files (~100 lines); N+1 / Prisma over-fetch / missing transaction; wrong NestJS exception (P2025 → `NotFoundException`) + missing `@UseGuards`; broken React form-state sequence + `createContext(undefined)` guard hook; rung fit (no rung-6 custom where stdlib/platform/dep covers); findings confidence-scored, only ≥75 surfaced, each cited `file:Lstart-Lend`.
+- **`the-stickler`** (convention adherence): forbidden abbreviations + single-char vars; `handle*` / `on*` / `*Props` / `*Input` suffixes; `class` DTO vs `interface` shape vs `type` union; Tailwind class order (layout → sizes → margins → paddings → backgrounds → borders → text → focus → rounded → shadows); barrel `index.ts` per module; rule quoted verbatim when invoked.
+- **`accessibility-agents:accessibility-lead`** (shipped UI): WCAG SC met at every real paint site; contrast measured not asserted; `aria-hidden` on decorative icons + explicit `role`/label on interactive elements; focus visible + keyboard reachable; live-region announcement where state changes.
+- **`the-chemist`** (test coverage and quality): every error branch covered (P2025 → `NotFoundException`), not just happy path; tests assert real behavior, never mock plumbing; `*.spec.ts` back-end / `*.test.tsx` front-end; query by role/label not class/test-id; at least one integration test mirroring a real user flow.
+- **`the-chronicler`** (documentation): external contracts thorough (Swagger + `@ApiProperty` + README), internal code WHY + gotchas only; no JSDoc echoing the type signature; comment style (wrap 75, lowercase single-line, no blank before JSDoc tags).
+- **`the-improver`** (refactor / simplification): extract at 3+ repeats, not before; god-file split (100+ suspicious, 200+ guilty); ladder walk (delete → stdlib → platform → existing dep → one-line) before reshaping custom code; behavior preserved exactly (existing tests pass unedited); scope to changed code, no drive-by refactors.
+
 ## What to look for
 
 - **Design fit:** change match existing patterns? New pattern = better, or different?
