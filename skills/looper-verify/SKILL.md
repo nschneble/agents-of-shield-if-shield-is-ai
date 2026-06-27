@@ -15,6 +15,14 @@ Functional verification only. Does change do what spec said? Distinct from revie
 4. Cover golden path + 2–3 edge cases per spec + common sense
 5. Confirm no regressions in adjacent functionality. Run existing tests if available.
 
+## Executable verification function (where an oracle exists)
+
+An LLM judge alone cannot be the sole completion gate — the best frontier long-context model scores only ~11% at agent-trace error-localization ([TRAIL, arxiv 2505.08638](https://arxiv.org/abs/2505.08638)). So WHERE a runnable oracle exists or is cheaply generatable, pair the judgment above with an EXECUTABLE verification function (VF): a generated test/assertion in the wave's language that automation runs. Its pass — not the LLM's say-so — is the completion gate.
+
+- **Conditional, not universal.** Required only where an oracle is feasible. A prose / markdown / spec / docs wave with no runnable oracle CANNOT fabricate one: executable VF = N/A — fall back to the coherence + internal-consistency checks below. Never invent a test for a one-line doc fix.
+- **Distinct from the build's suite.** The VF asserts THIS wave's acceptance criteria; it is not a rerun of the regression suite build already passed. The compiled-CSS grep, class-string jsdom test, contrast math, and endpoint curl below all already qualify.
+- **Unseen-test robustness guard.** Where a test oracle exists, don't only re-run the cases the executor saw or wrote — that overfits to the tests the build targeted. Exercise UNSEEN cases (inputs / edges beyond the visible set) to confirm the change generalizes ([CodeTree, arxiv 2411.04329](https://arxiv.org/abs/2411.04329)). Same conditionality: no oracle, no hidden-test step.
+
 ## For UI changes specifically
 
 - Start `npm run dev` (or project equivalent), click through feature in real browser
