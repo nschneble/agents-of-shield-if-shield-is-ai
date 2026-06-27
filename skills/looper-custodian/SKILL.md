@@ -5,7 +5,7 @@ description: Scheduled cross-run, cross-repo housekeeping for the looper system.
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
 
-Full design rationale: `docs/looper-custodian-plan.md`. This file is the executable spec.
+Full design rationale + decision log: `docs/looper-custodian.md`. This file is the executable spec.
 
 ## Governing principle: custodian PROPOSES, human DISPOSES
 
