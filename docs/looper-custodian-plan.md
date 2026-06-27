@@ -142,7 +142,11 @@ So the rule is sharp:
 
 ## Scheduling
 
-- Cloud cron via the `/schedule` skill (routine), **weekly for all phases**
+- **Local launchd, NOT cloud `/schedule`.** Phases A/B/C read local-only state
+  (`local/loops/` scratch, the `~/.claude` memory dir, `gates.jsonl` across
+  local repos) that an isolated cloud session can't reach — so the host is a
+  macOS launchd job (`com.nickschneble.looper-custodian`, weekly Mon 09:00
+  local), running `scripts/looper-custodian-cron.sh`. **Weekly, all phases**
   (A, B, C, E on one tick). Low frequency — this is hygiene, not a hot loop.
   One cadence keeps it simple; if E proves too noisy weekly it can drop to a
   rotating-every-other-week track without touching A–C.
@@ -203,7 +207,9 @@ B and E carrying the actionable checkboxes.
 - `the-turncoat` — the only actor that rewrites an agent/skill. Custodian
   routes to it; never does the rewrite itself.
 - `deep-research` — Phase E's engine. Reused, not reinvented.
-- `/schedule` — the cron host. Reused.
+- **launchd** — the cron host. Local, not cloud `/schedule`: the scheduled run
+  touches local-only state a cloud session can't reach. Plist +
+  `scripts/looper-custodian-cron.sh` wrapper.
 - `gh` CLI — opens the report issue, reads its checkboxes, comments the apply
   summary. The issue is the report transport AND the approval surface.
 

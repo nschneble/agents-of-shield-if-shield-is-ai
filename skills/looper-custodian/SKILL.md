@@ -99,10 +99,14 @@ Triggered ONLY by `/looper-custodian apply #<issue>`. Never on the cron.
 
 ## Scheduling
 
-- Cloud cron via `/schedule` (routine), **weekly, all phases on one tick** (A → B → C → E). Low frequency — hygiene, not a hot loop. If E proves noisy weekly, drop it to an every-other-week rotating track without touching A–C.
+**Local launchd, NOT cloud `/schedule`.** Phases A/B/C read local-only state — `local/loops/` scratch (gitignored), the `~/.claude` memory dir (outside any repo), `gates.jsonl` across local repos — none of which an isolated cloud session can reach. So the host is a macOS launchd job on the dev machine.
+
+- Job: `~/Library/LaunchAgents/com.nickschneble.looper-custodian.plist` → runs `scripts/looper-custodian-cron.sh`, **weekly, Monday 09:00 local**, all phases on one tick (A → B → C → E). Low frequency — hygiene, not a hot loop.
+- The wrapper runs `claude -p "/looper-custodian" --dangerously-skip-permissions` because an unattended job can't answer prompts. Bounded: the scheduled run is propose-only (see below), so no tracked-file edits happen on it, and the destructive-git guard hook still blocks history rewrites.
+- launchd runs a missed tick on next wake, so a sleeping Mac just defers the run rather than skipping it.
 - The scheduled run only ever opens/updates the report issue. `apply` is always a separate, human-triggered invocation.
 
-Wire it once with `/schedule`: weekly, command `/looper-custodian`.
+To change cadence, edit `StartCalendarInterval` in the plist and reload (`launchctl bootout` then `bootstrap`).
 
 ## Artifacts
 
@@ -139,7 +143,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - `looper-learn` — per-run/per-orchestration lessons. Custodian reads what learn wrote; it does not duplicate learn's diagnosis.
 - `the-turncoat` — the only actor that rewrites an agent/skill. Custodian routes to it; never does the rewrite itself.
 - `deep-research` — Phase E's engine. Reused, not reinvented.
-- `/schedule` — the cron host. Reused.
+- **launchd** — the cron host (local, not cloud `/schedule`, which can't reach local state). Plist + wrapper under `~/Library/LaunchAgents/` + `scripts/`.
 - `gh` CLI — opens the report issue, reads its checkboxes, comments the apply summary.
 
 ## What looper-custodian does NOT do
