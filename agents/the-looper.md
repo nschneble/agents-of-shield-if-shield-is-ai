@@ -87,6 +87,7 @@ Hand-back to orchestrator:
 - **`deferred`**: items out of scope, with reason
 - **`gate needed pre-build`**: populated when plan emits ESCALATE; specifies (a) gate to invoke, (b) input to pass, (c) output looper needs to resume at step 3. Orchestrator re-dispatches with `gate outputs` populated.
 - **`gates needed post-build`**: specialists orchestrator should run after review (crew pass)
+- **`ranked alternates`**: populated ONLY on a retryable STOP (verify-twice / rethink / no-progress) — carries the wave's remaining ranked fallback plan(s) from `looper-plan`, so the orchestrator's 2b-retry hands the next one to the fresh re-dispatch instead of improvising. Empty on any non-retryable stop or clean ship.
 - **`learn`**: new memories / skill edits captured this run
 - **`flags`**: anything worth surfacing that you didn't act on
 

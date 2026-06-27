@@ -89,7 +89,7 @@ False-zero consumer claims shipped broken retirement waves before; plan-stage ST
 
 ### When no mechanized check applies
 
-Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all six output sections, but mechanized predictions section become:
+Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all seven output sections, but mechanized predictions section become:
 
 > No mechanized check applies; wave touches `<change kind>`, not source under contract-tested domain. Risk register relies on `judgment-required` items only.
 
@@ -97,7 +97,7 @@ Honest output, not fallback. Other sections (scope, constraints, risk register, 
 
 ## Output (hand to looper-build)
 
-Structured brief, six sections:
+Structured brief, seven sections (plus `## Ranked alternate plans` below, which rides in the brief for non-trivial waves but is not one of the seven numbered Output sections):
 
 1. **Wave scope**
 
@@ -146,14 +146,13 @@ Source: MapCoder (ACL 2024) — generate k confidence-ranked plans; on failure, 
 
 Proportional — rank only where the wave has genuine alternatives:
 
-- **Non-trivial wave, real approach alternatives** → emit the primary plus 1-2 ranked fallbacks. Each fallback = one line: the alternate approach + a one-line confidence rationale (why it ranks below the primary, what it trades).
+- **Non-trivial wave, real approach alternatives** → emit the primary plus exactly 1 ranked fallback. The 2b-retry is ONE-SHOT, so only Fallback 1 is ever consumed inside the loop — a second fallback is unreachable retry fuel; don't manufacture it. The fallback = one line: the alternate approach + a one-line confidence rationale (why it ranks below the primary, what it trades).
 - **One-line fix / single mechanical change / one viable approach** → primary only. State it: "no ranked alternates — single viable approach." Manufacturing fake fallbacks for a trivial wave is noise; the retry then improvises from the failure signal, correct when there genuinely is no second approach.
 
 Shape:
 
 > **Primary (confidence: high)** — `<approach>`. `<why it leads>`.
 > **Fallback 1 (confidence: medium)** — `<different approach>`. `<what it trades vs primary, e.g. "more files touched, sidesteps the shared-state coupling the primary risks">`.
-> **Fallback 2 (confidence: low)** — `<last-resort approach>`. `<why last, e.g. "widest blast radius; only if both above wedge">`.
 
 Rank by confidence the approach SHIPS the wave clean, not by ease. Fallbacks are real plans: each must still satisfy the wave's constraints (#2) + exit criteria (#7) and pass the same mechanized predictions (#4). A fallback that can't clear the same checks is not a fallback — drop it.
 
@@ -176,7 +175,7 @@ When escalation need, plan emit one line per gate: `ESCALATE: <gate name> – <i
 - Plan NOT write code. Mechanized checks read existing files + dry-run tests. No `Edit` / `Write` to source.
 - Plan NOT replace specialist for judgment-required residuals. Mechanized checks cover deterministic surface; specialists own rest.
 - Plan NOT re-research. Constraint missing, send back to research, do not invent.
-- Plan NOT manufacture ranked alternates for a trivial wave. One viable approach → primary only, stated plainly. Fake fallbacks are noise (`## Ranked alternate plans`).
+- Plan NOT manufacture ranked alternates for a trivial wave (`## Ranked alternate plans`).
 
 ## Stop conditions
 
