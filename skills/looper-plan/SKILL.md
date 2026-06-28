@@ -87,6 +87,20 @@ Multiple extensions via repeated pathspecs (single-quoted), not via brace expans
 
 False-zero consumer claims shipped broken retirement waves before; plan-stage STOP fires per `[[feedback-verify-upstream-gate-claims]]`, but cheaper failsafe is author grep correctly first place. Mechanized predictions section MUST include actual `git grep` command run + raw output, not paraphrased "verified zero consumers."
 
+### UI-touching waves always tag `ui: true` + mandate accessibility-lead
+
+`the-looper` is a SUBAGENT. The main-loop accessibility hook (`UserPromptSubmit` → "delegate to accessibility-lead") fires on the PARENT prompt, NOT inside a subagent dispatch. So a wave whose build edits UI source gets ZERO automatic accessibility pass — the executor can ship `.tsx` hands-off with no specialist review. Plan closes that gap deterministically: it detects UI-touching waves and mandates the gate, so the orchestrator runs accessibility-lead as a pre-build sibling pass (loop-de-looper Step 2b) instead of relying on a hook that never fires.
+
+Detection is mechanical (a glob over the wave's touched-files list from section 1, NOT a judgment call). A wave is UI-touching if ANY touched file matches:
+
+- Components / markup: `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`
+- Server-side templates: `*.leaf`, `*.ejs`, `*.erb`, `*.hbs`, Jinja/`*.j2`
+- Styling that paints user-facing surface: `*.css`, `*.scss`, Tailwind config, design-token files (`tokens.json`, Style Dictionary)
+
+Match → brief carries `UI: yes` in section 1 AND emits a mandatory `ESCALATE: accessibility-lead` pre-build gate (see `## Escalation to specialist`). NON-NEGOTIABLE; not subject to the mechanized-check absorption above. Contrast/token math plan can mechanize and cite (the contrast dry-runs); role/name/keyboard/focus judgment stays the specialist's. Plan mechanizes what it can AND still mandates the gate for the residual.
+
+No UI file touched → `UI: no`, no accessibility-lead mandate. A pure backend / docs / config wave does not summon the specialist.
+
 ### When no mechanized check applies
 
 Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all seven output sections, but mechanized predictions section become:
@@ -103,6 +117,7 @@ Structured brief, seven sections (plus `## Ranked alternate plans` below, which 
 
    - Files touched (exact paths) OR change kind if no files touched (`PR body`, `GitHub release`, `external config`, `documentation`)
    - Regions within file (line ranges or function names) when narrower than whole-file
+   - `UI: yes|no` — `yes` if any touched file matches a UI surface (see `### UI-touching waves always tag`). A `yes` MANDATES the accessibility-lead gate in the escalation section, fired up-front by the orchestrator.
    - Blast radius estimate. Code waves: files + lines + downstream consumers. Non-file waves: user-visible impact surface (e.g. "PR description on github.com: visible to reviewers + repo browsers", "release notes: visible on releases page + automated changelog feeds").
 
 2. **Constraints (cited)**
@@ -162,6 +177,7 @@ Build executes the primary only. The ranked list rides in the brief and surfaces
 
 Mechanizable checks cover most cases. Some categories ALWAYS escalate even when mechanized pass:
 
+- **Any UI-touching wave** (`UI: yes` per `### UI-touching waves always tag`). The accessibility-lead gate is mandatory and fires up-front — the executor subagent never triggers the main-loop accessibility hook, so plan mandates it here. Emit `ESCALATE: accessibility-lead` even when contrast/token math mechanized clean; role/name/keyboard/focus judgment is unmechanizable residual.
 - **Brand-locked palette decisions** (e.g. landing page hardcoded white-on-navy). Mechanized check tell contrast value; only specialist tell whether palette can shift.
 - **Novel palette / new theme.** No historical baseline for delta-E sanity; specialist must vet.
 - **Rendering-context mismatch.** Mechanized check assume import location = host bundle. Shared components render under DIFFERENT host bundle than import directory. Plan flag suspicion; specialist judge.
