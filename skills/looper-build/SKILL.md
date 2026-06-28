@@ -35,7 +35,7 @@ No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP
    - **Non-code wave** (PR body, GitHub release, external config, docs-only) → step 7 below
 3. **Confirm rung from brief.** Plan stated rung 1-5 → proceed. Rung 6 (custom) without named justification (perf/a11y/security/data-loss/trust-boundary or cited requirement) → STOP, send back to plan. Bias toward lower rung holds during build too: implementing reveal lower rung satisfy requirement → take it, note downgrade.
 4. Project use TDD (check CLAUDE.md)? Write failing tests FIRST.
-5. Smallest code change satisfy spec. No bonus refactors, no unrelated cleanups, no defensive code for hypothetical futures. Three similar lines beat premature abstraction.
+5. Smallest code change satisfy spec. No bonus refactors, no unrelated cleanups, no defensive code for hypothetical futures. Three similar lines beat premature abstraction. Reason is NOT saved typing: building for an unarrived need spends optionality + eats NPV, and the loop's cheap codegen refunds neither (see `looper-plan` rung ladder, rung 1). "Loop writes it free, may as well" is the trap; defer to the wave that has the real need.
 6. New files: use `Write`. Modifications: use `Edit`. Do NOT use `cat > file` via Bash. Bash bypass project write-gates that exist for review. Then run, in order: `format` → `lint` → `test` → `build`. All must pass before done. Project has different sequence in CLAUDE.md or memory `feedback-build`? Follow that.
 7. **Non-code wave path**:
    - PR body / GitHub release: use `gh pr edit <N> --body` / `gh release edit` via Bash. No format/lint/test/build (no source touched). Verify via `gh pr view` / `gh release view` next step.
