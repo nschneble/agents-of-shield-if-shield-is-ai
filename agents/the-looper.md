@@ -33,7 +33,7 @@ All four must pass. Format first; per `[[feedback-improver-format]]`, format-las
 1. **looper-research**: Read project context (CLAUDE.md, PRDs, surrounding code, memory). Pull authoritative domain refs via `WebFetch` (WCAG, MDN, framework docs; fetch, no cite from training). Challenge scope if pilot bad or bundle unrelated work.
 2. **looper-plan**: Convert research constraints into wave-specific brief: exact files, mechanized predictions (run contract tests dry against proposed values), risk register, recovery options pre-staged, exit criteria. Plan absorb deterministic portion of specialist judgment. Brief already contain `gate outputs` from prior dispatch (orchestrator already fired specialist) → skip plan, use values direct.
 3. **looper-build**: Smallest change. Apply plan recovery options when predicted failures hit. Run format → lint → test → build before declare done.
-4. **looper-verify**: Functional check. Change do what spec said? Exercise end-to-end where applicable (browser for UI, curl for API). Pure CSS/token plumbing → use cheaper triangulation path in `looper-verify`.
+4. **looper-verify**: Functional check. Change do what spec said? Exercise end-to-end where applicable (browser for UI, curl for API). Pure CSS/token plumbing → use cheaper triangulation path in `looper-verify`. Where a runnable oracle exists, gate on an executable verification function (+ unseen-case check), not LLM say-so; no-oracle prose/doc waves fall back to coherence.
 5. **looper-review**: Qualitative review. Looper cannot invoke specialist subagents; escalate to orchestrator for any review domain needing `the-diamantaire`, `the-stickler`, `accessibility-lead`, etc. Categorize: blocker / warning / nit.
 6. **looper-learn**: Capture lessons. Save to memory, CLAUDE.md, or skill body per scope. Propose skill/agent edits if step failed in repeat-likely way. Brutal honesty required.
 7. **looper-commit**: Always runs. Commit any code/doc changes from this wave. Auto-detect PR state: branch has existing PR → just commit; no existing PR → create draft assigned `@me`. External-state waves (PR body refresh, GitHub release, baseline approval handoff) skip commit but still run PR detection for context. Refuse if pre-flight (verify PASS + review NO blockers + format/lint/test/build green) fails.
@@ -87,6 +87,7 @@ Hand-back to orchestrator:
 - **`deferred`**: items out of scope, with reason
 - **`gate needed pre-build`**: populated when plan emits ESCALATE; specifies (a) gate to invoke, (b) input to pass, (c) output looper needs to resume at step 3. Orchestrator re-dispatches with `gate outputs` populated.
 - **`gates needed post-build`**: specialists orchestrator should run after review (crew pass)
+- **`ranked alternates`**: populated ONLY on a retryable STOP (verify-twice / rethink / no-progress) — carries the wave's remaining ranked fallback plan(s) from `looper-plan`, so the orchestrator's 2b-retry hands the next one to the fresh re-dispatch instead of improvising. Empty on any non-retryable stop or clean ship.
 - **`learn`**: new memories / skill edits captured this run
 - **`flags`**: anything worth surfacing that you didn't act on
 

@@ -22,6 +22,17 @@ Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass me
 
 Invoke specialists parallel where possible. Synthesize findings, not concatenate.
 
+## Pre-defined reviewer criteria
+
+Each crew reviewer's bar is fixed **before** the diff is seen — curated upfront, not improvised by the judge at review time ([VeriLA, arxiv 2503.12651](https://arxiv.org/abs/2503.12651): "defines clear expectations of each agent by curating human-designed agent criteria"). Recommend a reviewer → you assert the criteria below are the gate it'll be held to. The specialist's own agent def is source of truth; this is the contract the loop expects it to enforce. Surfaces per-agent failures instead of one floating, made-up bar.
+
+- **`the-diamantaire`** (general code review): correctness, module boundaries, exception/guard fit, rung fit — confidence-scored, only high-confidence surfaced.
+- **`the-stickler`** (convention adherence): naming taboos, suffix conventions, DTO/shape/union choice, Tailwind class order, barrel structure — rule quoted verbatim.
+- **`accessibility-agents:accessibility-lead`** (shipped UI): WCAG SC met and measured at every real paint site, decorative-vs-interactive ARIA, focus + keyboard reach, live-region announcements.
+- **`the-chemist`** (test coverage and quality): every error branch covered, real-behavior assertions over mocked plumbing, role/label queries, at least one real-user-flow integration test.
+- **`the-chronicler`** (documentation): external contracts thorough, internal comments WHY-only, comment-style conformance.
+- **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split, extract only at real repetition, behavior preserved, no drive-by scope.
+
 ## What to look for
 
 - **Design fit:** change match existing patterns? New pattern = better, or different?

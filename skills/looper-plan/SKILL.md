@@ -89,7 +89,7 @@ False-zero consumer claims shipped broken retirement waves before; plan-stage ST
 
 ### When no mechanized check applies
 
-Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all six output sections, but mechanized predictions section become:
+Some waves match no domain: PR body refresh, README rewrite, GitHub release notes, project-config tweaks, doc-only changes. Real waves, plan still produce all seven output sections, but mechanized predictions section become:
 
 > No mechanized check applies; wave touches `<change kind>`, not source under contract-tested domain. Risk register relies on `judgment-required` items only.
 
@@ -97,7 +97,7 @@ Honest output, not fallback. Other sections (scope, constraints, risk register, 
 
 ## Output (hand to looper-build)
 
-Structured brief, six sections:
+Structured brief, seven sections (plus `## Ranked alternate plans` below, which rides in the brief for non-trivial waves but is not one of the seven numbered Output sections):
 
 1. **Wave scope**
 
@@ -138,6 +138,26 @@ Structured brief, six sections:
    - Concrete: "wave done when N files migrated, contract tests green, no new lint warnings"
    - Used by verify + review to confirm "wave done" objectively
 
+## Ranked alternate plans (retry fuel for non-trivial waves)
+
+Recovery options (#6) patch a _predicted_ failure inside the primary plan — build applies one mid-wave. Ranked alternate plans are a different altitude: whole-approach fallbacks for when the primary plan _wedges_ (verify fails twice, review says rethink) and the orchestrator's stuck-wave retry (`loop-de-looper` 2b-retry) needs a DIFFERENT approach. Pre-rank them now, while research context fresh, so the retry reverts to a vetted next plan instead of improvising one cold.
+
+Source: MapCoder (ACL 2024) — generate k confidence-ranked plans; on failure, revert to the next-highest-confidence plan rather than re-running the failed one (O(kt) for k plans, t repair turns).
+
+Proportional — rank only where the wave has genuine alternatives:
+
+- **Non-trivial wave, real approach alternatives** → emit the primary plus exactly 1 ranked fallback. The 2b-retry is ONE-SHOT, so only Fallback 1 is ever consumed inside the loop — a second fallback is unreachable retry fuel; don't manufacture it. The fallback = one line: the alternate approach + a one-line confidence rationale (why it ranks below the primary, what it trades).
+- **One-line fix / single mechanical change / one viable approach** → primary only. State it: "no ranked alternates — single viable approach." Manufacturing fake fallbacks for a trivial wave is noise; the retry then improvises from the failure signal, correct when there genuinely is no second approach.
+
+Shape:
+
+> **Primary (confidence: high)** — `<approach>`. `<why it leads>`.
+> **Fallback 1 (confidence: medium)** — `<different approach>`. `<what it trades vs primary, e.g. "more files touched, sidesteps the shared-state coupling the primary risks">`.
+
+Rank by confidence the approach SHIPS the wave clean, not by ease. Fallbacks are real plans: each must still satisfy the wave's constraints (#2) + exit criteria (#7) and pass the same mechanized predictions (#4). A fallback that can't clear the same checks is not a fallback — drop it.
+
+Build executes the primary only. The ranked list rides in the brief and surfaces in the wave hand-back, so a later retry has a pre-vetted place to go (see `loop-de-looper` 2b-retry mechanic 2). One shot per wave still holds: the retry consumes the next-ranked plan, it does not walk the whole list.
+
 ## Escalation to specialist (the residual path)
 
 Mechanizable checks cover most cases. Some categories ALWAYS escalate even when mechanized pass:
@@ -155,6 +175,7 @@ When escalation need, plan emit one line per gate: `ESCALATE: <gate name> – <i
 - Plan NOT write code. Mechanized checks read existing files + dry-run tests. No `Edit` / `Write` to source.
 - Plan NOT replace specialist for judgment-required residuals. Mechanized checks cover deterministic surface; specialists own rest.
 - Plan NOT re-research. Constraint missing, send back to research, do not invent.
+- Plan NOT manufacture ranked alternates for a trivial wave (`## Ranked alternate plans`).
 
 ## Stop conditions
 

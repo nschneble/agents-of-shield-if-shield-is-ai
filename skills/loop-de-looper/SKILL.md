@@ -99,7 +99,7 @@ For each wave in queue, in order:
 
 Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + project target (branch name, PR number).
 
-`the-looper` runs full protocol internally: research → plan → build → verify → review → learn → commit. Returns hand-back report (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `learn`, `flags`).
+`the-looper` runs full protocol internally: research → plan → build → verify → review → learn → commit. Returns hand-back report (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`).
 
 **Brief authoring — PR + push directives.** Every wave brief carries two SEPARATE flags. Never bundle them into one "No PR, nothing flipped to ready" phrase — that conflation collapses two different actions and orphaned PR creation in a real run (every wave deferred PR to "the end," and the end had no PR action, so none was ever created). See `## PR lifecycle + push ownership`.
 
@@ -129,7 +129,7 @@ Other stop conditions from the-looper (verify fails twice, review verdict `rethi
 
 #### 2b-retry. Stuck-wave retry-from-scratch (one shot, bounded)
 
-Before bubbling a **retryable** the-looper stop up to Step 4, attempt EXACTLY ONE fresh-context re-dispatch. This is the loop-engineering "restart to escape a local optimum" move: an agent stuck after repeated failures escapes more often from a clean restart than from more turns on a rotted context (the ComPilot study's multi-run finding — a from-scratch dialogue beats continued exploration on a wedged one).
+Before bubbling a **retryable** the-looper stop up to Step 4, attempt EXACTLY ONE fresh-context re-dispatch. This is the loop-engineering "restart to escape a local optimum" move: an agent stuck after repeated failures escapes more often from a clean restart than from more turns on a rotted context (the ComPilot study's multi-run finding — a from-scratch dialogue beats continued exploration on a wedged one). "From scratch" here means fresh CONTEXT — a clean re-dispatch that drops the rotted transcript — NOT a freshly-improvised plan (mechanic 2 below: revert to the next ranked alternate, improvise only when none exists).
 
 **Retryable** (non-deterministic — a fresh attempt can plausibly differ):
 
@@ -142,10 +142,21 @@ Before bubbling a **retryable** the-looper stop up to Step 4, attempt EXACTLY ON
 Mechanics:
 
 1. **Fresh agent, not a resume.** Re-dispatch `the-looper` with NEW context — the whole point is to drop the rotted context and the failed path. A resume re-feeds the dead end and reproduces the failure.
-2. **Directed, not blind.** The retry brief carries a `prior attempt failed:` note — the failure mode in one line (e.g. "verify failed twice on null-deref in `X`; prior approach tiled via `Y`") — and instructs a DIFFERENT strategy. We have the failure signal; use it. Restarting with zero memory of why the last attempt died wastes the retry.
+2. **Directed, not blind — revert to the next ranked plan first.** The retry brief carries a `prior attempt failed:` note — the failure mode in one line (e.g. "verify failed twice on null-deref in `X`; prior approach tiled via `Y`"). For the new strategy, the retry FIRST reverts to the next-highest-ranked alternate plan the wave's `looper-plan` emitted (its `## Ranked alternate plans` list, surfaced in the stuck hand-back), if one exists — that fallback was vetted against the same constraints, exit criteria, and mechanized predictions while the research context was fresh, so the one shot is spent on a pre-vetted approach, not a cold guess. This is MapCoder's move (ACL 2024): on failure, revert to the next-highest-confidence plan rather than re-running the failed one. Only when the plan emitted NO ranked alternate — a trivial wave, or one with a single viable approach — does the retry improvise a DIFFERENT strategy from the failure signal. Either way pass the `prior attempt failed:` note: restarting with zero memory of why the last attempt died wastes the retry.
 3. **One shot.** Best-of-2, no more. A second stuck hand-back on the SAME wave bubbles to Step 4 and escalates to the user. No third attempt.
 4. **Log it.** Append a `kind: "wave-retry"` event to `gates.jsonl` (wave, original failure mode, retry outcome) — auditable like any gate. A retry that the orchestrator could not actually dispatch (no Task tool) logs `ran: false`, same discipline as `## Gate artifacts`.
 5. **Counters.** A retry dispatch increments `total_waves` and `wave_retries` (never reset — budget input). It does NOT increment `corrective_waves` (those are crew-blocker fixes, a different cause). A retry that ships net-new work resets `consecutive_no_progress`; a retry that fails again counts toward it.
+
+#### 2b-flags. Triage cross-file flags before advancing
+
+A wave can SHIP clean yet hand back a `flag` that names a **cross-file incompleteness** — it introduced a reference (to a field, section, contract, or channel in ANOTHER file) that does not exist yet, or left a sibling file needing a matching change. Do NOT let that ride to the crew pass. A flag that says "X references Y, but Y isn't defined" is a known defect the moment it's reported; deferring it converts a one-line fix into a crew BLOCKER plus a full corrective wave plus a re-crew (observed: a ranked-alternates hand-back field referenced by three files but defined in none rode from its wave to the final crew, costing exactly that churn).
+
+On every shipped wave, read the hand-back `flags` before dispatching the next wave:
+
+- **Cross-file incompleteness** (a dangling reference the wave itself created) → action it NOW: if a later queued wave already touches the named file, fold the fix into that wave's brief; otherwise spawn an immediate corrective wave for it. Either way it is resolved before the crew sees it.
+- **Out-of-scope observation** (a pre-existing issue the wave noticed but didn't cause) → capture for a future scope run; do not action mid-run.
+
+The test is causation + reachability: did THIS wave create the dangling reference, and can a queued/cheap wave close it? Yes → triage now. A flag about something the run never touched is not this case.
 
 #### 2c. Update counters
 
@@ -358,7 +369,8 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 - Does NOT loop unbounded. The budget governor caps total waves, corrective waves, no-progress thrash, AND from-scratch retries; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
-- Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt.
+- Does NOT defer a wave's cross-file-incompleteness flag to the crew pass. A shipped wave that flags a dangling reference it created (a field/section/contract named but not defined) gets triaged immediately — folded into a later wave's brief or fixed in an immediate corrective — not ridden to the crew where it surfaces as a blocker (`## Protocol` 2b-flags).
+- Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt — reverting to the next pre-ranked plan from `looper-plan` when one exists, improvising only when none does.
 - Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
 - Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
