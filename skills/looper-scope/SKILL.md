@@ -24,14 +24,14 @@ Scope distinct from plan: scope enumerate waves at goal-level granularity (one l
 
 Classify goal before decompose. Classification determine decomposition strategy.
 
-| Goal shape                   | Example                                                             | Decomposition strategy                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Goal shape                   | Example                                                             | Decomposition strategy                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | **Single-wave bugfix**       | "Fix auth race condition in login flow"                             | One wave. Scope still runs; sets exit criteria, flags if staging needed                                                          |
-| **Feature increment**        | "Add MFA recovery codes"                                            | 1–3 waves usually. Decompose by sub-feature (gen, store, verify, UI)                                                              |
-| **Multi-file refactor**      | "Migrate UserMenu to orbit-tier"                                    | One wave per cluster of co-touching files. Group by host-bundle context, not directory alone                                      |
-| **Cross-cutting initiative** | "Finish the theme refactor", "Harden a11y AAA"                      | Many waves. Order by dependency + risk. Pilot-first per memory `[[feedback-refactor-staging]]`                                    |
+| **Feature increment**        | "Add MFA recovery codes"                                            | 1–3 waves usually. Decompose by sub-feature (gen, store, verify, UI)                                                             |
+| **Multi-file refactor**      | "Migrate UserMenu to orbit-tier"                                    | One wave per cluster of co-touching files. Group by host-bundle context, not directory alone                                     |
+| **Cross-cutting initiative** | "Finish the theme refactor", "Harden a11y AAA"                      | Many waves. Order by dependency + risk. Pilot-first per memory `[[feedback-refactor-staging]]`                                   |
 | **Release-readiness**        | "Flip draft PR to ready-for-review", "Wrap up the auth refactor PR" | Small queue (1–3 waves), often doc-heavy. Explicitly enumerate human-gated tasks; they block completion but loops can't run them |
-| **Open-ended**               | "Improve performance", "Clean up the codebase"                      | REFUSE. Surface to user: needs budget, regression baseline, definition of done                                                    |
+| **Open-ended**               | "Improve performance", "Clean up the codebase"                      | REFUSE. Surface to user: needs budget, regression baseline, definition of done                                                   |
 
 Open-ended goals = refusal, not best-effort decomposition. Scope job = bounded queue, not infinite work.
 
@@ -79,6 +79,7 @@ Eight sections:
 
    - Things that COULD be in scope but consciously excluded for now, will likely surface in future scope run. Each line cite reason: `<item>: deferred because <reason>`.
    - Prevent scope creep mid-loop; document conscious choices for future runs to pick up.
+   - Deferring is not debt — it is holding the option. Naming a future candidate and NOT queuing it now preserves the choice to build it once the need is real (cheaper, better-informed) instead of guessing this run. Don't pad the queue with speculative waves to "save a future scope run"; the future run is cheap and runs with more information.
 
 7. **Out of goal scope**
 

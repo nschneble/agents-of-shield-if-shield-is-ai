@@ -37,6 +37,7 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 
 - **Design fit:** change match existing patterns? New pattern = better, or different?
 - **Rung fit:** approach sit at right ladder rung (YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)? Rung-6 custom code where rung 2/3/4 (stdlib / platform / existing dep) cover? Plan brief named rung; implementation match? Downgrade opportunity (custom → one-liner → existing dep) = blocker or warning by cost. Escape-hatch claims (perf, a11y, security, data-loss, trust), verify requirement real, not asserted.
+- **Speculative build (YAGNI):** structure, config hooks, abstraction, or params built for a need NOT in this wave's spec? Flag it. Cost is optionality + NPV (committed early on a guess, value deferred), NOT "only a few lines." Loop's cheap codegen is why this leaks — easier to over-build, never cheaper to own. Unused-future code shaping a public contract = blocker; otherwise warning. See `looper-plan` rung ladder, rung 1.
 - **Hidden costs:** change add bundle weight, runtime cost, DB load, maintenance burden out of proportion to value?
 - **Regression risk:** break adjacent code? Tests cover change, but cover seams between change + what touches?
 - **Spec drift:** implementation match spec, or build sneak scope? (Compare vs PRD / bug report / research output.)
