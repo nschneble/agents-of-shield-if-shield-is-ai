@@ -94,3 +94,23 @@ Refined 2026-06-27 by the first supervised run (commit `2d8d767`):
    first pass). The orchestrator owns enumeration; delegated reads get explicit
    paths + Read-only; `files_audited < files_total` ⇒ a `partial` verdict, never
    a clean bill on uncovered files.
+
+Refined 2026-06-29 from an external-research review (this pass):
+
+9. **Phase D is previewable + reversible.** `apply` snapshots every target to a
+   `backup-*/` dir before its first write; `apply … --dry-run` prints the exact
+   before/after and writes nothing; `undo` restores the last snapshot. The
+   propose/dispose split already gated *commitment*; this makes the committed
+   step approve a *previewed* diff and a regretted one revert in one command.
+   Convergent signal — brianlovin's `sync.sh` (timestamped backup + `undo` +
+   `--dry-run`), clig.dev (preview before consent), and the "most-capable-agent"
+   prompt (checkpoint-before-destructive) all pointed the same way.
+10. **Phase B gains distillation.** Beyond de-dupe + contradiction, the audit
+    now proposes consolidating 3+ episodic notes that instance one rule into a
+    single semantic/procedural memory (`B-distill-<n>`), linking the instances
+    as evidence. A flat de-dupe misses the pattern the dir only implies.
+11. **Phase E requires a local-validation method.** An external-research
+    candidate is only an actionable checkbox if it carries a runnable eval /
+    shadow run / replay (`validate-by:`); otherwise it stays informational. The
+    highest-variance input shouldn't enter the apply path on an external
+    author's say-so — same discipline as `looper-verify`'s executable VF.
