@@ -32,6 +32,8 @@ Generate challenges across four axes. For each, the orchestrator answers or fold
 
 Cite the conflicting source VERBATIM — rule text, skill description, directive line. A challenge you can't trace to a real line is noise; drop it.
 
+**Every challenge carries a recommended resolution.** An objection with no proposed fix just stalls the orchestrator. For each challenge, after raising it, state the move you'd recommend if the orchestrator can't defend the run as-is — drop the redundant wave, route this decision to the user, add the missing gate, defer the speculative piece to the wave that needs it. A skeptic that only objects forces the orchestrator to invent the resolution; one that recommends turns the interrogation into an actionable hand-off. The recommendation is advisory like the rest of the pass — the orchestrator can answer the challenge instead of taking it — but it's never absent.
+
 ## Sizing
 
 Second output, orthogonal to the verdict. Before any queue gets built, judge how much loop the goal warrants. The full orchestration — scope → per-wave research/plan/build/verify/review/learn → crew passes — is heavy. Swinging it at a one-line fix is its own waste, and nothing downstream self-selects down: `looper-scope` runs the same machinery on a single-wave bugfix as on a cross-cutting refactor. Sizing is the front-door that routes a misfiled small ask off the heavy path.
@@ -52,13 +54,17 @@ Two columns (challenge + orchestrator response) plus a verdict line.
 
 ```
 CHALLENGE 1 [contradiction]: CLAUDE.md "<rule, verbatim>" — goal does <X>, rule forbids <X>.
+  RECOMMEND:    <the move if undefended — e.g. "route the X-vs-rule call to the user">
   ORCHESTRATOR: <justification, or "folds">
 CHALLENGE 2 [redundancy]: skill `looper-build` already ships features. Why a parallel path?
+  RECOMMEND:    <e.g. "drop the parallel wave; fold into looper-build">
   ORCHESTRATOR: <justification>
 ...
 VERDICT: PROCEED | PROCEED-WITH-NOTES | STOP
 SIZING:  inline | single-wave | full-orchestration
 ```
+
+Each challenge emits a `RECOMMEND:` line before the orchestrator's response — the resolution the orchestrator adopts if it can't defend the run. PROCEED-WITH-NOTES carries the adopted recommendations into scope as its notes.
 
 - **PROCEED**: every challenge answered, no hard conflict. Run goes to scope unchanged.
 - **PROCEED-WITH-NOTES**: challenges raised real adjustments (drop a redundant wave, add a gate). Notes appended to scope input. Run continues.
@@ -74,5 +80,6 @@ Skeptic, NOT veto. A challenge being _raised_ never halts the run — only the t
 
 - Does NOT decompose, execute, or fix. Read-only interrogation; hands off to `looper-scope`.
 - Does NOT veto a well-formed run, re-argue after the response, or invent contradictions. PROCEED unless a STOP trigger fires; one round; every challenge cites a real verbatim line or is dropped.
+- Does NOT raise a challenge without a recommended resolution. Each objection pairs with the move it would take if undefended — advisory, but never a bare objection the orchestrator must resolve from scratch.
 - Does NOT decide user-authority questions itself. Finds them, routes them to the user.
 - Does NOT itself skip, shrink, or run the loop. Sizing only labels the work; the orchestrator routes on the label. And it never sizes vague work as small — unspecified scope is a STOP, not an `inline`.
