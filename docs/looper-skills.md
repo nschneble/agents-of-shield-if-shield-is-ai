@@ -1,5 +1,36 @@
 # [Looper](../agents/the-looper.md) skills
 
+## Subcommand grammar
+
+Most looper skills are invoked by natural-language trigger, or as a slash
+command `/<skill>`. The few that take a structured argument follow ONE
+convention so the grammar is predictable across the family:
+
+```
+/<skill> [verb] [arg] [--flag]
+```
+
+- **verb** — lowercase, a single word naming the operation (`resume`, `apply`,
+  `undo`). Noun-verb shape: the skill is the noun, the verb is what to do with it.
+- **arg** — the operand the verb acts on (`#<issue>`, a branch). Positional,
+  after the verb.
+- **--flag** — `--kebab-case`, modifies the verb without changing it
+  (`--dry-run`). Same flag means the same thing wherever it appears.
+
+Structured invocations today:
+
+| Skill | Invocation |
+| ----- | ---------- |
+| `loop-de-looper` | `/loop-de-looper resume` |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo` |
+
+Two rules keep it extensible (clig.dev future-proofing): **add verbs
+explicitly** — a new operation is a new named verb, never folded into a
+catch-all that guesses intent from free text; and **no arbitrary
+abbreviation** — `apply` is `apply`, not `ap`. A bare `/<skill>` with no verb
+runs the skill's default (the maintenance run, a fresh orchestration), so new
+verbs can be added later without colliding with the no-verb form.
+
 ## Looper "build"
 
 **File:** `skills/looper-build/SKILL.md`
