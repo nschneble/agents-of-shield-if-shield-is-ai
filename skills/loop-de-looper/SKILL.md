@@ -346,6 +346,17 @@ Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. 
 
 Defaults are tunable per project — see the single canonical override block in `## Crew trigger + budget tuning`.
 
+## Context-pressure handoff
+
+A long unattended run fills the context window. Pushed past that, recall degrades: the in-context queue and counters get summarized lossily, mid-wave reasoning rots, and a wave dispatched into a degraded context ships worse work than the same wave from a clean start. The wave boundary is the safe place to stop — `run-state.json` is written there (step 2c, atomic), so a halt-and-resume across that line loses nothing.
+
+So context pressure is a **wave-boundary handoff**, not a mid-wave abort:
+
+- **The signal is observed, not metered.** Same honesty as the budget governor's no-token-gauge rule: a Skill orchestrator can't read an exact context-window %, so don't invent one. The real signals are coarse and real — a compaction/summary event fired this run, OR the orchestrator had to re-derive in-context queue/counters from `run-state.json` because it lost them (the `## State tracking` fallback firing mid-run is itself the tell). Treat either as pressure.
+- **Halt at the NEXT wave boundary, never mid-wave.** Let the current `the-looper` dispatch finish its wave (it commits at a clean point), write `run-state.json`, then stop BEFORE dispatching the next wave. Never interrupt a wave to "save context" — a half-built wave is the loss this avoids, not the cure.
+- **It's a clean handoff, not a stuck stop.** Because state is persisted, the halt report is a normal resumable one: surface where the queue stands and end with the literal `` `/loop-de-looper resume` `` (per `## Voice + style`). The resume re-dispatches from the snapshot into a fresh context — the same "restart to escape a rotted context" move 2b-retry uses for a wedged wave, applied to the whole run.
+- **Don't pre-empt needlessly.** A run that still has clear headroom does not stop early — this fires on observed pressure near a boundary, not on wave count. Wave count already has its own rail (`max_total_waves`); this is the orthogonal context axis.
+
 ## Stop conditions
 
 - **Nonbeliever STOP verdict**: goal hard-conflicts with CLAUDE.md/directive, smuggles a user-authority decision, or substitutes orchestrator judgment for a required gate → STOP before scope, surface nonbeliever output to user
@@ -354,6 +365,7 @@ Defaults are tunable per project — see the single canonical override block in 
 - **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → ONE from-scratch retry first if the stop is retryable (`## Protocol` 2b-retry); STOP and surface agent output only after the retry also fails (or immediately, for a non-retryable stop)
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
 - **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, `consecutive_no_progress`, or `max_wave_retries` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
+- **Context pressure at a wave boundary**: a compaction fired or in-context state had to be re-derived from `run-state.json` → finish the current wave, then halt cleanly BEFORE the next dispatch and emit `/loop-de-looper resume` (`## Context-pressure handoff`). A clean handoff, not a failure — the snapshot makes the resume lossless.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
 - **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
@@ -375,6 +387,8 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT defer a wave's cross-file-incompleteness flag to the crew pass. A shipped wave that flags a dangling reference it created (a field/section/contract named but not defined) gets triaged immediately — folded into a later wave's brief or fixed in an immediate corrective — not ridden to the crew where it surfaces as a blocker (`## Protocol` 2b-flags).
 - Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt — reverting to the next pre-ranked plan from `looper-plan` when one exists, improvising only when none does.
 - Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
+- Does NOT dispatch a new wave into a degraded context, and does NOT interrupt a wave mid-flight to save context. On observed context pressure it halts at the NEXT wave boundary (state already persisted) and hands off with a `/loop-de-looper resume` line — never a mid-wave abort, never an invented context-% gauge (`## Context-pressure handoff`).
+- Does NOT halt without naming the next command. Every STOP / escalation / context-pressure handoff / required-not-loopable termination ends with the literal runnable line the user pastes next (`## Voice + style`).
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
 - Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
 - Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
@@ -398,6 +412,14 @@ Tighter triggers + budgets for high-drift domains (palette, auth surface) where 
 Reports to user: structured, scannable. Per-wave status line. Crew pass summary. Final state report. Match lean voice of `looper-commit` and `looper-learn`.
 
 Cite agent outputs verbatim when surfacing blockers; no paraphrase. Per memory `[[feedback-verify-upstream-gate-claims]]` and `[[feedback-task-tool-availability]]`, orchestrator's job = surface signal, not summarize away.
+
+**Every halt names the next command — literally.** A STOP, an escalation, a budget-rail halt, a context-pressure handoff, or a required-not-loopable termination ends with the exact copy-paste line the user runs next — not a described intent the user has to translate. The run knows its own resume path; spell it:
+
+- Resumable halt (governor rail, context pressure, user-intervention pause) → `` `/loop-de-looper resume` `` (the persisted `run-state.json` makes it exact).
+- Custodian-style follow-on (a proposal to apply) → `` `/looper-custodian apply #<issue>` ``.
+- A user-authority decision the run can't make → state the decision, then the command that continues once they've decided.
+
+A halt report that says "the user should re-run when ready" without the runnable line is the gap this rule closes: the next action is one paste, never an inference.
 
 ## Integration prerequisites
 
