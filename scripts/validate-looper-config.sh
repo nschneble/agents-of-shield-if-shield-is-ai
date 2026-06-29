@@ -15,7 +15,7 @@
 set -uo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$repo_root"
+cd "$repo_root" || exit 1
 
 errors=0
 warnings=0
@@ -51,7 +51,9 @@ has_frontmatter() {
 # `local/loops/<branch>/...`, prose, and absolute/home paths.
 check_references() {
   local file="$1" token
-  # Pull every `backtick`-wrapped token, one per line.
+  # Pull every `backtick`-wrapped token, one per line. The backticks are literal
+  # regex chars, not shell expansion — single quotes are intentional.
+  # shellcheck disable=SC2016
   grep -oE '`[^`]+`' "$file" 2>/dev/null | tr -d '`' | while IFS= read -r token; do
     case "$token" in
       agents/*|skills/*|docs/*|scripts/*) : ;;
