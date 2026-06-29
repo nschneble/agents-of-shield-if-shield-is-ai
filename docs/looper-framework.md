@@ -25,3 +25,14 @@ Plan absorbs the deterministic portion of pre-build specialist judgment so
 the loop stays autonomous unless real residual judgment is needed. When
 plan emits `ESCALATE: <gate>`, the agent stops; orchestrator invokes the
 named specialist, appends its output as `gate outputs`, and re-dispatches.
+
+## Config validation
+
+The agent + skill specs are themselves checked. `scripts/validate-looper-config.sh`
+asserts every `agents/*.md` and `skills/*/SKILL.md` has the frontmatter the
+harness resolves on (`name`, `description`) and that the declared name matches
+its path — a malformed name silently breaks resolution. It also warns on
+backtick'd repo-relative path references that don't resolve (doc rot), while
+leaving `[[memory-links]]` alone (a dangling one is a valid forward-reference).
+The `.github/workflows/validate.yml` CI job runs it on every push and PR, so a
+broken spec can't land; run it locally before committing spec edits.
