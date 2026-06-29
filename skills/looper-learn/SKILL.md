@@ -52,6 +52,20 @@ Match lesson to right persistence layer:
 
 Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't leave just memory. Memories = evidence; skill edits = fixes.
 
+## Recurring failure → durable guardrail (not just a note)
+
+A memory records that something went wrong; it does not *prevent* the recurrence. When a failure is one a **check could have caught** — and especially when it has now happened more than once — the lesson is incomplete until it proposes a durable guardrail, not only a prose note. "Fails twice → add a guardrail" beats "fails twice → write it down again," because the next run reads code/tests, not every memory.
+
+Classify the recurring failure by what would have caught it, and propose the matching artifact:
+
+| Failure shape | Durable guardrail to propose |
+| ------------- | ---------------------------- |
+| A behavior regressed / a bug reappeared that a runnable oracle could assert | An **executable verification assertion** — graduate it into `looper-verify` as a standing check (see its `## Standing regression assertions`), or a project test. Its pass, not memory, is the gate next time. |
+| A convention/constraint was violated that a rule could state flatly | A **CLAUDE.md policy line** (per-project) or a one-line addition to the relevant skill/agent body (cross-project). |
+| An orchestration step misfired the same way across runs | A **skill/agent body edit** to the misfiring step (the table above), not a third memory restating the symptom. |
+
+Discipline: the guardrail is *proposed*, not silently installed — same propose/dispose line the rest of the system holds. Learn writes the memory (the evidence) AND names the concrete check to add (the fix); a human/commit adopts the check. A guardrail with no failing-case behind it is speculation — only propose one a real, cited failure motivates. Do not over-fit: one flaky incident is a note, a *repeated* or check-shaped failure is a guardrail.
+
 ## What NOT to save
 
 - Code patterns derivable from current code (`git blame` or `grep` find them)

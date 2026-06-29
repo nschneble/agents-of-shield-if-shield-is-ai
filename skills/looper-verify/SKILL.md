@@ -23,6 +23,14 @@ An LLM judge alone cannot be the sole completion gate — the best frontier long
 - **Distinct from the build's suite.** The VF asserts THIS wave's acceptance criteria; it is not a rerun of the regression suite build already passed. The compiled-CSS grep, class-string jsdom test, contrast math, and endpoint curl below all already qualify.
 - **Unseen-test robustness guard.** Where a test oracle exists, don't only re-run the cases the executor saw or wrote — that overfits to the tests the build targeted. Exercise UNSEEN cases (inputs / edges beyond the visible set) to confirm the change generalizes ([CodeTree, arxiv 2411.04329](https://arxiv.org/abs/2411.04329)). Same conditionality: no oracle, no hidden-test step.
 
+## Standing regression assertions (guardrails graduated from past failures)
+
+A failure that recurred is one `looper-learn` may graduate into a **durable check** (its `## Recurring failure → durable guardrail`). Where that check is an executable assertion, it lands HERE — a standing verification function that runs on every wave whose change could re-trigger the original failure, not only the wave that first hit it.
+
+- **Scope by trigger, not by wave.** A graduated assertion declares what it guards (a file, a contract, an invariant). Verify runs it whenever this wave's diff touches that surface — so the regression can't silently come back three waves later in a different change. A wave that touches nothing the assertion guards skips it.
+- **Same oracle conditionality** as the VF above: a guardrail only graduates here if it's runnable. A failure with no runnable oracle becomes a policy line or a checklist item (learn's table), not a fake test.
+- **Cite its origin.** Each standing assertion names the failure that motivated it (the cited incident / memory), so a future reader knows why it exists and a stale one can be retired with evidence, not guesswork. Adopting one is a normal proposed edit — verify hosts the assertion; it doesn't self-install it.
+
 ## For UI changes specifically
 
 - Start `npm run dev` (or project equivalent), click through feature in real browser
