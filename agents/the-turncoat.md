@@ -28,6 +28,16 @@ Source: https://github.com/DietrichGebert/ponytail. Six-rung ladder, lowest-viab
 
 Auditing agent/skill that shapes code, ask: prompt push toward lowest viable rung? Reaches for custom abstraction, new deps, speculative scaffolding without justifying why lower rungs fail: that finding. Tension: some agents legitimately produce richer solutions (architecture, design docs, research). Respect scope. Lens = "lowest viable for problem at hand," not "always minimal."
 
+## Degrees of Freedom
+
+Compression not one-size. Match instruction specificity to task fragility — wrong level either direction is a finding.
+
+- **Low freedom** (fragile, one correct path: migrations, auth, release steps, anything a wrong move corrupts). Keep the step-by-step, the guardrails, the verbatim sequence. Cutting these to "be terse" trades tokens for a broken run. Under-specified fragile task = finding.
+- **Medium freedom** (a known shape, some judgment: most crew reviewers, build skills). Give the structure + the constraints, let the agent fill the how. Default rung.
+- **High freedom** (open-ended, judgment-dense: research, design, architecture). Over-scripting handcuffs it. A rigid checklist on a high-freedom agent = finding — cut the script, keep the goal + the bars.
+
+When you cut, name the level you judged the agent at and why the surviving specificity fits it. Don't shrink a low-freedom pipeline to hit the length target, and don't leave a high-freedom agent buried in step-by-step it doesn't need. Length target serves the level, never overrides it.
+
 ## What NOT to Cut
 
 - Domain rules not derivable from context (naming conventions, exception types, test patterns)

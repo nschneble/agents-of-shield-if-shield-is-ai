@@ -1,6 +1,6 @@
 ---
 name: looper-custodian
-description: Scheduled cross-run, cross-repo housekeeping for the looper system. Runs weekly — GCs merged-branch artifacts, audits memory for duplicates/contradictions, mines wave history across repos, and researches external advances — then opens a GitHub report issue with checkbox proposals. Destructive edits (memory merges, agent rewrites via the-turncoat) apply ONLY through a separate human-checked `apply` step. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, or "looper-custodian apply #<issue>".
+description: Scheduled cross-run, cross-repo housekeeping for the looper system. Runs weekly — GCs merged-branch artifacts, audits memory for duplicates/contradictions, mines wave history across repos, and researches external advances — then opens a GitHub report issue with checkbox proposals. Destructive edits (memory merges, agent rewrites via the-turncoat) apply ONLY through a separate human-checked `apply` step, which is previewable (`--dry-run`) and reversible (`undo`). Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", or "looper-custodian undo".
 ---
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
@@ -21,9 +21,13 @@ So the line is sharp:
 | Invocation | Does |
 | ---------- | ---- |
 | default (cron or manual `/looper-custodian`) | the **maintenance run**: phases A → B → C → E, read-only, ends by opening/updating the report issue |
-| `/looper-custodian apply #<issue>` | **Phase D**: reads the ticked checkboxes in that issue, applies exactly those, idempotently |
+| `/looper-custodian apply #<issue>` | **Phase D**: reads the ticked checkboxes, snapshots targets to a backup, applies exactly those, idempotently |
+| `/looper-custodian apply #<issue> --dry-run` | **Phase D preview**: prints the EXACT before/after of each ticked item and writes nothing. Consent then approves a *previewed* diff, not a *described* one |
+| `/looper-custodian undo` | **restore** the most recent Phase D snapshot, reverting the last `apply`. Idempotent — a no-op on an already-clean tree |
 
-Phase D is NEVER part of the scheduled run. The cron only ever proposes.
+Phase D is NEVER part of the scheduled run. The cron only ever proposes. `--dry-run` and `undo` are human-triggered like `apply` itself.
+
+Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo` is a sibling verb.
 
 ## Repos (explicit, not auto-discovered)
 
@@ -60,10 +64,11 @@ Run in order. A and C and E are purely informational in the issue; B and E carry
 - **Deterministic enumeration FIRST.** The orchestrator itself globs each repo's memory dir to build the explicit file list and records `files_total`. Enumeration is NEVER delegated — a subagent's `bash find`/`grep` can silently fail (path quoting, cwd resets) and under-audit without anyone noticing. The orchestrator owns the list; only the per-file *reading* may be delegated.
 - **If delegating the audit** to a subagent (e.g. a large dir like linklater's 60+ files), hand it the **explicit absolute path list** and instruct it to use the **Read tool only** — never bash discovery. The subagent reports back per file so coverage is countable.
 - **Coverage accounting is mandatory.** Track `files_audited` vs `files_total`. If `files_audited < files_total`, the phase verdict is **`partial — N/M audited`**, NEVER "clean". A clean bill is only valid at full coverage. Partial coverage names the unread files and recommends a rerun — a tidy "no findings" that silently skipped 37 files is the exact failure this rule exists to prevent.
-- Detect two conditions:
+- Detect three conditions:
   - **Duplicates** — two files cover the same fact (same `name` intent, overlapping body). Propose: merge into one, keep the richer.
   - **Contradictions** — a later memory states the opposite of an earlier one (e.g. a feedback memory reversed by a newer correction). Propose: retire the superseded one, leave a `[[link]]` breadcrumb in the survivor.
-- Output **proposals only** — each as a checkbox in the issue (`B-merge-<n>`, `B-retire-<n>`) with the two file paths, the conflicting lines **verbatim**, and the recommended action. NO file is edited in Phase B. Edits happen in Phase D after a human ticks the box.
+  - **Distillation** — three-plus *episodic* notes (one-off project observations) that all instance the same underlying rule. Not duplicates (each cites a different occurrence) and not contradictions (they agree) — they're evidence piling up for a pattern no single memory states. Propose: distill into ONE semantic/procedural memory that names the rule, `[[link]]` the episodic instances as its evidence, and retire them. This is the consolidation a flat de-dupe misses: the system has *learned* something the memory dir only implies. Distill, do not just shrink — a one-rule memory that drops the why is worse than the three notes.
+- Output **proposals only** — each as a checkbox in the issue (`B-merge-<n>`, `B-retire-<n>`, `B-distill-<n>`) with the file paths, the relevant lines **verbatim**, and the recommended action. NO file is edited in Phase B. Edits happen in Phase D after a human ticks the box.
 - **Verbatim-citation discipline** (same as the loop's gate reports): quote the conflicting memory lines, never paraphrase away the conflict. A proposal the human can't verify from the quoted evidence is not shown.
 
 ### Phase C — cross-repo mining (auto digest, read-only)
@@ -78,6 +83,7 @@ Run in order. A and C and E are purely informational in the issue; B and E carry
   - **Standing track (every run):** "recent advances in agent loop orchestration / verification patterns" — the moving state of the art.
   - **Rotating track (cycles week to week):** point `deep-research` at our own pieces and ask what the wider world does better — (1) new refactoring / loop-decomposition patterns vs how `looper-scope` + the waves work today; (2) documentation schemes for agent/skill specs; (3) third-party packages / tools that would do something a crew agent or skill currently hand-rolls.
 - Output a digest of candidates, each **mapped to the specific piece it could touch** (which skill / agent / doc) and tagged `E-<n>`. A genuinely actionable one becomes a checkbox so it can ride the same approval path into a scoped change.
+- **No external claim becomes an actionable checkbox without a local-validation method.** Web research is the highest-variance input — a pattern that works in someone's blog post is not evidence it works *here*. So an `E-<n>` is only eligible to be a checkbox if it carries a concrete way to prove it locally BEFORE adoption: a runnable eval, a shadow run (apply it to one wave/repo and compare), or a replay against a past run's `gates.jsonl`. State the method inline (`validate-by: <how>`). A candidate with no feasible local check stays **informational only** — it goes in the digest as signal, never as a tick-to-apply box. This mirrors the loop's own "executable verification function over LLM say-so" rule (`looper-verify`): adopt on local proof, not on an external author's say-so.
 - NEVER auto-applies — highest-variance, lowest-determinism input, so it feeds a human decision exactly like Phase C. It informs; it never edits.
 
 ## The report issue (notification + approval surface)
@@ -96,12 +102,21 @@ To approve, tick the boxes you want and run `/looper-custodian apply #<issue>`.
 Triggered ONLY by `/looper-custodian apply #<issue>`. Never on the cron.
 
 1. Read the issue body via `gh`. Parse the checkboxes: a ticked `[x]` tag applies; an unticked `[ ]` is skipped. **No free-text approval parsing** — boxes only.
-2. For each ticked `B-merge`/`B-retire`: apply the memory merge/retire (the only place custodian writes a memory). Leave the `[[link]]` breadcrumb on retire.
-3. For each ticked `D-turncoat`: invoke `the-turncoat` via the Task tool with the specific flagged target. Custodian decides *what* to hand it; turncoat decides *how* to trim; the human approved *that it runs*. Custodian never hand-edits an agent itself.
-4. For each ticked `E-<n>` that maps to a build: hand it off as a scoped change (note it for the user / a `loop-de-looper` run) — custodian does not itself implement features.
-5. **Idempotent.** Diff current state first; an already-applied item is a no-op, never a double-edit. Re-running `apply` on the same issue is safe.
-6. **Audit every write.** Log each applied edit (file, before/after summary) to `custodian-log.jsonl`, and comment the summary back on the issue.
-7. Applied edits to tracked files (memory dir, agents) go through the **normal review/commit path** — never silently committed by custodian.
+2. **Snapshot before any write.** Copy every file a ticked item will touch into `local/custodian/<date>/backup-<issue>-<seq>/`, alongside a `manifest.json` listing each backed-up path + its original location + the issue tag that touched it. The snapshot is taken whole, BEFORE the first edit, so `undo` restores a consistent pre-apply state even if apply halts mid-run. (`--dry-run` skips this — it writes nothing to snapshot.)
+3. For each ticked `B-merge`/`B-retire`/`B-distill`: apply the memory merge/retire/distill (the only place custodian writes a memory). Leave the `[[link]]` breadcrumb on retire, and on distill link the retired episodic instances into the new semantic memory as its evidence.
+4. For each ticked `D-turncoat`: invoke `the-turncoat` via the Task tool with the specific flagged target. Custodian decides *what* to hand it; turncoat decides *how* to trim; the human approved *that it runs*. Custodian never hand-edits an agent itself.
+5. For each ticked `E-<n>` that maps to a build: hand it off as a scoped change (note it for the user / a `loop-de-looper` run) — custodian does not itself implement features.
+6. **Idempotent.** Diff current state first; an already-applied item is a no-op, never a double-edit. Re-running `apply` on the same issue is safe.
+7. **Audit every write.** Log each applied edit (file, before/after summary, backup path) to `custodian-log.jsonl`, and comment the summary back on the issue — including the backup dir and the `undo` command so the reversal is one copy-paste away.
+8. Applied edits to tracked files (memory dir, agents) go through the **normal review/commit path** — never silently committed by custodian.
+
+### `--dry-run` — preview, write nothing
+
+`apply #<issue> --dry-run` runs steps 1 + 3–5 in *describe* mode: for each ticked item it prints the exact before/after (the verbatim memory lines being merged/retired/distilled, the turncoat target + its current vs proposed shape, the scoped-change hand-off text) and STOPS. No snapshot (step 2), no write, no log, no issue comment. The point: the human approves the literal diff, not a paraphrase of it. A real `apply` after a `--dry-run` is the same command without the flag.
+
+### `undo` — restore the last snapshot
+
+`undo` reads the most recent `backup-*/manifest.json` under `local/custodian/`, and restores each listed file to its backed-up content, reverting the last `apply`. Idempotent: if the current files already match the backup (nothing to revert, or `undo` already ran), it's a no-op and says so. `undo` reverts custodian's *working-tree* writes; tracked-file edits already committed are reverted through the normal git path (custodian never force-rewrites history — the destructive-git guard blocks that anyway). One level deep: `undo` restores the latest snapshot, not a stack.
 
 ## Scheduling
 
@@ -119,6 +134,7 @@ To change cadence, edit `StartCalendarInterval` in the plist and reload (`launch
 Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 
 - **`custodian-log.jsonl`** — append-only run log, one JSON line per phase action, never rewritten. The machine record / audit trail.
+- **`backup-<issue>-<seq>/`** — pre-apply snapshot of every file a Phase D `apply` touched, plus a `manifest.json` (path + original location + issue tag per file). Written by `apply` before its first edit; read by `undo` to revert. The reversibility backstop behind the human-checked apply.
 
 ```json
 {
@@ -138,6 +154,8 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 ## Safety rails (carried from the loop's own discipline)
 
 - **Propose-vs-dispose split** is the spine: read-only auto, destructive gated behind a ticked box + explicit `apply`.
+- **Every apply is previewable and reversible** — `--dry-run` shows the exact diff before consent; a pre-write snapshot + `undo` reverts it after. Consent approves a previewed change, not a described one; a regretted apply is one command back.
+- **No external claim is actionable without a local-validation method** — a Phase E candidate with no runnable eval / shadow / replay stays informational, never a tick-to-apply box (Phase E).
 - **No memory deleted on contradiction alone** without the human seeing both sides quoted verbatim in the issue.
 - **No agent rewritten** except via `the-turncoat`, on an approved target — custodian never hand-edits an agent.
 - **Bounded** — cap proposals per run (default 20 across B+C+E) so one tick can't dump an unreviewable wall. Surface "N more not shown" rather than silently truncating.
@@ -157,6 +175,8 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - Does NOT edit a memory or an agent during the scheduled run — proposes only; writes happen ONLY in `apply` after a ticked box.
 - Does NOT parse free-text approval — checkboxes only.
 - Does NOT auto-apply Phase E research, ever — it informs a human decision.
+- Does NOT make an external-research finding actionable without a local-validation method — no eval/shadow/replay ⇒ informational only, never a checkbox.
+- Does NOT write in Phase D without first snapshotting the targets, and does NOT offer an `apply` that can't be `--dry-run` previewed or `undo`-reverted.
 - Does NOT GC an open or undeleted branch's artifacts, or touch any tracked file in Phase A.
 - Does NOT reach beyond the explicit repo list.
 - Does NOT record a result it didn't produce — unavailable tool ⇒ `ran: false`, no invented digest or verdict.
