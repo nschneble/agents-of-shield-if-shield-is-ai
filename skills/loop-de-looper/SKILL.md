@@ -183,9 +183,15 @@ After every wave, evaluate trigger:
 
 - `waves_since_crew >= 4` OR
 - `cumulative_files_changed >= 30` OR
-- `last_review_verdict == warning-saturated` (multiple consecutive warnings across waves)
+- `last_review_verdict == warning-saturated` (multiple consecutive warnings across waves) OR
+- **the wave was novel/large/high-risk OR left debris** — crew NOW, regardless of the count/file floor.
 
 Trigger fires → invoke crew (step 3). Threshold tunable per project via CLAUDE.md override; defaults above.
+
+The first three are *drift* signals (small changes accumulating unreviewed). The fourth is a *concentrated-risk / debris* signal and is the one orchestrators most often under-apply (observed twice on theme-editor runs — see memory `[[feedback-loop-crew-cadence-risk-weighted]]`). Two sub-cases, both fire it:
+
+- **Concentrated risk**: a wave shipped a new algorithm/generator, a state machine, a model inversion, or a single large diff. Crew it the moment it lands so a structural flaw surfaces small, not buried under later waves in a giant final-crew diff.
+- **Debris**: a wave performed **deletions / removed a subsystem / left dead code or doc drift** — even when later waves do NOT build on it. The trap is reasoning "later waves don't touch this, so it can wait": deletion debris (an orphaned dead branch, a docstring/comment the deletion silently falsified) is flagged by a crew pass *regardless* of whether later waves compound it, and deferring only concentrates the blocker + its corrective churn at the end. A wave that deletes a subsystem is a crew-now wave.
 
 ### Step 3: Crew pass (interim OR final)
 
