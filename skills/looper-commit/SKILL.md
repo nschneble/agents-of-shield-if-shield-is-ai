@@ -118,9 +118,11 @@ Clear pattern → emulate. Else default to:
 ```
 
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
-- Attach screenshots for UI changes when available (refer to verify's browser run) — and add the structured recap's UI before/after block (see `## Structured recap`)
-- Include before/after for visual changes — the ASCII wireframe in `## Structured recap` is the dependency-free default
+- Attach screenshots for UI changes when available (refer to verify's browser run) — and add the structured recap's UI before/after block (see `## Structured recap (PR-body section)`)
+- Include before/after for visual changes — the ASCII wireframe in `## Structured recap (PR-body section)` is the dependency-free default
 - Document deferred work explicit; don't hide
+
+> **Recap timing.** In an orchestrated multi-wave run the structured recap is emitted by the TERMINAL PR-body refresh (`loop-de-looper` Step 4), NOT at wave-1 creation — so a wave-1 executor does NOT build it here from a partial diff. A standalone single-commit PR (no orchestrator, whole diff already present) can include it directly.
 
 Create as DRAFT, assign `@me`:
 
@@ -141,11 +143,11 @@ Pass body via HEREDOC to preserve format.
 
 ## Structured recap (PR-body section)
 
-A `## Structured recap` block in the PR body that gives the reviewer the *shape* of the diff before they read it. Dependency-free reimplementation of Builder.io's `visual-recap` taxonomy — same review-acceleration value, PLAIN GitHub markdown, NO hosted / MCP tool (standing directive: no third-party hosted-tool reliance). Stands on its own; a reader who never saw `visual-recap` needs nothing else.
+The emitted `## Structured recap` block in the PR body gives the reviewer the *shape* of the diff before they read it. Dependency-free reimplementation of Builder.io's `visual-recap` taxonomy — same review-acceleration value, PLAIN GitHub markdown, NO hosted / MCP tool (standing directive: no third-party hosted-tool reliance). Stands on its own; a reader who never saw `visual-recap` needs nothing else.
 
 This section defines the FORMAT only. WHEN a recap is emitted (which waves, the UI-glob that gates the wireframe block) is decided upstream — not here.
 
-Composed of up to four sub-blocks, in order:
+Composed of three content sub-blocks, rendered in order — plus a skip rule (a guard that suppresses the whole section, not a fourth block that gets rendered):
 
 ### 1. File-tree with change flags
 
@@ -202,13 +204,13 @@ button's accessible name reads "Submit right-pointing triangle".
 
 If this block is included, the a11y call-out is mandatory and specific — name the actual risk (contrast, accessible-name, focus order, motion), never a generic "check a11y".
 
-### 4. Small-diff skip
+### Small-diff skip (guard, not a rendered block)
 
 A genuinely tiny change — one file, a handful of obvious lines, no behavioural subtlety, no UI delta — gets NO structured recap. It reviews faster as the raw diff; a recap is pure noise on it. Skip the whole section, don't emit an empty one. When genuinely unsure, include it — the cost of a recap on a small diff is low; the cost of omitting it on a subtle one is a missed review.
 
 ### Grounding + secret redaction (every block)
 
-- Build every structural block MECHANICALLY from the real whole-run diff (`git diff <base>...<head>`, `git diff --name-status`). The tree, the flags, the hunks are all real excerpts — never invented, never inferred. When the diff doesn't carry a fact, leave it out. Anything beyond the diff (intent, downstream impact) that you state anyway → mark it `inferred:` so the reviewer knows it isn't ground truth.
+- Build every structural block MECHANICALLY from the real whole-run diff (`git diff <wave1>^..HEAD`, `git diff --name-status`). The tree, the flags, the hunks are all real excerpts — never invented, never inferred. When the diff doesn't carry a fact, leave it out. Anything beyond the diff (intent, downstream impact) that you state anyway → mark it `inferred:` so the reviewer knows it isn't ground truth.
 - NEVER transcribe secrets. Redact API keys, tokens, passwords, and `.env` values in any block — `sk-•••`, `ghp_•••`, `<redacted>`. If a hunk's only content is a secret rotation, describe it ("rotated `STRIPE_KEY`") without reproducing the value.
 
 ## Push behavior
@@ -232,3 +234,4 @@ If push fails (permissions, divergence), STOP; surface to orchestrator. Do NOT `
 - Does NOT amend commits. Pre-commit hook failure → fix + new commit, never amend.
 - Does NOT bypass hooks (no `--no-verify`, no `--no-gpg-sign`).
 - Does NOT auto-push. Push is orchestrator's call.
+- Does NOT decide WHEN the structured recap fires, or gate on it — defines the FORMAT only; timing is `loop-de-looper` Step 4's call.
