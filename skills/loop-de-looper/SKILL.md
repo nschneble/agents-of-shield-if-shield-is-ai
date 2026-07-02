@@ -247,6 +247,16 @@ Learn runs BEFORE recap because learn WRITES (skill/agent/memory edits) and reca
 
 Invoke `looper-recap` via Skill tool. Pass run state (`gates.jsonl`, `git log main..HEAD`, scope section 5, PR #/URL/state). Recap emits a plain-language closing summary, read-only — it decides nothing and flips nothing. It layers ON TOP of the structured exit report, not instead of it; the structured report still carries the verbatim gate verdicts. Recap pulls its facts from the same on-disk sources, so a gate logged `ran: false` stays `ran: false` in the recap. Skip recap on the STOP/escalation path — a halted run reports its stop state directly.
 
+**Structured-recap PR-body refresh (run on success paths, after PR finalization + recap, before the exit report):**
+
+Refresh the PR body ONCE, at termination, with the structured recap (`looper-commit`'s `## Structured recap (PR-body section)` defines the FORMAT — the file-tree, collapsed `<details>` diff hunks, UI wireframe; this step decides WHEN it fires). The PR body was created early at wave 1 (`## PR lifecycle + push ownership`), before the whole-run diff existed — so the rich recap lands as a terminal body refresh (`gh pr edit <N> --body`), not a creation-time body. This is an external-state edit on the read-only side of recap; it changes the PR, not the branch.
+
+- **Source diff.** Build every block from the WHOLE-RUN diff — the SAME base the final crew pass already derives: the parent of wave 1's commit (`git diff <wave1>^..HEAD`, Step 3). Reuse that derivation; do NOT reinvent a base.
+- **UI-glob gate.** Reuse the EXISTING UI-glob detector (`## Protocol` 2b pre-mandated) — do NOT define a second glob. Whole-run diff matched the UI-glob → INCLUDE the before/after ASCII wireframe + a11y call-out block; no match → omit it.
+- **Small-diff skip.** Honor `looper-commit`'s small-diff skip — a genuinely tiny / one-file run gets NO structured-recap refresh; the raw diff reviews faster than a recap layered on it.
+- **Best-effort, never a gate.** The refresh is an enhancement on the already-finalized PR. A failed refresh (API error, body too long) LOGS and continues to goal-complete — it NEVER blocks termination. The PR is finalized by the backstop above; the recap only enriches it.
+- **Skip on the STOP/escalation path** — same discipline as recap and run-level learn; a halted run reports its stop state directly.
+
 For path 3 (release-readiness goals typically), order fixed:
 
 1. Run final crew pass FIRST (against cumulative loopable work)
@@ -424,6 +434,8 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT skip nonbeliever pre-flight, and does NOT halt on a mere challenge. Only a nonbeliever STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
 - Does NOT skip run-level learn on a success path. It is the only step that diagnoses the orchestration itself; per-wave learn can't see past its own wave. But run-level learn only WRITES lessons (skill/agent/memory edits) — it does NOT gate, flip, revert, or re-open the run.
 - Does NOT let recap decide, fix, or flip anything, and does NOT let it replace the structured exit report. Recap is read-only narration layered on top; its facts trace to `gates.jsonl` / git log, never invented.
+- Does NOT invent diff facts in the structured-recap PR-body refresh. The tree, flags, and hunks are byte-exact mechanical excerpts of the real whole-run diff (`git diff <wave1>^..HEAD`); the before/after wireframe is NOT `git diff`-derivable — it is a good-faith RECONSTRUCTION constrained to elements the diff actually carries, never invented beyond it. Anything beyond the diff is marked `inferred:`, secrets redacted, per `looper-commit`'s `## Structured recap (PR-body section)` grounding + secret-redaction rule. Same `ran: false`-style honesty the recap owes: no fabricated hunk, no wireframe element the diff doesn't support (`## Protocol` Step 4).
+- Does NOT block termination on a failed structured-recap refresh. The recap is a best-effort enhancement on the finalized PR, never a gate; a refresh that errors logs and continues straight to goal-complete. The PR-finalization backstop owns the PR's existence; the recap only enriches an already-shipped one (`## Protocol` Step 4).
 
 ## Crew trigger + budget tuning
 

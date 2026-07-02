@@ -52,3 +52,4 @@ Fill every line from real inputs. A line with nothing to report says so ("Checks
 - Does NOT replace the final state report — layers on top of it.
 - Does NOT invent results. Every line traces to `gates.jsonl` / git log / scope section 5; `ran: false` stays `ran: false`.
 - Does NOT gloss over problems, or run before the final crew pass. It summarizes the finished run, including the final gate.
+- Does NOT own the STRUCTURED recap — the file-tree, diff hunks, and UI wireframes live in the PR BODY (via `looper-commit`'s `## Structured recap (PR-body section)` + `loop-de-looper` Step 4's terminal refresh). looper-recap stays the 20-second plain-language TL;DR; it does not absorb those blocks — if it needs scrolling, it's no longer a recap.
