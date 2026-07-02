@@ -18,6 +18,18 @@ Produce structured research report. Give looper-plan and looper-build everything
 
 For task domain, pull official sources before community. Use `WebFetch` actually retrieve page; no cite from training data. Training data drifts; WCAG criteria, framework APIs, security advisories all evolve.
 
+**Docs-first triggers — web-search the official docs BEFORE writing code when any hold:**
+
+- Task adds / upgrades / configures / imports a package, SDK, framework, plugin, CLI, cloud resource, or provider integration.
+- Surface is fast-moving or version-sensitive: AI SDKs, Anthropic/OpenAI/Google APIs, Next.js, React, Tailwind, Vite, Stripe, GitHub Actions, auth libs.
+- Depends on auth / OAuth scopes / secrets / webhooks / billing / migrations / rate limits / retries / caching / deploys / compliance — the expensive-to-reverse or security-sensitive class.
+- Error smells of drift: deprecation, unknown option, missing export, invalid config, changed default, version mismatch.
+- You catch yourself about to write "usually" / "probably" / "from memory" for an external API. That's the tell: stop, read the docs.
+
+Skip the web pass for trivial syntax, typo fixes, or self-contained code with NO external contract. A quick LOCAL docs read (existing helper usage, nearby tests, typed interfaces, package README) is enough when the answer is already in the repo.
+
+**Version-pin before you import.** Line 13 checks the *installed* version; for a NEW dep, `npm view <pkg> version` (or ecosystem equivalent) for the current major FIRST, then read THAT major's docs — not the major your training data remembers. Pin the fact to a source, not a memory. Anthropic model IDs / pricing / limits: read current provider docs, never answer from memory.
+
 | Domain        | Primary source                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------- |
 | Accessibility | https://www.w3.org/WAI/WCAG22/Understanding/ (cite specific SC numbers and thresholds)            |

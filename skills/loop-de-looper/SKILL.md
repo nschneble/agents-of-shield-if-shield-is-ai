@@ -127,6 +127,8 @@ Repeat 2b only until escalation cleared. Same specialist gate requested twice fo
 
 **Pre-mandated gates fire up-front, not via a round-trip.** Two sources tag a wave for an up-front gate: `looper-scope` (explicit tag in the queue) and the **UI-glob detector** the orchestrator runs itself over each wave's candidate files before dispatch. The UI-glob mirrors `looper-plan`'s `### UI-touching waves always tag` exactly (`*.tsx`/`*.jsx`/`*.vue`/`*.svelte`/`*.html`, server templates `*.leaf`/`*.ejs`/`*.erb`/`*.hbs`/Jinja, styling `*.css`/`*.scss`/Tailwind/token files) — any match makes the wave UI-touching and mandates `accessibility-lead`. Detecting it at dispatch time (not waiting for `the-looper`'s plan to hand back `gate needed pre-build`) is the whole point: the hook that would normally enforce accessibility fires only on the parent prompt, never inside the executor subagent, so the orchestrator is the only actor that can guarantee the gate. When a wave is tagged (by scope OR the UI-glob), the orchestrator invokes that specialist BEFORE dispatching `the-looper`, and ships the contract as `gate outputs` in the first brief — so the wave skips plan and builds directly. Do NOT dispatch `the-looper` only to have its plan re-discover the known gate and hand back `gate needed pre-build`; that round-trip burns a full dispatch to surface what scope already declared. The reactive 2b path above is for gates the plan discovers that scope did NOT foresee. If the specialist returns open design decisions that are implementation specifics inside the user's already-stated design (clip strategy, control reuse, caption copy), the orchestrator resolves them on the specialist's recommended defaults — these are not user-authority scope changes. A decision that genuinely re-opens scope (changes what the feature does) still goes to the user.
 
+**Behavior-neutral corrective waves are the one carve-out to the up-front a11y gate — confirm post-build instead.** A crew-driven cleanup wave whose ENTIRE diff is provably non-behavioral (dead-code removal, comment fixes, an unreachable-predicate alignment that leaves rendered output byte-identical) introduces no new UI behavior and no new a11y surface, so a fresh `accessibility-lead` pre-build gate has nothing to design — the live behavior was already gated when it shipped. Skip the up-front gate and instead re-run `the-auditor` on the corrective diff POST-build, scoped to confirm the rendered a11y output is byte-identical (this is the normal scoped-re-crew "domain the fix touched" path, not a gate skip). The carve-out is tight and self-policing: it holds ONLY when the wave proves byte-identical output (tests stay green AND the diff contains nothing that changes a rendered attribute, role, name, or computed style). The moment a "cleanup" wave touches real markup/behavior, it is a normal UI wave and the up-front gate is mandatory again (observed working on the report-restyle run: the post-crew cleanup wave skipped the pre-build gate, and the post-build the-auditor confirmed 0 a11y deltas). Do NOT stretch this to a wave that "mostly" doesn't change behavior — "mostly" is a normal UI wave.
+
 Other stop conditions from the-looper (verify fails twice, review verdict `rethink`, etc) do NOT bubble straight up — a *retryable* one earns ONE from-scratch retry first (see 2b-retry). Do NOT swallow either way: a retry that fails again bubbles up unchanged.
 
 #### 2b-retry. Stuck-wave retry-from-scratch (one shot, bounded)
@@ -156,9 +158,10 @@ A wave can SHIP clean yet hand back a `flag` that names a **cross-file incomplet
 On every shipped wave, read the hand-back `flags` before dispatching the next wave:
 
 - **Cross-file incompleteness** (a dangling reference the wave itself created) → action it NOW: if a later queued wave already touches the named file, fold the fix into that wave's brief; otherwise spawn an immediate corrective wave for it. Either way it is resolved before the crew sees it.
+- **Self-caused behavior-neutral debris** (dead code the wave's OWN change orphaned — a now-overridden CSS rule, an unused parameter after a deleted caller — that NO later queued wave will touch) → clean it INSIDE the creating wave, do NOT flag-and-defer to crew. Cheapest path: pre-authorize `the-looper` in the wave brief to delete debris its own change orphans (it already names that debris in its hand-back, so it knew at commit time). Deferring behavior-neutral debris to the crew is a false economy: the crew WILL surface it (the-improver flags dead code regardless of whether later waves compound it), and a crew-surfaced warning guarantees a corrective wave PLUS a re-crew — converting a one-line in-wave deletion into a full extra round-trip (observed on the report-restyle run: a dead `.summary-item .label` rule + an unused `apply()` param, both named in Wave 1's own hand-back, rode to the final crew and cost exactly that corrective-wave-plus-re-crew churn). A tightly-scoped "implement the gate contract verbatim, nothing beyond" brief is what produced the flag-and-defer here — so the brief must explicitly carve out "AND delete any dead code your change orphans" as in-scope, distinct from the no-scope-creep rule.
 - **Out-of-scope observation** (a pre-existing issue the wave noticed but didn't cause) → capture for a future scope run; do not action mid-run.
 
-The test is causation + reachability: did THIS wave create the dangling reference, and can a queued/cheap wave close it? Yes → triage now. A flag about something the run never touched is not this case.
+The test is causation + reachability: did THIS wave create the dangling reference (or orphan the dead code), and can a queued/cheap wave — or the creating wave itself — close it? Yes → triage now (in-wave for self-caused debris, next-wave-or-corrective for a cross-file dangling reference). A flag about something the run never touched is not this case.
 
 #### 2c. Update counters
 
@@ -175,7 +178,7 @@ Maintain run state (persisted — see `## State tracking`):
 | `consecutive_no_progress`  | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
 | `wave_retries`             | +1 on each stuck-wave from-scratch retry dispatch (2b-retry); never reset — budget governor input |
 
-After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the crew trigger. Order matters: persist before you might STOP, so a governor halt still leaves a resumable snapshot.
+After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the usage-window guard (`## Usage-window guard`), THEN the crew trigger. Order matters: persist before you might STOP or PAUSE, so a governor halt or a usage pause still leaves a resumable snapshot.
 
 #### 2d. Crew trigger check
 
@@ -326,9 +329,17 @@ Different shapes, different jobs: the jsonl is a log you append, the json is a s
     "wave_retries": 0
   },
   "last_crew_wave": 0,
-  "pr": { "number": 214, "url": "...", "state": "draft" }
+  "pr": { "number": 214, "url": "...", "state": "draft" },
+  "usage": {
+    "paused": false,
+    "block_start": "2026-07-01T14:00:00Z",
+    "observed_pct": 41,
+    "read_ok": true
+  }
 }
 ```
+
+`usage` is the usage-window guard's snapshot (`## Usage-window guard`): `block_start` is the active-block timestamp at the last read (a wake compares against it — a new value proves the window rolled), `observed_pct` the last real percent, `read_ok: false` when the usage tool couldn't run (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-reads the real window before continuing, never trusting this snapshot's staleness.
 
 Resume mode (`/loop-de-looper resume`):
 
@@ -352,6 +363,19 @@ Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. 
 
 Defaults are tunable per project — see the single canonical override block in `## Crew trigger + budget tuning`.
 
+## Usage-window guard
+
+The governor rails on *churn*; this rails on the *account usage window* — the 5-hour and weekly limits a long run can exhaust mid-flight. A run that burns its window dry doesn't fail cleanly: the next dispatch hard-errors partway, orphaning a half-built wave. This guard stops that at the wave boundary instead, then resumes itself when the window clears.
+
+**This is NOT the token-metering the governor refuses.** The governor's "no fake gauge" rule bans *inventing* a spend number a Skill orchestrator can't read. This guard reads a **real first-party observable** — the actual active-block usage the host already tracks — so it clears the same honesty bar the context-pressure handoff does ("observed, not metered"). The signal is measured, not guessed.
+
+- **Read the real window at the wave boundary.** In step 2c, after the governor, run the host usage tool. In Claude Code: `npx -y ccusage@latest blocks --active --json`. Parse the active-block start timestamp, its percent-of-limit (or cost converted through the known account limit), and time-remaining. This is a read, not a wave — it does not touch counters.
+- **Pause at 95%.** If either the active 5-hour or the weekly window is at or above 95%, do NOT dispatch the next wave. Threshold is tunable (`## Crew trigger + budget tuning`); the default is 95% of the *window*, never a dollar figure (a cost cap is one account's private guardrail, not a portable rule).
+- **Finish the in-flight wave first, never interrupt it.** Same discipline as every other halt: let the current `the-looper` dispatch commit at its clean point, write `run-state.json`, then pause BEFORE the next dispatch. A half-built wave is the loss this avoids, not the cure.
+- **This halt self-resumes — it does not wait on a human.** Unlike a governor rail or context pressure (which need the user to raise a ceiling or start a fresh context), a usage pause clears on a *known schedule*. So schedule a wakeup for `min(3600, secondsUntilWindowClears)` (`ScheduleWakeup`); if the runtime clamps the delay, chain wakeups. Each wake RE-READS the real window and compares the active-block start timestamp against the one snapshotted at pause — a *new* block is proof the window rolled, stronger than elapsed wall-clock (a sleeping Mac, a clock skew, or a paused laptop all lie about elapsed time). Reschedule if still over threshold; resume the queue only when the real window is safely below it.
+- **Report both the pause and the auto-resume.** The halt line names which window is over, the observed percent, and the scheduled wake (`~HH:MM local, when the 5-hour window clears`), AND still emits `` `/loop-de-looper resume` `` so the user can force-resume earlier if they've raised their own limit. Names the next command either way (`## Voice + style`).
+- **Tool-unavailable ⇒ do NOT guard, and say so.** If `ccusage` (or the host usage tool) can't run — no network, not installed, non-Claude-Code host — the guard cannot read the window. Per `[[feedback-task-tool-availability]]`: log that the usage read did not run, continue WITHOUT a usage pause (the governor + context handoff still bound the run), and note in the report that the usage window was unguarded this run. NEVER invent a percentage or a fake pause — an unread window is unread, not "0%".
+
 ## Context-pressure handoff
 
 A long unattended run fills the context window. Pushed past that, recall degrades: the in-context queue and counters get summarized lossily, mid-wave reasoning rots, and a wave dispatched into a degraded context ships worse work than the same wave from a clean start. The wave boundary is the safe place to stop — `run-state.json` is written there (step 2c, atomic), so a halt-and-resume across that line loses nothing.
@@ -372,6 +396,7 @@ So context pressure is a **wave-boundary handoff**, not a mid-wave abort:
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
 - **Budget governor rail hit**: `max_total_waves`, `max_corrective_waves`, `consecutive_no_progress`, or `max_wave_retries` exceeded → STOP, escalate with the persisted state report (`## Budget governor`). Resumable after the user raises a ceiling or redirects.
 - **Context pressure at a wave boundary**: a compaction fired or in-context state had to be re-derived from `run-state.json` → finish the current wave, then halt cleanly BEFORE the next dispatch and emit `/loop-de-looper resume` (`## Context-pressure handoff`). A clean handoff, not a failure — the snapshot makes the resume lossless.
+- **Usage window at/above 95% at a wave boundary**: the active 5-hour or weekly limit is near-exhausted → finish the current wave, pause BEFORE the next dispatch, and schedule a self-resume for when the window clears (`## Usage-window guard`). A PAUSE, not a STOP — it self-resumes on the window's known schedule; the user can also force `/loop-de-looper resume` earlier.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
 - **User intervenes**: any user message during run = stop signal; current wave completes, then halt
 
@@ -390,6 +415,7 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief. See `## PR lifecycle + push ownership`.
 - Does NOT re-scope mid-run. Goal shifts → user issues new run with new goal.
 - Does NOT loop unbounded. The budget governor caps total waves, corrective waves, no-progress thrash, AND from-scratch retries; a rail hit is a STOP, not a "push through." It does NOT meter token spend — that gauge isn't readable from a Skill orchestrator, so it rails only on what it can observe.
+- Does NOT invent a usage percentage, and does NOT keep dispatching into a near-exhausted window. The usage-window guard reads the REAL active-block usage (`ccusage`) at the wave boundary — a first-party observable, not the fake token gauge the governor bans — and pauses at 95%, self-resuming when the window clears (`## Usage-window guard`). If the usage tool can't run, it does NOT guess a number: it logs the read as not-run, leaves the window unguarded, and says so — never a fabricated pause or percent.
 - Does NOT defer a wave's cross-file-incompleteness flag to the crew pass. A shipped wave that flags a dangling reference it created (a field/section/contract named but not defined) gets triaged immediately — folded into a later wave's brief or fixed in an immediate corrective — not ridden to the crew where it surfaces as a blocker (`## Protocol` 2b-flags).
 - Does NOT retry a deterministic stop. A write-gate, a governor rail, a scope refusal hits the same wall every time — those bubble up immediately. Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns a from-scratch retry, and never more than ONCE per wave (`## Protocol` 2b-retry). A retry is a fresh-context re-dispatch, never a resume of the wedged attempt — reverting to the next pre-ranked plan from `looper-plan` when one exists, improvising only when none does.
 - Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic write) every wave, so a compacted or crashed run stays resumable; in-context is a cache of the file, not the source of truth.
@@ -401,7 +427,7 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 
 ## Crew trigger + budget tuning
 
-Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4` (see `## Budget governor`).
+Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4` (see `## Budget governor`). Usage-window guard default: pause at `95%` of the active 5-hour or weekly window (see `## Usage-window guard`).
 
 Single canonical override block in the project CLAUDE.md:
 
@@ -409,6 +435,7 @@ Single canonical override block in the project CLAUDE.md:
 ## Loop de Looper
 - crew-trigger: waves=N, files=M
 - budget: max-waves=N, max-corrective=N, no-progress=N, max-retries=N
+- usage-pause: pct=N   # 0 disables the usage-window guard
 ```
 
 Tighter triggers + budgets for high-drift domains (palette, auth surface) where churn signals a wrong approach early. Looser for long mechanical cleanup loops that legitimately run many waves.
@@ -422,6 +449,7 @@ Cite agent outputs verbatim when surfacing blockers; no paraphrase. Per memory `
 **Every halt names the next command — literally.** A STOP, an escalation, a budget-rail halt, a context-pressure handoff, or a required-not-loopable termination ends with the exact copy-paste line the user runs next — not a described intent the user has to translate. The run knows its own resume path; spell it:
 
 - Resumable halt (governor rail, context pressure, user-intervention pause) → `` `/loop-de-looper resume` `` (the persisted `run-state.json` makes it exact).
+- Usage-window pause → names BOTH the auto-resume and the manual override: "paused on the 5-hour window (96%), auto-resume scheduled ~HH:MM local when it clears; `` `/loop-de-looper resume` `` to force earlier if you've raised your limit." The scheduled wake IS the primary next step; the command is the escape hatch (`## Usage-window guard`).
 - Custodian-style follow-on (a proposal to apply) → `` `/looper-custodian apply #<issue>` ``.
 - A user-authority decision the run can't make → state the decision, then the command that continues once they've decided.
 
