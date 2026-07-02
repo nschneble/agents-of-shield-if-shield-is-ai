@@ -210,7 +210,7 @@ A genuinely tiny change — one file, a handful of obvious lines, no behavioural
 
 ### Grounding + secret redaction (every block)
 
-- Build every structural block MECHANICALLY from the real whole-run diff (`git diff <wave1>^..HEAD`, `git diff --name-status`). The tree, the flags, the hunks are all real excerpts — never invented, never inferred. When the diff doesn't carry a fact, leave it out. Anything beyond the diff (intent, downstream impact) that you state anyway → mark it `inferred:` so the reviewer knows it isn't ground truth.
+- Build the structural blocks MECHANICALLY from the real whole-run diff (`git diff <run-base>..HEAD`, `git diff --name-status`). `<run-base>` is a NAMED token bound upstream, NOT derived here: in an orchestrated run `loop-de-looper` binds it to `<wave1>^` (its Step 3/Step 4 derivation); a standalone single-commit PR (the **Recap timing** caveat) uses its own base (e.g. the branch point). The tree, the flags, the hunks are byte-exact mechanical excerpts — never invented, never inferred. The UI wireframe (block 3) is the ONE exception: NOT a byte excerpt but a diff-constrained good-faith RECONSTRUCTION (a sketch), still never inventing an element the diff doesn't carry — matching `loop-de-looper`'s does-NOT rail. When the diff doesn't carry a fact, leave it out. Anything beyond the diff (intent, downstream impact) that you state anyway → mark it `inferred:` so the reviewer knows it isn't ground truth.
 - NEVER transcribe secrets. Redact API keys, tokens, passwords, and `.env` values in any block — `sk-•••`, `ghp_•••`, `<redacted>`. If a hunk's only content is a secret rotation, describe it ("rotated `STRIPE_KEY`") without reproducing the value.
 
 ## Push behavior
