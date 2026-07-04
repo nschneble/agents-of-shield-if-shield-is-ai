@@ -1,6 +1,6 @@
 ---
 name: looper-custodian
-description: Scheduled cross-run, cross-repo housekeeping for the looper system. Runs weekly — GCs merged-branch artifacts, audits memory for duplicates/contradictions, mines wave history across repos, and researches external advances — then opens a GitHub report issue with checkbox proposals. Destructive edits (memory merges, agent rewrites via the-turncoat) apply ONLY through a separate human-checked `apply` step, which is previewable (`--dry-run`) and reversible (`undo`). Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", or "looper-custodian undo".
+description: Scheduled cross-run, cross-repo housekeeping for the looper system. Runs weekly — GCs merged-branch artifacts, audits memory for duplicates/contradictions, mines wave history across repos, and researches external advances — then opens a GitHub report issue with checkbox proposals. Destructive edits (memory merges, agent rewrites via the-turncoat) apply ONLY through a separate human-checked `apply` step, which is previewable (`--dry-run`) and reversible (`undo`). Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", or "looper-custodian history <query>".
 ---
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
@@ -24,10 +24,11 @@ So the line is sharp:
 | `/looper-custodian apply #<issue>` | **Phase D**: reads the ticked checkboxes, snapshots targets to a backup, applies exactly those, idempotently |
 | `/looper-custodian apply #<issue> --dry-run` | **Phase D preview**: prints the EXACT before/after of each ticked item and writes nothing. Consent then approves a *previewed* diff, not a *described* one |
 | `/looper-custodian undo` | **restore** the most recent Phase D snapshot, reverting the last `apply`. Idempotent — a no-op on an already-clean tree |
+| `/looper-custodian history <query> [--agent\|--verdict\|--kind\|--file\|--repo …]` | **read-only lookup** over the cross-run history index — ranked, cited matches from `gates.jsonl` across repos. Writes nothing. `--rebuild` re-derives the index from source. Never on the cron |
 
 Phase D is NEVER part of the scheduled run. The cron only ever proposes. `--dry-run` and `undo` are human-triggered like `apply` itself.
 
-Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo` is a sibling verb.
+Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo` and `history` are sibling verbs (`history` read-only, takes a query arg + filter flags).
 
 ## Repos (explicit, not auto-discovered)
 
@@ -71,11 +72,30 @@ Run in order. A and C and E are purely informational in the issue; B and E carry
 - Output **proposals only** — each as a checkbox in the issue (`B-merge-<n>`, `B-retire-<n>`, `B-distill-<n>`) with the file paths, the relevant lines **verbatim**, and the recommended action. NO file is edited in Phase B. Edits happen in Phase D after a human ticks the box.
 - **Verbatim-citation discipline** (same as the loop's gate reports): quote the conflicting memory lines, never paraphrase away the conflict. A proposal the human can't verify from the quoted evidence is not shown.
 
-### Phase C — cross-repo mining (auto digest, read-only)
+### Phase C — cross-repo mining (auto digest, read-only, index-backed)
 
-- Across the repo list, read each run's `gates.jsonl` + `git log` to extract: which crew agents flagged what, how often, in which domains; which waves needed retries (`kind: "wave-retry"`); which goals hit governor rails; stale-skips (`kind: "stale-skip"`).
-- Aggregate into a digest: "the-stickler flagged convention drift in `tuffgal` across 4 of 6 runs", "auth-surface goals hit `max_corrective_waves` twice in `linklater`".
-- Read-only. The digest is signal for a human (or a future scoped run), not an action — it surfaces the systemic pattern a per-run learn can't see. No checkboxes unless a finding is concrete enough to route to `the-turncoat`, in which case it becomes a `D-turncoat-<n>` proposal.
+- **Backed by a cross-run history index** — `local/custodian/history-index.jsonl`, append-only, one record per `gates.jsonl` line across the repo list. Each record carries the gate's fields verbatim (`wave, kind, agent, verdict, blockers, summary`) plus `repo`, `branch`, the branch's touched `files` (from `git log --name-only` for its commits; `[]` when git can't resolve them — never invented), and a `cite` = `<repo>/local/loops/<branch>/gates.jsonl:<line>`.
+- **Incremental ingest, not re-scan.** Phase C runs `scripts/custodian-history.sh ingest`, which appends ONLY `gates.jsonl` lines whose `cite` isn't already indexed (an anti-join by `cite` in `jq`). The weekly cost is the *new* runs since last week, not every run ever — the index is the durable rollup, so Phase C stops re-reading the whole history every tick. Touched `files` come from commit SHAs named in each run's summaries (`git cat-file`-verified, then `git show --name-only`) — SHA-based so they still resolve after the branch is merged + deleted. (This is the `ctx` pattern — one canonical structured store, *queried* rather than re-scanned, returning ranked cited matches instead of raw transcripts. Adapted to our substrate: JSONL + `jq`, no SQLite and no binary — `gates.jsonl` is already the structured log, so we graft the retrieval, not the store. `[[reference-ctx-agent-history-search]]`, `[[no-third-party-hosted-tool-reliance]]`.)
+- **Digest is queried from the index, and cited.** Aggregate as before ("the-stickler flagged convention drift in `tuffgal` across 4 of 6 runs", "auth-surface goals hit `max_corrective_waves` twice in `linklater`") — but every claim resolves to exact `cite` lines, quoted, never paraphrased away. Same verbatim-citation discipline as Phase B.
+- **Derived + regenerable.** The index is a cache of `gates.jsonl`, so `history --rebuild` re-derives it from source; a corrupt or lost index is never a data-loss event — it's gitignored scratch, same status as `local/loops/`. This is why an unattended cron may write it automatically: it sits on the read-only/auto side of the propose-dispose line.
+- Read-only. The digest is signal for a human (or a future scoped run), not an action — it surfaces the systemic pattern a per-run learn can't see. No checkboxes unless a finding is concrete enough to route to `the-turncoat`, in which case it becomes a `D-turncoat-<n>` proposal. If git is unavailable for a repo, its records carry `files: []` and the phase logs the gap per the availability discipline — never an invented touched-file list.
+
+### `history` — query the cross-run index (read-only, never on cron)
+
+Backed by `scripts/custodian-history.sh query`:
+
+```
+scripts/custodian-history.sh query <q> \
+  [--agent S] [--verdict S] [--kind S] [--repo S] [--file S] [--blocked] [--limit N]
+```
+
+Read-only lookup over `history-index.jsonl`. Returns **ranked, cited matches** — most-recent-first (by the source `gates.jsonl` mtime), each printed with its `cite` (`<repo>/local/loops/<branch>/gates.jsonl:<n>`) so every hit traces to source, same way `ctx` returns cited snippets rather than raw logs. `<q>` is a case-insensitive substring over summary+agent+verdict+kind; all flags are case-insensitive substrings too (real `verdict`s are free-text prose like `"CHANGES REQUESTED"`, not an enum — so match on substrings, and use `--blocked` for the reliable `blockers>0` "flagged" signal). Filters compose:
+
+- `--file src/auth.ts` → "what happened last time we touched this" (ctx's file filter, re-created from the indexed `files`).
+- `--agent the-diamantaire --blocked` → "everything this crew agent flagged with blockers."
+- `--kind wave-retry --repo linklater` → "which waves needed retries here."
+
+`scripts/custodian-history.sh rebuild` wipes and re-derives the whole index from every `gates.jsonl` — safe anytime, since the index is a derived cache. Query writes nothing; disposes nothing; never part of the scheduled run. Human- or agent-triggered, like `apply`/`undo`.
 
 ### Phase E — external research (auto digest, read-only)
 
@@ -135,6 +155,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 
 - **`custodian-log.jsonl`** — append-only run log, one JSON line per phase action, never rewritten. The machine record / audit trail.
 - **`backup-<issue>-<seq>/`** — pre-apply snapshot of every file a Phase D `apply` touched, plus a `manifest.json` (path + original location + issue tag per file). Written by `apply` before its first edit; read by `undo` to revert. The reversibility backstop behind the human-checked apply.
+- **`history-index.jsonl`** — lives at `local/custodian/` (NOT under `<date>/`; it's cross-run, not a per-date artifact). The append-only rollup that backs Phase C + `history`: one record per indexed `gates.jsonl` line, carrying the gate fields verbatim + `repo`/`branch`/`files`/`cite`. A **derived cache** of `gates.jsonl` across repos — regenerable via `history --rebuild`, gitignored like the rest of `local/`. Never a source of truth.
 
 ```json
 {
@@ -161,6 +182,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - **Bounded** — cap proposals per run (default 20 across B+C+E) so one tick can't dump an unreviewable wall. Surface "N more not shown" rather than silently truncating.
 - **Task/Skill availability honored** — unavailable tool ⇒ `ran: false`, never an invented outcome.
 - **Explicit repo list** — never reaches beyond the named repos.
+- **History index is a derived cache** — Phase C's `history-index.jsonl` rebuilds from `gates.jsonl` (`history --rebuild`), never becomes a source of truth, and `history` queries write nothing. Incremental ingest is a speed/token optimization that can't lose data.
 
 ## Integration with existing pieces
 
@@ -169,6 +191,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - `deep-research` — Phase E's engine. Reused, not reinvented.
 - **launchd** — the cron host (local, not cloud `/schedule`, which can't reach local state). Plist + wrapper under `~/Library/LaunchAgents/` + `scripts/`.
 - `gh` CLI — opens the report issue, reads its checkboxes, comments the apply summary.
+- `scripts/custodian-history.sh` — Phase C's engine + the `history` verb: `ingest` (incremental), `rebuild` (full re-derive), `query` (ranked cited lookup). Pure `jq` + `git`, no external store.
 
 ## What looper-custodian does NOT do
 
@@ -182,3 +205,6 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - Does NOT record a result it didn't produce — unavailable tool ⇒ `ran: false`, no invented digest or verdict.
 - Does NOT commit applied edits silently — they go through the normal review/commit path.
 - Does NOT open an issue on a quiet week — no findings, no noise.
+- Does NOT re-scan every `gates.jsonl` each run — Phase C ingests only new lines into the derived index; a lost index rebuilds from source, never a data-loss event.
+- Does NOT invent a touched-file list — if git can't resolve a branch's files, `files` is `[]`, logged, never fabricated.
+- Does NOT adopt an external tool's binary/store to get its behavior — `history` grafts `ctx`'s cited-retrieval pattern onto our own `gates.jsonl` (JSONL + `jq`/`grep`), no SQLite, no Rust dependency (`[[no-third-party-hosted-tool-reliance]]`).
