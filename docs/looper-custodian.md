@@ -61,6 +61,12 @@ run; unavailable tool ⇒ `ran: false`, never an invented outcome.
 - **External research promoted to a core phase, not a stretch opt-in.** It's
   read-only and auto-applies nothing, so it carries the same risk as the
   cross-repo digest — no reason to gate it behind a separate opt-in.
+- **Phase C history index is derived, never authoritative.**
+  `local/custodian/history-index.jsonl` is a rebuildable cache of `gates.jsonl`,
+  so incremental ingest is a speed/token optimization that can never lose data —
+  a corrupt index is one `history --rebuild` from correct. That regenerable-scratch
+  status (same as `local/loops/`) is exactly why an unattended cron may write it
+  automatically: it stays on the read-only/auto side of the propose-dispose line.
 
 ## Decision log
 
@@ -114,3 +120,23 @@ Refined 2026-06-29 from an external-research review (this pass):
     shadow run / replay (`validate-by:`); otherwise it stays informational. The
     highest-variance input shouldn't enter the apply path on an external
     author's say-so — same discipline as `looper-verify`'s executable VF.
+
+Refined 2026-07-03 from a tool-scan (`ctx` / `deptrust` / Safari MCP):
+
+12. **Phase C gains a cited, incremental history index (the `ctx` graft).**
+    `ctxrs/ctx` indexes agent-session logs into a searchable local store and
+    returns ranked *cited* matches (~50× token-efficient vs a raw scan) with a
+    `--file` filter. `gates.jsonl` is already our structured session log, so the
+    graft is *retrieval, not a new store*: Phase C now maintains
+    `local/custodian/history-index.jsonl` (append-only, one record per gate line
+    + `repo`/`branch`/`files`/`cite`), ingests only new runs each week instead of
+    re-scanning all history, and a read-only `history <query>` verb serves ranked
+    cited lookups (incl. `--file`, re-created from git). Faithful to ctx's
+    *pattern*; rejects its *substrate* — no Rust binary, no SQLite. That is the
+    `no-third-party-hosted-tool-reliance` directive in practice: mine the pattern,
+    not the tool. The index is a derived cache, `--rebuild`-able, gitignored scratch.
+    `deptrust` (dep-CVE guard) and the Safari MCP were scanned in the same pass and
+    left un-adopted: deptrust is a universal-Claude-Code concern with near-zero
+    surface in this markdown-only repo (revisit if a code repo in the list churns
+    deps), and the Safari browser-drive pattern is already covered by `/verify` +
+    the playwright accessibility agents.
