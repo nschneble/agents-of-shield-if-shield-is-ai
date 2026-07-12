@@ -18,6 +18,7 @@ Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass me
 | Accessibility (post-build review of shipped UI)        | `accessibility-agents:accessibility-lead` |
 | Test coverage and quality                              | `the-chemist`                             |
 | Documentation                                          | `the-chronicler`                          |
+| Voice and tone (prose surfaces, AI-slop tells)         | `the-ghostwriter`                         |
 | Refactor / simplification opportunities                | `the-improver`                            |
 
 Invoke specialists parallel where possible. Synthesize findings, not concatenate.
@@ -31,6 +32,7 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 - **`accessibility-agents:accessibility-lead`** (shipped UI): WCAG SC met and measured at every real paint site, decorative-vs-interactive ARIA, focus + keyboard reach, live-region announcements.
 - **`the-chemist`** (test coverage and quality): every error branch covered, real-behavior assertions over mocked plumbing, role/label queries, at least one real-user-flow integration test.
 - **`the-chronicler`** (documentation): external contracts thorough, internal comments WHY-only, comment-style conformance.
+- **`the-ghostwriter`** (voice and tone): prose surfaces read like Nick wrote them — no em-dashes, no slop vocabulary, no commit-linked comment archaeology, per-surface case/punctuation matrix respected. Findings only in crew mode, no edits.
 - **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split, extract only at real repetition, behavior preserved, no drive-by scope.
 
 ## What to look for

@@ -37,12 +37,9 @@ Plan run check, capture output, cite. NEVER substitute judgment for unrun checks
 
 ### Alias-chain trace for retirement waves
 
-Retiring CSS variable, framework token, or any indirection target requires tracing every CONSUMER of target, including aliases from prior waves. Per-theme cascade resolution that flowed through retiring token will collapse to whatever orchestrator-introduced `:root` default is once per-theme declarations vanish.
+Retiring a CSS variable, framework token, or any indirection target requires tracing every CONSUMER, including aliases from prior waves. Per-theme cascade resolution that flowed through a retiring token collapses to the orchestrator-introduced `:root` default once per-theme declarations vanish.
 
-Concrete trap from wave 39 / wave 40 of linklater theme refactor:
-
-- Wave 39 added `--page-gradient-{from,via,to}: var(--text-muted)` etc. at `:root`. Per-theme cascades resolve alias against each theme's own `--text-muted` declaration. Per-theme tinting preserved with zero per-theme work.
-- Wave 40 brief retired `--text` / `--text-muted` from per-theme files AND replaced `:root` aliases with literal hex. Effect: every theme's gradient collapse to same `:root` default hex pair. Wave-39 design intent silently lost.
+Concrete trap (linklater theme refactor): wave 39 added `:root` aliases `--page-gradient-*: var(--text-muted)` — per-theme cascades resolved each against its own `--text-muted`, preserving tint with zero per-theme work. Wave 40 retired `--text-muted` from per-theme files AND replaced the `:root` aliases with literal hex — collapsing every theme's gradient to the same default pair, silently losing wave 39's intent.
 
 Any retirement wave brief, plan MUST:
 
@@ -63,11 +60,9 @@ Any mechanized check that assert contrast pair (`token-A vs token-B ≥ ratio`) 
 - `box-shadow` / shadow utility (`border-shadow`, ring, drop-shadow): NO WCAG pair; visual lift only
 - Background-on-background adjacency: perceptual separation, not SC 1.4.11
 
-`git grep` consumer code for `border-\[var\(--TOKEN\)\]` BEFORE asserting `--TOKEN` against anything. If consumer paints `border-shadow` or `box-shadow`, contract subject wrong; re-frame as perceptual-separation (label "card-on-X lift" or similar, NOT SC 1.4.11) or drop contract.
+`git grep` consumer code for `border-\[var\(--TOKEN\)\]` BEFORE asserting `--TOKEN` against anything. Consumer paints `border-shadow` / `box-shadow` → contract subject wrong; re-frame as perceptual-separation (label "card-on-X lift", NOT SC 1.4.11) or drop the contract.
 
-Example trap: brief asserting `--page-gradient-stop vs --mount-border ≥ 3:1` unsatisfiable if consumer cards use `border-shadow`. Card edge is shadow, not `--mount-border`; `--mount-border` never painted on those cards. Contract subject fictional.
-
-When mechanizing perceptual-separation (background-on-background, shadow-edge-on-X), label correctly. Don't borrow SC numbers it doesn't earn.
+Example trap: `--page-gradient-stop vs --mount-border ≥ 3:1` is unsatisfiable if consumer cards use `border-shadow` — the card edge is shadow, `--mount-border` never paints there, so the contract subject is fictional. When mechanizing perceptual-separation, label it correctly; don't borrow SC numbers it doesn't earn.
 
 ### Grep authority: use `git grep`, not `grep -r`
 
@@ -134,7 +129,7 @@ Structured brief, seven sections (plus `## Ranked alternate plans` below, which 
    - Rung 6 (custom) requires named justification: perf, a11y, security, data-loss, trust-boundary, OR real requirement from research that no lower rung satisfies. Cite requirement (`research §X` or `file:line`).
    - One line: `Rung N – <approach in 5 words> – <why this rung>`.
    - Bias, not rule. Lower rung wins ties; escape hatches must be named.
-   - **Rung 1 (YAGNI) is the default, and its cost is not typing.** Building structure for a need that has not arrived spends two things cheap codegen cannot refund: _optionality_ — waiting holds the option to build once the real need is known; exercise it early on a guess and you usually guess wrong, guess right and you still burn the info waiting would have handed you ("waiting is holding an asset") — and _NPV_ — cost paid this wave, value lands some later wave = time-value loss. Looper generates code cheaply; that makes over-build EASIER, never CHEAPER. "It's only a few lines, the loop writes them free" is the exact trap. Skip it; let a future wave build it when the need is real. Source: Kent Beck, "The Cost YAGNI Was Never About" (https://newsletter.kentbeck.com/p/the-cost-yagni-was-never-about).
+   - **Rung 1 (YAGNI) is the default, and its cost is not typing.** Building structure for an unarrived need spends two things cheap codegen cannot refund: _optionality_ (waiting holds the option to build once the real need is known — spend it early on a guess and you usually guess wrong; "waiting is holding an asset") and _NPV_ (cost paid this wave, value lands a later wave = time-value loss). The loop's cheap codegen makes over-build EASIER, never CHEAPER — "it's only a few lines, the loop writes them free" is the exact trap. Let a future wave build it when the need is real. Source: Kent Beck, "The Cost YAGNI Was Never About" (https://newsletter.kentbeck.com/p/the-cost-yagni-was-never-about).
 
 4. **Mechanized predictions**
 
@@ -158,9 +153,7 @@ Structured brief, seven sections (plus `## Ranked alternate plans` below, which 
 
 ## Ranked alternate plans (retry fuel for non-trivial waves)
 
-Recovery options (#6) patch a _predicted_ failure inside the primary plan — build applies one mid-wave. Ranked alternate plans are a different altitude: whole-approach fallbacks for when the primary plan _wedges_ (verify fails twice, review says rethink) and the orchestrator's stuck-wave retry (`loop-de-looper` 2b-retry) needs a DIFFERENT approach. Pre-rank them now, while research context fresh, so the retry reverts to a vetted next plan instead of improvising one cold.
-
-Source: MapCoder (ACL 2024) — generate k confidence-ranked plans; on failure, revert to the next-highest-confidence plan rather than re-running the failed one (O(kt) for k plans, t repair turns).
+Recovery options (#6) patch a _predicted_ failure inside the primary plan — build applies one mid-wave. Ranked alternate plans are a different altitude: whole-approach fallbacks for when the primary plan _wedges_ (verify fails twice, review says rethink) and the orchestrator's stuck-wave retry (`loop-de-looper` 2b-retry) needs a DIFFERENT approach. Pre-rank them now, while research context is fresh, so the retry reverts to a vetted next plan instead of improvising cold. Source: MapCoder (ACL 2024) — generate k confidence-ranked plans; on failure, revert to the next rather than re-run the failed one.
 
 Proportional — rank only where the wave has genuine alternatives:
 
@@ -180,7 +173,7 @@ Build executes the primary only. The ranked list rides in the brief and surfaces
 
 Mechanizable checks cover most cases. Some categories ALWAYS escalate even when mechanized pass:
 
-- **Any UI-touching wave** (`UI: yes` per `### UI-touching waves always tag`). The accessibility-lead gate is mandatory and fires up-front — the executor subagent never triggers the main-loop accessibility hook, so plan mandates it here. Emit `ESCALATE: accessibility-lead` even when contrast/token math mechanized clean; role/name/keyboard/focus judgment is unmechanizable residual.
+- **Any UI-touching wave** (`UI: yes` per `### UI-touching waves always tag`). Emit `ESCALATE: accessibility-lead` even when contrast/token math mechanized clean — role/name/keyboard/focus judgment is unmechanizable residual, and the executor never triggers the accessibility hook.
 - **Brand-locked palette decisions** (e.g. landing page hardcoded white-on-navy). Mechanized check tell contrast value; only specialist tell whether palette can shift.
 - **Novel palette / new theme.** No historical baseline for delta-E sanity; specialist must vet.
 - **Rendering-context mismatch.** Mechanized check assume import location = host bundle. Shared components render under DIFFERENT host bundle than import directory. Plan flag suspicion; specialist judge.

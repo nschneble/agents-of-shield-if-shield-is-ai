@@ -5,7 +5,7 @@ description: Final step of every wave. Always commits any code/doc changes. Auto
 
 Last step. Always commits. Conditionally creates PR.
 
-Renamed from `looper-pr` in framework v1.2. Old name tied to PR creation; reality: commit is load-bearing action, PR creation only happens when branch has no existing PR. Skipping commit because no new PR needed was spec bug that lost work in transit.
+Commit is the load-bearing action; PR creation happens only when the branch has no existing PR. Skipping the commit because no new PR was needed once lost work in transit — commit always runs.
 
 ## When this runs
 
@@ -22,7 +22,7 @@ Before commit, confirm:
 2. `looper-review` produced `ship` or `fix-blockers-then-ship` with NO blockers remaining
 3. `format`, `lint`, `test`, `build` all green (or project equivalent; skip irrelevant ones for non-code waves per `looper-build` SKILL.md branching)
 4. No `cat > file` or other Bash-bypass write evidence in diff (`git log` and `git diff` should match; look for files created without normal write-path signal)
-5. `git status` clean of untracked stray files (lunchlady-style scorecard.png leaks per memory `feedback-lunchlady-scorecard-leak`)
+5. `git status` clean of untracked stray files (e.g. tool-generated scorecard.png leaks per memory `feedback-lunchlady-scorecard-leak`)
 
 Any pre-flight fail → STOP. Tell orchestrator what blocking.
 
@@ -210,7 +210,7 @@ A genuinely tiny change — one file, a handful of obvious lines, no behavioural
 
 ### Grounding + secret redaction (every block)
 
-- Build the structural blocks MECHANICALLY from the real whole-run diff (`git diff <run-base>..HEAD`, `git diff --name-status`). `<run-base>` is a NAMED token bound upstream, NOT derived here: in an orchestrated run `loop-de-looper` binds it to `<wave1>^` (its Step 3/Step 4 derivation); a standalone single-commit PR (the **Recap timing** caveat) uses its own base (e.g. the branch point). The tree, the flags, the hunks are byte-exact mechanical excerpts — never invented, never inferred. The UI wireframe (block 3) is the ONE exception: NOT a byte excerpt but a diff-constrained good-faith RECONSTRUCTION (a sketch), still never inventing an element the diff doesn't carry — matching `loop-de-looper`'s does-NOT rail. When the diff doesn't carry a fact, leave it out. Anything beyond the diff (intent, downstream impact) that you state anyway → mark it `inferred:` so the reviewer knows it isn't ground truth.
+- Build the structural blocks MECHANICALLY from the real whole-run diff (`git diff <run-base>..HEAD`, `git diff --name-status`). `<run-base>` is a NAMED token bound upstream, NOT derived here: an orchestrated run's `loop-de-looper` binds it to `<wave1>^`; a standalone single-commit PR uses its own base (e.g. the branch point). Tree, flags, hunks are byte-exact excerpts — never invented or inferred. The UI wireframe (block 3) is the ONE exception: a diff-constrained good-faith RECONSTRUCTION, still never inventing an element the diff doesn't carry. When the diff doesn't carry a fact, leave it out; anything beyond the diff (intent, downstream impact) stated anyway → mark it `inferred:`.
 - NEVER transcribe secrets. Redact API keys, tokens, passwords, and `.env` values in any block — `sk-•••`, `ghp_•••`, `<redacted>`. If a hunk's only content is a secret rotation, describe it ("rotated `STRIPE_KEY`") without reproducing the value.
 
 ## Push behavior

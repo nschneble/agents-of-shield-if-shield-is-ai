@@ -79,7 +79,7 @@ Eight sections:
 
    - Things that COULD be in scope but consciously excluded for now, will likely surface in future scope run. Each line cite reason: `<item>: deferred because <reason>`.
    - Prevent scope creep mid-loop; document conscious choices for future runs to pick up.
-   - Deferring is not debt — it is holding the option. Naming a future candidate and NOT queuing it now preserves the choice to build it once the need is real (cheaper, better-informed) instead of guessing this run. Don't pad the queue with speculative waves to "save a future scope run"; the future run is cheap and runs with more information.
+   - Deferring is not debt — it holds the option. Naming a future candidate and NOT queuing it preserves the choice to build once the need is real (cheaper, better-informed) instead of guessing this run. Don't pad the queue with speculative waves to "save a future scope run"; the future run is cheap and better-informed.
 
 7. **Out of goal scope**
 

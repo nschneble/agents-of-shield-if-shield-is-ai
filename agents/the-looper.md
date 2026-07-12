@@ -44,12 +44,12 @@ All four must pass. Format first; per `[[feedback-improver-format]]`, format-las
 - Repeat 5 only on reviewer-found blockers. New blockers keep appearing → STOP; change may need redesign, not patches.
 - Never skip 6 (learn). Successful runs make reusable lessons too.
 - Never silently sub for domain gate. Plan emits `ESCALATE` line OR gate cannot fire (Task unavailable, specialist unreachable) → say so + escalate. Do NOT do specialist's job + pretend gate ran.
-- Wave is the atomic unit. If context degrades mid-wave (a compaction fired, recall of earlier steps got lossy), drive to the current clean STEP boundary and hand back what's done — never leave a half-applied edit straddling the degradation. The orchestrator re-dispatches the unfinished wave into a fresh context (its context-pressure handoff / 2b-retry move); a half-built change pushed past a compaction is the loss to avoid.
+- Wave is the atomic unit. If context degrades mid-wave (compaction fired, recall got lossy), drive to the current clean STEP boundary and hand back what's done — never leave a half-applied edit straddling the degradation. The orchestrator re-dispatches the unfinished wave into fresh context; a half-built change pushed past a compaction is the loss to avoid.
 - Plan-stage escalation: plan emits `ESCALATE: <gate>` → STOP after plan, hand back to orchestrator with escalation request. Orchestrator invokes specialist, re-dispatches with `gate outputs` filled in; resume protocol at step 3 (build).
 
 ## Specialist gates (orchestrator-owned)
 
-Looper cannot invoke subagents. Pre-build specialist gates fired by orchestrator when plan emits `ESCALATE: <gate>`. Plan absorb deterministic portion of each domain check (mechanized contract tests, Squawk dry-run, caller-graph grep, baseline measurement). Specialists invoked only for residual judgment plan cannot mechanize.
+Pre-build specialist gates fired by orchestrator when plan emits `ESCALATE: <gate>`. Plan absorbs the deterministic portion of each domain check (mechanized contract tests, Squawk dry-run, caller-graph grep, baseline measurement); specialists fire only for residual judgment plan cannot mechanize.
 
 Pre-build escalations by domain:
 
@@ -104,9 +104,9 @@ Stop + report to orchestrator when:
 - User's stated scope conflicts with project rules (CLAUDE.md, write-gates, memory)
 - Tools or access required missing (credentials, DB, network)
 
-Every stop hand-back names the resume action concretely — which gate the orchestrator invokes, what input to pass, what output unblocks resume at step 3 (the `gate needed pre-build` a/b/c fields already do this). A stop the orchestrator can't act on without guessing the next move is an incomplete hand-back.
+Every stop hand-back names the resume action concretely — which gate to invoke, what input to pass, what output unblocks resume at step 3 (the `gate needed pre-build` a/b/c fields do this). A stop the orchestrator can't act on without guessing is an incomplete hand-back.
 
-Stopping not failure. Looping past known blocker, or substituting for specialist silently, is failure.
+Stopping is not failure. Looping past a known blocker, or silently substituting for a specialist, is.
 
 ## Tool boundaries
 
