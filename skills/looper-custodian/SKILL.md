@@ -75,7 +75,7 @@ Run in order. A and C and E are purely informational in the issue; B and E carry
 ### Phase C — cross-repo mining (auto digest, read-only, index-backed)
 
 - **Backed by a cross-run history index** — `local/custodian/history-index.jsonl`, append-only, one record per `gates.jsonl` line across the repo list. Each record carries the gate's fields verbatim (`wave, kind, agent, verdict, blockers, summary`) plus `repo`, `branch`, the branch's touched `files` (from `git log --name-only` for its commits; `[]` when git can't resolve them — never invented), and a `cite` = `<repo>/local/loops/<branch>/gates.jsonl:<line>`.
-- **Incremental ingest, not re-scan.** Phase C runs `scripts/custodian-history.sh ingest`, which appends ONLY `gates.jsonl` lines whose `cite` isn't already indexed (an anti-join by `cite` in `jq`). The weekly cost is the *new* runs since last week, not every run ever — the index is the durable rollup, so Phase C stops re-reading the whole history every tick. Touched `files` come from commit SHAs named in each run's summaries (`git cat-file`-verified, then `git show --name-only`) — SHA-based so they still resolve after the branch is merged + deleted. (This is the `ctx` pattern — one canonical structured store, *queried* rather than re-scanned, returning ranked cited matches instead of raw transcripts. Adapted to our substrate: JSONL + `jq`, no SQLite and no binary — `gates.jsonl` is already the structured log, so we graft the retrieval, not the store. `[[reference-ctx-agent-history-search]]`, `[[no-third-party-hosted-tool-reliance]]`.)
+- **Incremental ingest, not re-scan.** Phase C runs `scripts/custodian-history.sh ingest`, appending ONLY `gates.jsonl` lines whose `cite` isn't already indexed (anti-join by `cite` in `jq`). Weekly cost is the *new* runs since last week, not every run ever. Touched `files` come from commit SHAs named in each run's summaries (`git cat-file`-verified, then `git show --name-only`) — SHA-based so they resolve after the branch is merged + deleted. (The `ctx` pattern grafted onto our substrate: query one structured store rather than re-scan, JSONL + `jq`, no SQLite — `gates.jsonl` is already the structured log. `[[reference-ctx-agent-history-search]]`, `[[no-third-party-hosted-tool-reliance]]`.)
 - **Digest is queried from the index, and cited.** Aggregate as before ("the-stickler flagged convention drift in `tuffgal` across 4 of 6 runs", "auth-surface goals hit `max_corrective_waves` twice in `linklater`") — but every claim resolves to exact `cite` lines, quoted, never paraphrased away. Same verbatim-citation discipline as Phase B.
 - **Derived + regenerable.** The index is a cache of `gates.jsonl`, so `history --rebuild` re-derives it from source; a corrupt or lost index is never a data-loss event — it's gitignored scratch, same status as `local/loops/`. This is why an unattended cron may write it automatically: it sits on the read-only/auto side of the propose-dispose line.
 - Read-only. The digest is signal for a human (or a future scoped run), not an action — it surfaces the systemic pattern a per-run learn can't see. No checkboxes unless a finding is concrete enough to route to `the-turncoat`, in which case it becomes a `D-turncoat-<n>` proposal. If git is unavailable for a repo, its records carry `files: []` and the phase logs the gap per the availability discipline — never an invented touched-file list.
@@ -175,14 +175,14 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 ## Safety rails (carried from the loop's own discipline)
 
 - **Propose-vs-dispose split** is the spine: read-only auto, destructive gated behind a ticked box + explicit `apply`.
-- **Every apply is previewable and reversible** — `--dry-run` shows the exact diff before consent; a pre-write snapshot + `undo` reverts it after. Consent approves a previewed change, not a described one; a regretted apply is one command back.
-- **No external claim is actionable without a local-validation method** — a Phase E candidate with no runnable eval / shadow / replay stays informational, never a tick-to-apply box (Phase E).
+- **Every apply is previewable and reversible** — `--dry-run` before consent, snapshot + `undo` after. Consent approves a previewed change, not a described one.
+- **No external claim actionable without a local-validation method** — no eval/shadow/replay ⇒ informational only (Phase E).
 - **No memory deleted on contradiction alone** without the human seeing both sides quoted verbatim in the issue.
-- **No agent rewritten** except via `the-turncoat`, on an approved target — custodian never hand-edits an agent.
-- **Bounded** — cap proposals per run (default 20 across B+C+E) so one tick can't dump an unreviewable wall. Surface "N more not shown" rather than silently truncating.
-- **Task/Skill availability honored** — unavailable tool ⇒ `ran: false`, never an invented outcome.
+- **No agent rewritten** except via `the-turncoat`, on an approved target.
+- **Bounded** — cap proposals per run (default 20 across B+C+E); surface "N more not shown" rather than truncate silently.
+- **Task/Skill availability honored** — unavailable ⇒ `ran: false`, never an invented outcome.
 - **Explicit repo list** — never reaches beyond the named repos.
-- **History index is a derived cache** — Phase C's `history-index.jsonl` rebuilds from `gates.jsonl` (`history --rebuild`), never becomes a source of truth, and `history` queries write nothing. Incremental ingest is a speed/token optimization that can't lose data.
+- **History index is a derived cache** — rebuilds from `gates.jsonl`, never a source of truth; queries write nothing.
 
 ## Integration with existing pieces
 
@@ -195,16 +195,15 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 
 ## What looper-custodian does NOT do
 
-- Does NOT edit a memory or an agent during the scheduled run — proposes only; writes happen ONLY in `apply` after a ticked box.
+- Does NOT edit a memory or agent during the scheduled run — proposes only; writes happen ONLY in `apply` after a ticked box.
 - Does NOT parse free-text approval — checkboxes only.
-- Does NOT auto-apply Phase E research, ever — it informs a human decision.
-- Does NOT make an external-research finding actionable without a local-validation method — no eval/shadow/replay ⇒ informational only, never a checkbox.
-- Does NOT write in Phase D without first snapshotting the targets, and does NOT offer an `apply` that can't be `--dry-run` previewed or `undo`-reverted.
+- Does NOT auto-apply Phase E research — it informs a human decision, and no finding is a checkbox without a local-validation method.
+- Does NOT write in Phase D without first snapshotting, or offer an `apply` that can't be `--dry-run` previewed or `undo`-reverted.
 - Does NOT GC an open or undeleted branch's artifacts, or touch any tracked file in Phase A.
 - Does NOT reach beyond the explicit repo list.
 - Does NOT record a result it didn't produce — unavailable tool ⇒ `ran: false`, no invented digest or verdict.
 - Does NOT commit applied edits silently — they go through the normal review/commit path.
-- Does NOT open an issue on a quiet week — no findings, no noise.
-- Does NOT re-scan every `gates.jsonl` each run — Phase C ingests only new lines into the derived index; a lost index rebuilds from source, never a data-loss event.
-- Does NOT invent a touched-file list — if git can't resolve a branch's files, `files` is `[]`, logged, never fabricated.
-- Does NOT adopt an external tool's binary/store to get its behavior — `history` grafts `ctx`'s cited-retrieval pattern onto our own `gates.jsonl` (JSONL + `jq`/`grep`), no SQLite, no Rust dependency (`[[no-third-party-hosted-tool-reliance]]`).
+- Does NOT open an issue on a quiet week.
+- Does NOT re-scan every `gates.jsonl` each run — Phase C ingests only new lines; a lost index rebuilds from source.
+- Does NOT invent a touched-file list — git can't resolve a branch's files ⇒ `files` is `[]`, logged, never fabricated.
+- Does NOT adopt an external tool's binary/store — `history` grafts `ctx`'s cited-retrieval pattern onto our own `gates.jsonl` (JSONL + `jq`/`grep`), no SQLite (`[[no-third-party-hosted-tool-reliance]]`).

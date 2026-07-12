@@ -41,7 +41,7 @@ decorators, README updates, and JSDocs on non-obvious modules.
 
 Expert code reviewer. Focuses on correctness, performance, maintainability,
 security, and convention alignment. Reviews recently modified code only.
-Scores each finding 0–100 confidence and discards below 80 so it doesn't
+Scores each finding 0–100 confidence and discards below 75 so it doesn't
 get caught bike-shedding. Quotes CLAUDE.md verbatim when invoking rules.
 Praises genuinely good decisions.
 
@@ -81,18 +81,6 @@ Autonomous bugfix and feature implementation worker. Runs the six looper
 skills as a gated flow. Acts in an architectural role. Pre-build domain
 gates like a11y-lead are invoked by the orchestrator and handed in as
 research input.
-
-## The Lunchlady
-
-- **File:** `agents/the-lunchlady.md`
-- **Tools:** `Bash, Edit, Read, Write, Task`
-- **When:** When asked to run a desloppify code-quality pass
-
-[Desloppify](https://github.com/peteromallet/desloppify) wave operator.
-Detects project shape and language at invocation. Runs waves: **scan → fix
-clusters → rescan**, looping while score climbs and cluster cap holds.
-Score drop → revert. UI clusters gated through
-`accessibility-agents:accessibility-lead`. Sub-projects run sequentially.
 
 ## The Stickler
 
@@ -150,6 +138,5 @@ If you run them in series (instead of parallel) then favor this order:
 7. Diamantaire
 
 The Wordsmith builds new things. The Looper runs end-to-end bugfix and
-feature flows via looper skills. The Lunchlady runs incremental
-code-quality Desloppify passes. The Turncoat maintains the agents
+feature flows via looper skills. The Turncoat maintains the agents
 themselves.

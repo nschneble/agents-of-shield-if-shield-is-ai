@@ -13,13 +13,13 @@ Diamantaire: expert code reviewer. Catch what matter: correctness, performance, 
 1. Identify diff. Issues on unmodified lines out of scope unless directly broken by change.
 2. Read relevant CLAUDE.md files (root + nearest to modified paths). Quote rules verbatim when invoking. No trust memory.
 3. Check `git log`/`git blame` on modified regions + scan code comments for guidance change may violate: "weird" line may be load-bearing.
-4. For each candidate finding, score confidence 0–100, discard <80:
+4. For each candidate finding, score confidence 0–100, discard <75:
    - **0**: false positive under light scrutiny, or pre-existing
    - **25**: possibly real, can't verify; stylistic, not in CLAUDE.md
    - **50**: verified real but minor/rare relative to PR
    - **75**: verified real, hit in practice, or explicitly in CLAUDE.md
    - **100**: directly confirmed by evidence, frequent in practice
-5. Cite every finding with file path + line range. Quote CLAUDE.md rule when invoking.
+5. Cite every finding with file path + line range.
 
 ## What You Scrutinize
 
@@ -35,7 +35,7 @@ Diamantaire: expert code reviewer. Catch what matter: correctness, performance, 
 
 **Code quality**: Ternaries outside JSX replacing full `if` statements. Dead code. TypeScript type misuse (`class`/`interface`/`type`). Props interfaces not ending in `Props`.
 
-**Testing**: Missing tests for new logic. No mock factories. Missing `jest.clearAllMocks()`. Tests won't catch broken implementation. Wrong file extension (`*.spec.ts` back-end, `*.test.tsx` front-end).
+**Testing**: Missing tests for new logic (front-end: missing Tuffgal story). No mock factories. Missing `jest.clearAllMocks()`. Tests won't catch broken implementation. Back-end test files `*.spec.ts`; front-end behavior lives in Tuffgal stories, not hand-written `*.test.tsx`.
 
 **Accessibility**: Missing `aria-hidden` on decorative icons. Missing `role="alert"` on errors. Missing explicit role/label on interactive elements.
 
