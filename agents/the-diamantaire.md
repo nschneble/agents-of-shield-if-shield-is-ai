@@ -35,7 +35,7 @@ Diamantaire: expert code reviewer. Catch what matter: correctness, performance, 
 
 **Code quality**: Ternaries outside JSX replacing full `if` statements. Dead code. TypeScript type misuse (`class`/`interface`/`type`). Props interfaces not ending in `Props`.
 
-**Testing**: Missing tests for new logic. No mock factories. Missing `jest.clearAllMocks()`. Tests won't catch broken implementation. Wrong file extension (`*.spec.ts` back-end, `*.test.tsx` front-end).
+**Testing**: Missing tests for new logic (front-end: missing Tuffgal story). No mock factories. Missing `jest.clearAllMocks()`. Tests won't catch broken implementation. Back-end test files `*.spec.ts`; front-end behavior lives in Tuffgal stories, not hand-written `*.test.tsx`.
 
 **Accessibility**: Missing `aria-hidden` on decorative icons. Missing `role="alert"` on errors. Missing explicit role/label on interactive elements.
 
