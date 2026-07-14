@@ -63,10 +63,14 @@ run; unavailable tool ⇒ `ran: false`, never an invented outcome.
   cross-repo digest — no reason to gate it behind a separate opt-in.
 - **Phase C history index is derived, never authoritative.**
   `local/custodian/history-index.jsonl` is a rebuildable cache of `gates.jsonl`,
-  so incremental ingest is a speed/token optimization that can never lose data —
-  a corrupt index is one `history --rebuild` from correct. That regenerable-scratch
-  status (same as `local/loops/`) is exactly why an unattended cron may write it
-  automatically: it stays on the read-only/auto side of the propose-dispose line.
+  so incremental ingest is a speed/token optimization — a corrupt index is one
+  `history --rebuild` from correct, **provided the source still exists**. The
+  original claim here was "can never lose data"; the 2026-07-13 incident
+  falsified it: rebuild-ability dies the moment Phase A reaps the source
+  `gates.jsonl`, so ingest must strictly precede GC (decision 13). That
+  regenerable-scratch status (same as `local/loops/`) is exactly why an
+  unattended cron may write it automatically: it stays on the read-only/auto
+  side of the propose-dispose line.
 
 ## Decision log
 
@@ -140,3 +144,22 @@ Refined 2026-07-03 from a tool-scan (`ctx` / `deptrust` / Safari MCP):
     surface in this markdown-only repo (revisit if a code repo in the list churns
     deps), and the Safari browser-drive pattern is already covered by `/verify` +
     the playwright accessibility agents.
+
+Refined 2026-07-13 from the reap-before-ingest incident:
+
+13. **Ingest strictly precedes GC (run order C → A → B → E) + per-dir
+    ingest-guard.** The 2026-07-13 scheduled run executed the spec'd A-first
+    order while `history-index.jsonl` did not yet exist: Phase A reaped 11
+    merged-branch dirs whose `gates.jsonl` lines had never been ingested,
+    destroying the index's source (recovered only from an off-site Backblaze
+    backup — APFS snapshots and Time Machine had nothing). Two fixes: (a) the
+    maintenance run now executes Phase C's ingest before Phase A's reap, and
+    (b) Phase A gained a hard ingest-guard — a dir with any `gates.jsonl` line
+    missing from the index (anti-join by `cite`) is kept and logged
+    `kept (unindexed — ingest gap)`, never reaped, so a partial or failed
+    ingest degrades to deferred GC instead of data loss. Same run also
+    exposed the wrapper as silent-on-failure — two consecutive Mondays died to
+    `API Error: Connection closed mid-response` with no alert — so
+    `looper-custodian-cron.sh` gained retry-with-backoff (3 attempts) and a
+    loud failure path (macOS notification + `Custodian run FAILED <date>`
+    GitHub issue).
