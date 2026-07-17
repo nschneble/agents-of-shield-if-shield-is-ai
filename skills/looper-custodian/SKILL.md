@@ -75,11 +75,12 @@ Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.
 - **Deterministic enumeration FIRST.** The orchestrator itself globs each repo's memory dir to build the explicit file list and records `files_total`. Enumeration is NEVER delegated — a subagent's `bash find`/`grep` can silently fail (path quoting, cwd resets) and under-audit without anyone noticing. The orchestrator owns the list; only the per-file *reading* may be delegated.
 - **If delegating the audit** to a subagent (e.g. a large dir like linklater's 60+ files), hand it the **explicit absolute path list** and instruct it to use the **Read tool only** — never bash discovery. The subagent reports back per file so coverage is countable.
 - **Coverage accounting is mandatory.** Track `files_audited` vs `files_total`. If `files_audited < files_total`, the phase verdict is **`partial — N/M audited`**, NEVER "clean". A clean bill is only valid at full coverage. Partial coverage names the unread files and recommends a rerun — a tidy "no findings" that silently skipped 37 files is the exact failure this rule exists to prevent.
-- Detect three conditions:
+- Detect four conditions:
   - **Duplicates** — two files cover the same fact (same `name` intent, overlapping body). Propose: merge into one, keep the richer.
   - **Contradictions** — a later memory states the opposite of an earlier one (e.g. a feedback memory reversed by a newer correction). Propose: retire the superseded one, leave a `[[link]]` breadcrumb in the survivor.
   - **Distillation** — three-plus *episodic* notes (one-off project observations) that all instance the same underlying rule. Not duplicates (each cites a different occurrence) and not contradictions (they agree) — they're evidence piling up for a pattern no single memory states. Propose: distill into ONE semantic/procedural memory that names the rule, `[[link]]` the episodic instances as its evidence, and retire them. This is the consolidation a flat de-dupe misses: the system has *learned* something the memory dir only implies. Distill, do not just shrink — a one-rule memory that drops the why is worse than the three notes.
-- Output **proposals only** — each as a checkbox in the issue (`B-merge-<n>`, `B-retire-<n>`, `B-distill-<n>`) with the file paths, the relevant lines **verbatim**, and the recommended action. NO file is edited in Phase B. Edits happen in Phase D after a human ticks the box.
+  - **Staleness** — a memory cites a `file:line`, script, symbol, or flag that no longer resolves in the surface it documents. Resolve each citation against the RIGHT root (a `~/.claude/…` cite against user-global; a repo-relative cite against that repo) and by existence-plus-`grep` for the symbol, NOT an exact-line match — an unrelated edit shifting `:42` to `:47` is line drift, not a dead reference, and reading it as one floods false retires. A target that merely MOVED is live: propose `B-repoint` — update the citation to its new location, the same "provably gone, not merely moved" line `loop-de-looper`'s stale-candidate pre-check draws. Propose `B-retire` ONLY when a relocation search comes up empty — the thing is genuinely gone. Quote the dead reference verbatim, AND on a retire quote the failed relocation search too, so the human verifies *gone*, not merely *moved*.
+- Output **proposals only** — each as a checkbox in the issue (`B-merge-<n>`, `B-retire-<n>`, `B-distill-<n>`, `B-repoint-<n>`) with the file paths, the relevant lines **verbatim**, and the recommended action. NO file is edited in Phase B. Edits happen in Phase D after a human ticks the box.
 - **Verbatim-citation discipline** (same as the loop's gate reports): quote the conflicting memory lines, never paraphrase away the conflict. A proposal the human can't verify from the quoted evidence is not shown.
 
 ### `history` — query the cross-run index (read-only, never on cron)
@@ -114,7 +115,7 @@ The weekly run is a cloud cron with nobody watching, and `local/` is gitignored 
 
 - **Title:** `Custodian report <date>`
 - **Body** mirrors the phases: A reaped (info) / B proposals (checkboxes) / C digest (info) / E research (info + any checkboxes).
-- **Every actionable proposal is a checkbox tagged** `B-merge-1`, `B-retire-5`, `D-turncoat-2`, `E-3` — with verbatim evidence inline.
+- **Every actionable proposal is a checkbox tagged** `B-merge-1`, `B-retire-5`, `B-repoint-4`, `D-turncoat-2`, `E-3` — with verbatim evidence inline.
 - **No findings → no issue.** A quiet week opens nothing, so no notification noise. This is also how you learn a report is ready: GitHub's issue-opened notification IS the signal.
 
 To approve, tick the boxes you want and run `/looper-custodian apply #<issue>`.
@@ -125,7 +126,7 @@ Triggered ONLY by `/looper-custodian apply #<issue>`. Never on the cron.
 
 1. Read the issue body via `gh`. Parse the checkboxes: a ticked `[x]` tag applies; an unticked `[ ]` is skipped. **No free-text approval parsing** — boxes only.
 2. **Snapshot before any write.** Copy every file a ticked item will touch into `local/custodian/<date>/backup-<issue>-<seq>/`, alongside a `manifest.json` listing each backed-up path + its original location + the issue tag that touched it. The snapshot is taken whole, BEFORE the first edit, so `undo` restores a consistent pre-apply state even if apply halts mid-run. (`--dry-run` skips this — it writes nothing to snapshot.)
-3. For each ticked `B-merge`/`B-retire`/`B-distill`: apply the memory merge/retire/distill (the only place custodian writes a memory). Leave the `[[link]]` breadcrumb on retire, and on distill link the retired episodic instances into the new semantic memory as its evidence.
+3. For each ticked `B-merge`/`B-retire`/`B-distill`/`B-repoint`: apply the memory merge/retire/distill/re-point (the only place custodian writes a memory). Leave the `[[link]]` breadcrumb on retire, and on distill link the retired episodic instances into the new semantic memory as its evidence. A `B-repoint` is the one NON-destructive memory write: edit the stale citation in place to its new location, keeping the memory otherwise intact — no removal, no breadcrumb.
 4. For each ticked `D-turncoat`: invoke `the-turncoat` via the Task tool with the specific flagged target. Custodian decides *what* to hand it; turncoat decides *how* to trim; the human approved *that it runs*. Custodian never hand-edits an agent itself.
 5. For each ticked `E-<n>` that maps to a build: hand it off as a scoped change (note it for the user / a `loop-de-looper` run) — custodian does not itself implement features.
 6. **Idempotent.** Diff current state first; an already-applied item is a no-op, never a double-edit. Re-running `apply` on the same issue is safe.
@@ -181,6 +182,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 - **Every apply is previewable and reversible** — `--dry-run` before consent, snapshot + `undo` after. Consent approves a previewed change, not a described one.
 - **No external claim actionable without a local-validation method** — no eval/shadow/replay ⇒ informational only (Phase E).
 - **No memory deleted on contradiction alone** without the human seeing both sides quoted verbatim in the issue.
+- **No memory retired on a dead citation alone** without the human seeing the dead reference AND the failed relocation search quoted verbatim — a not-found cite is `B-repoint` (moved) until the search proves it gone, never a bare retire.
 - **No agent rewritten** except via `the-turncoat`, on an approved target.
 - **Bounded** — cap proposals per run (default 20 across B+C+E); surface "N more not shown" rather than truncate silently.
 - **Task/Skill availability honored** — unavailable ⇒ `ran: false`, never an invented outcome.
