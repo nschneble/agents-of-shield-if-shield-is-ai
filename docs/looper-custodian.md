@@ -163,3 +163,33 @@ Refined 2026-07-13 from the reap-before-ingest incident:
     `looper-custodian-cron.sh` gained retry-with-backoff (3 attempts) and a
     loud failure path (macOS notification + `Custodian run FAILED <date>`
     GitHub issue).
+
+Refined 2026-07-16 from an 8-article agent-harness audit (Osmani, Cloudflare,
+LangChain, Ambiance, wakamoleguy, Hobday, Elliot Smith, capn-hook):
+
+14. **Phase B gains a staleness condition (the capn-hook graft).** capn-hook
+    invalidates a memory entry by content hash — a recall backed by a file the
+    file no longer backs is pruned. Grafted as a fourth Phase B condition:
+    a memory citing a `file:line` / script / symbol / flag that no longer
+    resolves is flagged. Two dispositions, split into two verb tags so Phase D's
+    one-tag-one-write apply stays unambiguous: `B-repoint-<n>` (target MOVED —
+    non-destructive in-place cite edit) and the existing `B-retire-<n>` (target
+    GONE). Resolution is existence-plus-`grep` against the *right* root
+    (user-global vs repo), never exact-line — line drift (`:42`→`:47`) is not a
+    dead reference, and a moved target is a re-point, not a retire (the same
+    "provably gone, not merely moved" line `loop-de-looper`'s stale-candidate
+    pre-check draws). A retire on a dead cite carries the failed relocation
+    search quoted verbatim, so the human verifies *gone* not merely *moved* — a
+    sibling of the "no delete on contradiction alone" rail. Faithful to
+    capn-hook's *pattern* (hash-invalidation of code-citing recalls); rejects its
+    *substrate* — no `.capn/` store, no SQLite, just a path check over the memory
+    dir Phase B already reads. `no-third-party-hosted-tool-reliance` in practice.
+    Local eval at adoption found 0 current stale hits (preventive, not urgent)
+    but surfaced the root-ambiguity failure mode, which is why right-root
+    resolution is mandatory in the spec. The other audited pieces were already
+    covered: `flexible-gates` is the existing "always gate, rigor scales with
+    risk" design (nonbeliever sizing + risk-weighted crew trigger), Ralph
+    loops / durable-state / adversarial-verify / ranked-plans / budget-rails all
+    have direct analogues, and the two remaining residues (shallow-pass evidence,
+    unmechanized-constraint-as-ignored-signal) stayed informational for want of a
+    replay proving a real miss — Phase E discipline applied to an inbound idea.
