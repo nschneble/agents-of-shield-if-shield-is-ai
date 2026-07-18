@@ -217,6 +217,27 @@ Added in framework v1.3.
 
 ---
 
+## Scheduled maintenance
+
+### Looper "custodian"
+
+**File:** `skills/looper-custodian/SKILL.md`
+
+**Trigger:** "Run the custodian", "custodian cleanup", "looper housekeeping", the weekly cron, or `/looper-custodian apply #<issue>`
+
+Scheduled cross-run, cross-repo housekeeping — the only looper step that runs
+ACROSS runs and ACROSS repos on a cadence (weekly, local launchd). Five
+phases: GCs merged-branch artifacts under `local/loops/`, audits memory for
+duplicates/contradictions/staleness, mines wave history across repos, and
+researches external advances, then opens a GitHub report issue with checkbox
+proposals. Governing rail: custodian PROPOSES, human DISPOSES — read-only/
+regenerable work auto-applies; anything that writes a memory or an agent
+lands as a checkbox and applies ONLY through a separate human-checked `apply`
+step, which is previewable (`--dry-run`) and reversible (`undo`). Design
+rationale + full decision log live in `docs/looper-custodian.md`.
+
+---
+
 ## The Flow
 
 Per wave: Research → Plan → Build → Verify → Review → Learn → Commit

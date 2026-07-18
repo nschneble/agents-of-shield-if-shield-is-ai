@@ -11,3 +11,4 @@ These are the agents and skills I use for AI-assisted software development.
 - [Agent dossiers](docs/agents.md)
 - [Looper framework](docs/looper-framework.md)
 - [Looper skills](docs/looper-skills.md)
+- [Looper custodian](docs/looper-custodian.md)
