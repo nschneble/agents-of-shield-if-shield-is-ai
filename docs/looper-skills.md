@@ -19,9 +19,9 @@ convention so the grammar is predictable across the family:
 
 Structured invocations today:
 
-| Skill | Invocation |
-| ----- | ---------- |
-| `loop-de-looper` | `/loop-de-looper resume` |
+| Skill              | Invocation                                                               |
+| ------------------ | ------------------------------------------------------------------------ |
+| `loop-de-looper`   | `/loop-de-looper resume`                                                 |
 | `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo` |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
@@ -225,16 +225,22 @@ Added in framework v1.3.
 
 **Trigger:** "Run the custodian", "custodian cleanup", "looper housekeeping", the weekly cron, or `/looper-custodian apply #<issue>`
 
-Scheduled cross-run, cross-repo housekeeping — the only looper step that runs
-ACROSS runs and ACROSS repos on a cadence (weekly, local launchd). Five
-phases: GCs merged-branch artifacts under `local/loops/`, audits memory for
-duplicates/contradictions/staleness, mines wave history across repos, and
-researches external advances, then opens a GitHub report issue with checkbox
-proposals. Governing rail: custodian PROPOSES, human DISPOSES — read-only/
-regenerable work auto-applies; anything that writes a memory or an agent
-lands as a checkbox and applies ONLY through a separate human-checked `apply`
-step, which is previewable (`--dry-run`) and reversible (`undo`). Design
-rationale + full decision log live in `docs/looper-custodian.md`.
+Scheduled cross-run, cross-repo housekeeping. The only looper step that
+runs across runs and repos on a cadence.
+
+There are five phases:
+
+1. GCs merged-branch artifacts under `local/loops/`
+2. Audits memory for duplicates / contradictions / staleness
+3. Mines wave history across repos
+4. Researches external advances
+5. Opens a GitHub report with proposals
+
+Governing rail: custodian proposes, human disposes. Read-only/regenerable
+work auto-applies. Anything that writes a memory or an agent lands as a
+checkbox and applies only through a human-checked `apply` step, which is
+previewable and reversible. Design rationale + full decision log live in
+`docs/looper-custodian.md`.
 
 ---
 

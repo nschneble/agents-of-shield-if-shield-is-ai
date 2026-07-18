@@ -21,9 +21,9 @@ unless it hits a hard rule conflict. The recap closes the run with a clean,
 shareable summary drawn from the gate log + git history; it narrates, it
 never decides.
 
-Loop de Looper's operational safety rails — the budget governor, usage-window
-guard, gate artifacts, and durable run-state — are specified in its SKILL,
-`skills/loop-de-looper/SKILL.md`.
+Loop de Looper's operational safety rails – the budget governor,
+usage-window guard, gate artifacts, and durable run-state – are specified
+in its SKILL, `skills/loop-de-looper/SKILL.md`.
 
 Plan absorbs the deterministic portion of pre-build specialist judgment so
 the loop stays autonomous unless real residual judgment is needed. When
