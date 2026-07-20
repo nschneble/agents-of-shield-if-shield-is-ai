@@ -193,3 +193,48 @@ LangChain, Ambiance, wakamoleguy, Hobday, Elliot Smith, capn-hook):
     have direct analogues, and the two remaining residues (shallow-pass evidence,
     unmechanized-constraint-as-ignored-signal) stayed informational for want of a
     replay proving a real miss — Phase E discipline applied to an inbound idea.
+
+Refined 2026-07-20 from the bg-wait-ceiling incident:
+
+15. **Phase E gets ceiling headroom, and a ceiling-kill is resumable, not
+    silently dropped.** The 2026-07-20 run backgrounded Phase E's `deep-research`
+    and then hit the harness `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default
+    (600s) while the fan-out was still running (~644s in, not yet done). The
+    harness terminated the workflow — but a ceiling-kill still exits 0, so the
+    wrapper counted it a clean success: no `Custodian report` issue was ever
+    opened and ~1.4M tokens of already-completed research were thrown away with
+    no trace but a drained session limit. Sibling failure mode to decision 13's
+    silent-on-failure wrapper — a half-done run that *looks* done is as bad as a
+    dead one that looks alive. Three fixes: (a) the wrapper raises the ceiling to
+    30 min so a normal Phase E finishes within the end-of-turn wait and Phase F
+    runs; (b) a ceiling-kill is detected (the harness'
+    `Background tasks still running after …` marker in the run log), turned into
+    a loud resumable state — a `resume.json` breadcrumb + a
+    `Custodian INCOMPLETE <date>` issue — and **never retried** (a retry re-runs
+    C/A/B and re-hits the ceiling on E, compounding the waste); and (c) a new
+    `/looper-custodian resume [<date>]` mode replays only the unlogged tail
+    (Phase E → report), reusing the C/A/B already in `custodian-log.jsonl` and
+    recovering Phase E's findings from the killed workflow's on-disk journal when
+    reachable. Each cron attempt now runs under a known `--session-id` so resume
+    can locate that transcript — `resumeFromRunId`'s agent cache is same-session
+    only, so the persisted journal is the cross-session handle. `custodian-log.jsonl`
+    is the resume source of truth: a phase counts as done iff it logged, never on
+    a subagent's say-so (the same executable-record discipline as decision 8).
+16. **Phase E gets a usage-window gate — probe before the expensive dispatch.**
+    The same 2026-07-20 review noted the deeper exposure behind the ceiling-kill:
+    Phase E is the run's one large token sink (~1.4M tokens) and the custodian
+    had NO usage-window guard at all — unlike `loop-de-looper`, whose guard reads
+    the real `anthropic-ratelimit-unified-*` window and pauses at a wave boundary.
+    The custodian has no wave loop, but the C → A → B → E order is itself a
+    checkpoint and E is the dispatch worth gating. So E now runs
+    `scripts/usage-window-probe.sh` before invoking `deep-research`: at ≥95%
+    utilization or a `rejected` status on the 5-hour or weekly window it DEFERS E
+    — logs `deferred (usage-window)`, writes the `resume.json` breadcrumb, and
+    still ships the report on C/A/B with an `E: deferred … resets ~HH:MM` line —
+    rather than burning the window dry mid-fan-out and orphaning both the research
+    and whatever the user does next. `read_ok:false` ⇒ run E unguarded and say so,
+    never a fabricated pause (same probe-unavailable honesty as the loop's guard).
+    `resume` re-probes before re-running E, so a too-early resume re-defers instead
+    of slamming a still-hot window. Reuses the loop's existing probe and threshold
+    — one real observable, no cost-axis guess (`[[reference-usage-window-real-ratelimit-headers]]`,
+    `no-third-party-hosted-tool-reliance`).
