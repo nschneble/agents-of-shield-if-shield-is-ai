@@ -61,6 +61,8 @@ ingest() {
         {
           repo:$repo, branch:$branch,
           wave, kind, agent, verdict,
+          outcome: (.outcome // null),
+          verified_by: (.verified_by // null),
           blockers: (.blockers // 0),
           ran: (.ran // null),
           task_tool_available: (.task_tool_available // null),

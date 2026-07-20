@@ -81,6 +81,8 @@ All three: NO new behavior to exercise. Verify pass = "resource now says what pl
 
 PASS / FAIL verdict per acceptance criterion.
 
+**Report the verdict's provenance in the gate log's `verified_by` vocabulary** (`loop-de-looper` → `## Gate artifacts`), so the wave's hand-back states it in the same terms any gate line records: `executable` when an executable verification function's pass was the completion gate (`## Executable verification function`), `llm` when the criterion had no runnable oracle and the verdict rests on the coherence / internal-consistency judgment instead. A prose/markdown/spec wave with `executable VF = N/A` reports `llm` — honestly, not dressed up as a check that never ran. Mixed criteria (some executable, some judged) report `executable` only when the *completion gate itself* was the runnable pass. Verify is a step inside the wave, not itself a `gates.jsonl` line — this provenance travels in the hand-back, where the orchestrator can carry it into the terms it records.
+
 FAIL → cite:
 
 - Which criterion failed

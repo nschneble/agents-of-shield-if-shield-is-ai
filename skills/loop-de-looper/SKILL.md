@@ -306,11 +306,13 @@ Each line records:
 ```json
 {
   "wave": 4,
-  "kind": "crew",                 // "crew" | "pre-build-specialist"
+  "kind": "crew",                 // "crew" | "pre-build-specialist" | "wave-retry" | "stale-skip"
   "agent": "the-diamantaire",     // crew member or specialist name
   "task_tool_available": true,    // false = orchestrator could NOT invoke; see below
   "ran": true,                    // false when task_tool_available is false
   "verdict": "MERGE-READY",       // agent's own words, verbatim — no paraphrase
+  "outcome": "promote",           // refutation-posture reviewers only: "refute" | "promote"; else null
+  "verified_by": "llm",           // provenance: "executable" | "llm" | null
   "blockers": 0,
   "summary": "one line, cited from agent output"
 }
@@ -320,6 +322,15 @@ Hard rules:
 
 - **`task_tool_available: false` ⇒ `ran: false` ⇒ no verdict.** Per memory `[[feedback-task-tool-availability]]`, the Task tool is sometimes absent in practice. A gate the loop *wanted* to run but could not is logged as unavailable — NEVER as passed, NEVER with an invented verdict. Detect availability, don't assume it.
 - **Verdicts are cited verbatim** from agent output, matching the `## Voice + style` no-paraphrase rule.
+- **`outcome` is the structured twin of `verdict` for a refutation-posture reviewer — never its replacement, and NOT every crew agent's field.** Only a reviewer whose mandate is *refute-or-promote* sets it: `the-diamantaire` (its kill-mandate posture) is the one today; the set grows only if another agent adopts that posture. Such a reviewer normalizes its `verdict` to `refute` (a defensible defect that blocks the diff) or `promote` (survived review) so the log is machine-queryable without paraphrasing away the verbatim line. **Every other line carries `outcome: null`** — a non-refutation crew agent (voice/test/doc/refactor findings have no refute/promote shape), a `pre-build-specialist` gate, a `wave-retry`/`stale-skip` event, a `ran: false` line. It never overwrites `verdict`; both ride on the line.
+- **`verified_by` records whether THIS gate's verdict was backed by a runnable check the agent actually executed, or rests on judgment.** `executable` when the agent ran a check — a test, a lint, an oracle, a `jq` assertion — whose result gated the verdict (the same executable-over-judgment axis `looper-verify` draws in `## Executable verification function (where an oracle exists)`); `llm` when the verdict rests on model reasoning alone; `null` only when `ran: false` (nothing gated). It applies to any ran gate, crew or specialist — a code reviewer with Bash *can* run a check to confirm a finding (`executable`), or reason to it (`llm`). This is the drift-audit the field exists for: a log whose verdicts are all `verified_by: llm` shows no verdict was ever empirically backed — the "unanimous consensus, no empirical check" failure (custodian #21 E-1/E-2) becomes greppable, not buried. Never label a line `executable` without an actual runnable check behind it; an unbacked judgment is `llm`, same honesty as `ran: false`.
+- **Provenance is machine-checkable, not just documented.** The fields earn their keep only if a lint enforces them, so validate a run's log with a `jq` pass over `gates.jsonl` (the same file `scripts/custodian-history.sh` already `jq`-parses) — every ran verdict-bearing gate (`crew` or `pre-build-specialist`) carries `verified_by`, and a refutation-posture reviewer's crew line also carries `outcome`:
+  ```
+  jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"))
+         | select(.verified_by == null
+                  or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null))' gates.jsonl   # must print nothing
+  ```
+  The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope above); the `outcome` check is crew-refutation-only. `wave-retry` / `stale-skip` events aren't verdict-bearing gates, so neither field is required on them. Extend the `.agent ==` clause if another agent takes the refutation posture. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt. A `verified_by: llm`-only run is *valid* but *flagged* — the lint proves the fields are present, not that the run used an executable check.
 - **Write before acting on the result** — log the crew pass before looping back or resetting counters (step 3), log the specialist gate before re-dispatch (step 2b). A blocker found is still a gate that ran.
 
 The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
