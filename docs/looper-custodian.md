@@ -238,3 +238,26 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     of slamming a still-hot window. Reuses the loop's existing probe and threshold
     — one real observable, no cost-axis guess (`[[reference-usage-window-real-ratelimit-headers]]`,
     `no-third-party-hosted-tool-reliance`).
+17. **The report body is sanitized by default because the target repo is
+    public.** The 2026-07-20 resume finished C/A/B/E and then the `gh issue create`
+    was denied by the auto-mode classifier: `agents-of-shield-if-shield-is-ai` is a
+    **public** repo, and the drafted body carried other repos' branch names + PR
+    numbers, crew agent code names, and `~/.claude/…` absolute paths — excess
+    internal detail for a public recipient. On the interactive resume that's a
+    solvable prompt; on the unattended weekly cron it is a **hard block** — the
+    headless `claude -p` can't clear the classifier, so a non-sanitized body would
+    kill Phase F the same way the ceiling killed Phase E (decision 15): work done,
+    nothing published. The fix moves the discipline into the spec rather than
+    relying on a human to trim each week. The full per-line detail already lives in
+    `custodian-log.jsonl` (gitignored, local), so the issue body is written to carry
+    only what a human needs to *approve a checkbox*: Phase A/C give counts + a
+    repo-agnostic gloss (exact `repo/branch:line` cites stay in the log), crew
+    agents are named by role not code name, and memories/skills are named by bare
+    slug not filesystem path. What stays verbatim is Phase B's quoted memory
+    *evidence* — that's this repo's own memory, it's the thing the human checks the
+    proposal against, and it carries none of the flagged cross-repo/agent/abs-path
+    detail, so the verbatim-citation rail (decision 8) is untouched. A body that
+    still trips the classifier is trimmed further, never worked around — same
+    propose/dispose deference the whole custodian holds. Sibling of decisions 15
+    and 16: a run that finishes its work but can't ship its report is another
+    half-done-looks-done failure, closed by making the shippable shape the default.
