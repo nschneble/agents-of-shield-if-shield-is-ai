@@ -19,10 +19,11 @@ convention so the grammar is predictable across the family:
 
 Structured invocations today:
 
-| Skill              | Invocation                                                               |
-| ------------------ | ------------------------------------------------------------------------ |
-| `loop-de-looper`   | `/loop-de-looper resume`                                                 |
-| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo` |
+| Skill              | Invocation                                                                        |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `loop-de-looper`   | `/loop-de-looper resume`                                                          |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`          |
+| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>` |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
 explicitly** — a new operation is a new named verb, never folded into a
@@ -241,6 +242,36 @@ work auto-applies. Anything that writes a memory or an agent lands as a
 checkbox and applies only through a human-checked `apply` step, which is
 previewable and reversible. Design rationale + full decision log live in
 `docs/looper-custodian.md`.
+
+---
+
+## On-demand security
+
+### Looper "defend"
+
+**File:** `skills/looper-defend/SKILL.md`
+
+**Trigger:** "Find and fix vulnerabilities", "security scan this repo", "hunt for vulns", "run looper-defend", or `/looper-defend apply #<finding-id>`
+
+On-demand proactive vulnerability hunt + human-gated remediation over a
+whole target repo. The whole-repo counterpart to `security-review` and
+`the-diamantaire`, which review only the pending diff. Not cron —
+on-demand only.
+
+There are five phases:
+
+1. Recon: detect stack(s), threat-model, partition into hunt surfaces
+2. Find: hunt each surface (optional runtime-detected scanners + LLM code read)
+3. Triage: verify, dedupe, rank, classify real-vs-noise
+4. Report: surface findings with checkbox patch proposals
+5. Patch: remediate ticked findings through the normal wave pipeline
+
+Governing rail: defend proposes, human disposes. Recon/find/triage/report
+run read-only and automatically; patch is propose-only, landing as a
+checkbox that applies only after a human ticks it and runs `/looper-defend
+apply`. One narrow class — a dependency CVE bump with zero app-code change —
+may auto-apply, and even it lands as a reviewable draft-PR commit. Design
+rationale + full decision log live in `docs/looper-defend.md`.
 
 ---
 

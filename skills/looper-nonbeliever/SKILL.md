@@ -32,7 +32,7 @@ Generate challenges across four axes. For each, the orchestrator answers or fold
 
 Cite the conflicting source VERBATIM — rule text, skill description, directive line. A challenge you can't trace to a real line is noise; drop it.
 
-**Every challenge carries a recommended resolution.** An objection with no proposed fix just stalls the orchestrator. For each challenge, after raising it, state the move you'd recommend if the orchestrator can't defend the run as-is — drop the redundant wave, route this decision to the user, add the missing gate, defer the speculative piece to the wave that needs it. A skeptic that only objects forces the orchestrator to invent the resolution; one that recommends turns the interrogation into an actionable hand-off. The recommendation is advisory like the rest of the pass — the orchestrator can answer the challenge instead of taking it — but it's never absent.
+**Every challenge carries a recommended resolution.** An objection with no proposed fix just stalls the orchestrator into inventing one from scratch. For each challenge, after raising it, state the move you'd recommend if the orchestrator can't defend the run as-is — drop the redundant wave, route this decision to the user, add the missing gate, defer the speculative piece to the wave that needs it. The recommendation is advisory like the rest of the pass — the orchestrator can answer the challenge instead of taking it — but it's never absent.
 
 ## Sizing
 

@@ -1,7 +1,7 @@
 ---
 name: "the-stickler"
 description: "Use this agent when you want a strict, methodical code review of recently written or modified code to ensure it adheres to project conventions, best practices, and architectural rules. Particularly valuable after implementing new features, refactoring modules, or making structural changes."
-model: opus
+model: sonnet
 memory: user
 tools: Bash, Read
 ---
