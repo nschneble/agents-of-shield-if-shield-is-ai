@@ -3,8 +3,8 @@
 Status: **built.** Operational spec (the five phases, the adapter table, the
 artifacts, the `apply` grammar, the full "what it does") lives in
 `skills/looper-defend/SKILL.md` — that is the source of truth. This doc holds
-only what the skill doesn't: *why* it exists, *why* the choices are what they
-are, and the *decision record*. Don't duplicate mechanics here — if a phase's
+only what the skill doesn't: _why_ it exists, _why_ the choices are what they
+are, and the _decision record_. Don't duplicate mechanics here — if a phase's
 behavior changes, it changes in `SKILL.md`.
 
 ## Why it exists
@@ -28,8 +28,8 @@ sprint, is invisible to a diff review precisely because there is no diff.
 reimplementation of diff review — its triage phase MAY call `/security-review`
 as one input signal for the pending-diff sub-case, but the hunt is the part
 neither built-in covers. And it is the on-demand sibling of `looper-custodian`:
-custodian housekeeps the looper *system* on a weekly cadence; defend hunts a
-*target codebase* when a human asks.
+custodian housekeeps the looper _system_ on a weekly cadence; defend hunts a
+_target codebase_ when a human asks.
 
 ## Governing principle: defend PROPOSES, human DISPOSES
 
@@ -99,12 +99,12 @@ comprehended before it lands, and defend is the propose-side of that split.
   diff is the preview and the human gates the merge. Skipping review entirely
   was rejected: the propose/dispose line moves to the merge, it does not
   disappear. (And in the zero-scanner LLM-read mode there is no mechanical
-  verifier at all, so *nothing* is auto-eligible — every finding is
+  verifier at all, so _nothing_ is auto-eligible — every finding is
   propose-only.)
 - **v1 excludes PoC-execution and fuzzing; the executable tier is
   assertion-style.** Defend's executable oracle never fires a crafted payload at
   a sink. For an injection / SSRF / path-traversal class the repro asserts the
-  *fix invariant* — "the query is parameterized" (CWE-89), "the path is
+  _fix invariant_ — "the query is parameterized" (CWE-89), "the path is
   canonicalized and confined" (CWE-22), "the outbound URL is validated against
   the allowlist" (CWE-918) — or runs a controlled benign probe, never a
   weaponized malformed input. This is the deliberate divergence from the
@@ -125,6 +125,7 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
    by default.** The skill shipped as recon → find → triage → report → patch,
    with recon/find/triage/report read-only and patch gated. Three shaping
    decisions:
+
    - **One agnostic pipeline with a runtime-detected adapter, NOT a per-stack
      fork.** Mined from the reference harness's `/customize` (ports across
      languages by re-answering the build/finding/input/ground-truth questions,
@@ -140,6 +141,7 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
 2. **Crew-blocker refinement (wave 1, corrective commit `a67d066`).** The first
    crew pass (the-stickler + the-diamantaire) surfaced two real blockers,
    resolved against each cited dependency skill:
+
    - **Pipeline gap.** The draft shortcut the remediation path — it did not
      route every fix through the full canonical chain, so a single-finding fix
      could skip the plan and review passes that `looper-build` and
@@ -147,7 +149,7 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
      `looper-plan` brief that names a rung, and `looper-commit`'s pre-flight
      will not land a fix without a `looper-review` verdict. Resolved: patch now
      names the full `looper-plan → looper-build → looper-verify → looper-review
-     → looper-commit` chain at every call site and runs a real (if short) plan
+→ looper-commit` chain at every call site and runs a real (if short) plan
      and review pass even for a one-line fix — the wave is small, the pipeline
      is not skipped.
    - **Oracle contradiction.** The draft's executable-oracle language
@@ -164,7 +166,7 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
 
    The same corrective commit also introduced the **auth/authz ESCALATE
    handling** — an authz finding's remediation wave emits plan's `ESCALATE:
-   security-review` and defend routes it the normal way (hand to the
+security-review` and defend routes it the normal way (hand to the
    orchestrator, fire the specialist, resume at build) rather than swallowing
    it. Decision 3 below later tightens that claim from "always escalates" to the
    two-case shape, so the reader meets it here first.
@@ -182,7 +184,7 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
      auto-committing. The triage flag was a prediction; this is the enforcement.
    - **The auth/authz ESCALATE claim was tightened.** The draft overstated that
      any auth/permission/token finding definitely trips plan's escalation.
-     `looper-plan`'s actual trigger is narrower — a *public API contract change*
+     `looper-plan`'s actual trigger is narrower — a _public API contract change_
      — which a fix that tightens an existing check without changing its
      signature need not hit, and `looper-build`'s security-review row fires only
      when plan already escalated (it is not an independent build-time mandate).

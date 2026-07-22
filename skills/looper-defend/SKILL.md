@@ -28,12 +28,12 @@ Same discipline the loop and custodian hold. An autonomous hunt that auto-rewrit
 
 Noun-verb grammar (`docs/looper-skills.md` → `## Subcommand grammar`), same shape as custodian:
 
-| Invocation | Does |
-| ---------- | ---- |
-| `/looper-defend` (or an NL trigger) | the **hunt run**: phases recon → find → triage → report, read-only, ends by emitting the structured report + persisting findings |
-| `/looper-defend apply #<finding-id>` | **patch one finding**: builds a wave brief for that finding and routes it through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` |
-| `/looper-defend apply <run-id>` | **patch all ticked findings** in that run's report, idempotently, each as its own wave |
-| `/looper-defend apply #<finding-id> --dry-run` | **preview**: prints the proposed patch brief + the exact diff the fix would attempt, and writes nothing. Consent approves a *previewed* fix, not a *described* one |
+| Invocation                                     | Does                                                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/looper-defend` (or an NL trigger)            | the **hunt run**: phases recon → find → triage → report, read-only, ends by emitting the structured report + persisting findings                                       |
+| `/looper-defend apply #<finding-id>`           | **patch one finding**: builds a wave brief for that finding and routes it through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` |
+| `/looper-defend apply <run-id>`                | **patch all ticked findings** in that run's report, idempotently, each as its own wave                                                                                 |
+| `/looper-defend apply #<finding-id> --dry-run` | **preview**: prints the proposed patch brief + the exact diff the fix would attempt, and writes nothing. Consent approves a _previewed_ fix, not a _described_ one     |
 
 `apply` is the verb, `#<finding-id>`/`<run-id>` the arg, `--dry-run` the flag — the exact interaction model custodian uses, not a new grammar. Patch phase writes nothing without an `apply` (except the narrow auto-class above). There is no bespoke `undo`: remediation lands as git commits on a **draft PR**, so the PR diff IS the preview and `git`/PR-close IS the reversal — reusing the pipeline's own review+revert path rather than reinventing custodian's snapshot/undo.
 
@@ -43,14 +43,14 @@ ONE agnostic pipeline, stack plugged in as a runtime-detected adapter — the sa
 
 An adapter answers three questions, none of which is a hard dependency:
 
-| Stack marker | Optional scanners (runtime-detected, NEVER required) | Verify/build oracle | Auto-patch-eligible class |
-| ------------ | ---------------------------------------------------- | ------------------- | ------------------------- |
-| `package.json` (Node/JS/TS) | `npm audit` / `osv-scanner` / eslint security plugins, if installed | `npm test`, `npm run build` | `package.json` + `package-lock.json` CVE bump |
-| `Gemfile` (Ruby/Rails) | `bundler-audit` / `brakeman`, if installed | `bundle exec rspec` / `rake test` | `Gemfile` + `Gemfile.lock` CVE bump |
-| `pyproject.toml` / `requirements.txt` (Python) | `pip-audit` / `bandit`, if installed | `pytest` | `pyproject.toml`/`requirements.txt` + pinned-dep CVE bump |
-| `go.mod` (Go) | `govulncheck`, if installed | `go test ./...` | `go.mod` + `go.sum` CVE bump |
-| any / cross-cutting | `semgrep`, `gitleaks`/`trufflehog` (secret scan), if installed | project's declared test command | — |
-| none matched, or no scanner installed | — (LLM code read only) | project's declared test command, if any | none (no mechanical dep-bump oracle) |
+| Stack marker                                   | Optional scanners (runtime-detected, NEVER required)                | Verify/build oracle                     | Auto-patch-eligible class                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------- |
+| `package.json` (Node/JS/TS)                    | `npm audit` / `osv-scanner` / eslint security plugins, if installed | `npm test`, `npm run build`             | `package.json` + `package-lock.json` CVE bump             |
+| `Gemfile` (Ruby/Rails)                         | `bundler-audit` / `brakeman`, if installed                          | `bundle exec rspec` / `rake test`       | `Gemfile` + `Gemfile.lock` CVE bump                       |
+| `pyproject.toml` / `requirements.txt` (Python) | `pip-audit` / `bandit`, if installed                                | `pytest`                                | `pyproject.toml`/`requirements.txt` + pinned-dep CVE bump |
+| `go.mod` (Go)                                  | `govulncheck`, if installed                                         | `go test ./...`                         | `go.mod` + `go.sum` CVE bump                              |
+| any / cross-cutting                            | `semgrep`, `gitleaks`/`trufflehog` (secret scan), if installed      | project's declared test command         | —                                                         |
+| none matched, or no scanner installed          | — (LLM code read only)                                              | project's declared test command, if any | none (no mechanical dep-bump oracle)                      |
 
 - **Detection is by presence, not by network call.** A scanner is used ONLY if the binary resolves on `PATH` (`command -v`); absent ⇒ skipped, logged, never installed on the fly.
 - **The loop still runs with zero scanners** — recon + find fall back to an LLM-driven code read (narrower recall, no execution-verified tier). In that mode NOTHING is auto-patch-eligible: with no mechanical verifier for a dep bump, every finding is propose-only.
@@ -84,7 +84,7 @@ The real-vs-noise gate. For each candidate:
   - an **executable oracle** confirmed it (a scanner hit with an id, or an **assertion-style** repro/failing test — see the definition below) → `verified_by: executable`, `outcome: promote`; OR
   - for a class with no runnable oracle, the LLM read is **corroborated** by a second signal (a matching CWE pattern, a reachable data-flow traced end-to-end from an untrusted entry point) AND cited to `file:line` with the exploit path → `verified_by: llm`, `outcome: promote`.
   - A candidate that survives neither is **refuted** (`outcome: refute`) and demoted to informational — reported as noise-suspect, never a patch proposal. Borrows `the-diamantaire`'s refute-or-promote posture and the family's `verified_by` split.
-- **What "repro" means for defend's v1 executable tier — assertion-style, never a live exploit.** The executable oracle is a check on the CODE'S SHAPE or a controlled, non-malicious probe — NOT a weaponized payload fired at the sink. For an injection / SSRF / path-traversal class the repro asserts the *fix invariant*, not the exploit: "the query is parameterized / uses a prepared statement" (CWE-89), "the path is canonicalized and confined before use" (CWE-22), "the outbound URL is validated against the allowlist" (CWE-918). This is deliberately distinct from the harness's exploit-crafting agents, which DO fire crafted payloads and therefore need the sandbox defend forgoes: defend's executable tier never runs a crafted attack input, in any phase, so it carries no sandbox/isolation requirement (`## Safety rails`).
+- **What "repro" means for defend's v1 executable tier — assertion-style, never a live exploit.** The executable oracle is a check on the CODE'S SHAPE or a controlled, non-malicious probe — NOT a weaponized payload fired at the sink. For an injection / SSRF / path-traversal class the repro asserts the _fix invariant_, not the exploit: "the query is parameterized / uses a prepared statement" (CWE-89), "the path is canonicalized and confined before use" (CWE-22), "the outbound URL is validated against the allowlist" (CWE-918). This is deliberately distinct from the harness's exploit-crafting agents, which DO fire crafted payloads and therefore need the sandbox defend forgoes: defend's executable tier never runs a crafted attack input, in any phase, so it carries no sandbox/isolation requirement (`## Safety rails`).
 - **False-positive filters** (mirror the harness's triage): drop findings in **test/fixture code**, findings on **unreachable paths**, and defects that are an **upstream library's responsibility** (report as a dependency finding, not an app-code finding).
 - **Dedupe by root cause, not by line** — group candidates by the underlying defect (same sink reached from two call sites is ONE finding). Dedupe within the run AND against prior runs' `findings.jsonl` in `local/defend/` (key on function/sink identity, not line number, which drifts).
 - **Severity + exploitability** — rate each finding on the harness's dimensions: primitive class (what kind of defect), reachability (accessible from untrusted input?), escalation path (impact if triggered), and constraints. Assign `critical | high | medium | low | info` on that judged rubric (not a keyword scan); carry a CWE/CVE id where one is known. This is not a novel scheme — standard severity mapped to exploitability, no CVSS-tooling dependency.
@@ -119,7 +119,7 @@ Triggered by `apply` (or auto, for the narrow dep-bump class). Defend does NOT p
 3. **Idempotent** — a finding whose fix is already present is a no-op, never a double-patch. Re-running `apply` on the same run is safe.
 4. **Honor tool availability** — if defend cannot actually invoke `looper-plan`/`looper-build`/`looper-verify`/`looper-review`/`looper-commit` (no Skill/Task tool), it logs `ran: false` on the patch record and hands the constructed brief back for the user/orchestrator to run — NEVER a claimed-but-unrun patch. Same `task_tool_available: false ⇒ ran: false` discipline as custodian.
 
-The narrow auto-patch-eligible class runs steps 1–2 without waiting for a tick — but with one hard mechanical gate BEFORE it commits. Triage classified the finding `auto-patch-eligible` from a *prediction* that the fix would be manifest/lockfile-confined; that prediction is made before any fix exists, so it is re-checked against the REAL diff once `looper-build` has produced it. After build, before `looper-commit`, enumerate the changed paths:
+The narrow auto-patch-eligible class runs steps 1–2 without waiting for a tick — but with one hard mechanical gate BEFORE it commits. Triage classified the finding `auto-patch-eligible` from a _prediction_ that the fix would be manifest/lockfile-confined; that prediction is made before any fix exists, so it is re-checked against the REAL diff once `looper-build` has produced it. After build, before `looper-commit`, enumerate the changed paths:
 
 ```
 git diff --name-only HEAD
@@ -147,18 +147,18 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 ```json
 {
   "finding_id": "F-3",
-  "phase": "triage",                 // "recon" | "find" | "triage" | "report" | "patch"
-  "severity": "high",                // critical | high | medium | low | info
+  "phase": "triage", // "recon" | "find" | "triage" | "report" | "patch"
+  "severity": "high", // critical | high | medium | low | info
   "primitive": "sql-injection",
   "cwe": "CWE-89",
   "location": "src/api/users.ts:142",
   "reachable_from": "POST /users/search (untrusted query param)",
-  "task_tool_available": null,       // patch records only; null here (triage) — scanner presence is tracked by the adapter table, not this field
-  "ran": null,                       // patch records only; null on recon/find/triage/report
+  "task_tool_available": null, // patch records only; null here (triage) — scanner presence is tracked by the adapter table, not this field
+  "ran": null, // patch records only; null on recon/find/triage/report
   "verdict": "reachable SQLi via unparameterized query",
-  "outcome": "promote",              // "promote" | "refute" (real-vs-noise), else null
-  "verified_by": "llm",              // "executable" | "llm" | null (null when a patch record has ran:false)
-  "remediation": "P-2",              // proposal tag, or null for informational
+  "outcome": "promote", // "promote" | "refute" (real-vs-noise), else null
+  "verified_by": "llm", // "executable" | "llm" | null (null when a patch record has ran:false)
+  "remediation": "P-2", // proposal tag, or null for informational
   "auto_patch_eligible": false
 }
 ```
