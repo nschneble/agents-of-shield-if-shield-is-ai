@@ -45,10 +45,10 @@ An adapter answers three questions, none of which is a hard dependency:
 
 | Stack marker | Optional scanners (runtime-detected, NEVER required) | Verify/build oracle | Auto-patch-eligible class |
 | ------------ | ---------------------------------------------------- | ------------------- | ------------------------- |
-| `package.json` (Node/JS/TS) | `npm audit` / `osv-scanner` / eslint security plugins, if installed | `npm test`, `npm run build` | `package-lock.json` CVE bump |
-| `Gemfile` (Ruby/Rails) | `bundler-audit` / `brakeman`, if installed | `bundle exec rspec` / `rake test` | `Gemfile.lock` CVE bump |
-| `pyproject.toml` / `requirements.txt` (Python) | `pip-audit` / `bandit`, if installed | `pytest` | pinned-dep CVE bump |
-| `go.mod` (Go) | `govulncheck`, if installed | `go test ./...` | `go.sum` CVE bump |
+| `package.json` (Node/JS/TS) | `npm audit` / `osv-scanner` / eslint security plugins, if installed | `npm test`, `npm run build` | `package.json` + `package-lock.json` CVE bump |
+| `Gemfile` (Ruby/Rails) | `bundler-audit` / `brakeman`, if installed | `bundle exec rspec` / `rake test` | `Gemfile` + `Gemfile.lock` CVE bump |
+| `pyproject.toml` / `requirements.txt` (Python) | `pip-audit` / `bandit`, if installed | `pytest` | `pyproject.toml`/`requirements.txt` + pinned-dep CVE bump |
+| `go.mod` (Go) | `govulncheck`, if installed | `go test ./...` | `go.mod` + `go.sum` CVE bump |
 | any / cross-cutting | `semgrep`, `gitleaks`/`trufflehog` (secret scan), if installed | project's declared test command | — |
 | none matched, or no scanner installed | — (LLM code read only) | project's declared test command, if any | none (no mechanical dep-bump oracle) |
 

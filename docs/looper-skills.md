@@ -19,10 +19,11 @@ convention so the grammar is predictable across the family:
 
 Structured invocations today:
 
-| Skill              | Invocation                                                               |
-| ------------------ | ------------------------------------------------------------------------ |
-| `loop-de-looper`   | `/loop-de-looper resume`                                                 |
-| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo` |
+| Skill              | Invocation                                                                     |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `loop-de-looper`   | `/loop-de-looper resume`                                                       |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`       |
+| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>` |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
 explicitly** — a new operation is a new named verb, never folded into a

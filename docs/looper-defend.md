@@ -9,7 +9,7 @@ behavior changes, it changes in `SKILL.md`.
 
 ## Why it exists
 
-Three surfaces already touch security, and all three answer the same question —
+Two surfaces already touch security, and both answer the same question —
 "is this CHANGE safe?":
 
 - **`security-review`** (built-in) reviews the pending diff on the current
@@ -161,6 +161,13 @@ Built 2026-07-21 (wave 1, commit `fdb1e44`):
      does-NOT-do list. This is exactly the kind of "why" this doc exists to
      hold: the exclusion of PoC-execution is a deliberate scope line, not an
      oversight.
+
+   The same corrective commit also introduced the **auth/authz ESCALATE
+   handling** — an authz finding's remediation wave emits plan's `ESCALATE:
+   security-review` and defend routes it the normal way (hand to the
+   orchestrator, fire the specialist, resume at build) rather than swallowing
+   it. Decision 3 below later tightens that claim from "always escalates" to the
+   two-case shape, so the reader meets it here first.
 
 3. **W3 + phrasing tightening (wave 2, this doc's wave).** A diamantaire
    re-review (both original blockers confirmed fixed) found one remaining real
