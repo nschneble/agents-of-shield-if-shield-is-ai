@@ -1,6 +1,6 @@
 ---
 name: looper-defend
-description: On-demand autonomous vulnerability hunt + remediation over a whole repo. Five phases — recon → find → triage → report → patch. Proactive whole-tree/whole-history hunt (the part `security-review` and `the-diamantaire` don't cover: they review the pending diff, this hunts the codebase). Findings surface as a structured end-of-run report with checkbox patch proposals; a patch proceeds only after a human ticks it (mirroring custodian's `apply #<id>`), routing through the normal `looper-build` → `looper-verify` → `looper-commit` pipeline — never a bespoke fixer. Real scanners (npm audit, bundler-audit, brakeman, pip-audit, govulncheck, semgrep…) are OPTIONAL, runtime-detected adapters; the loop still runs on an LLM code read when none are installed. Trigger when the user says "find and fix bugs", "find and fix vulnerabilities", "security scan this repo", "hunt for vulns", or "run looper-defend". Not cron — on-demand only.
+description: On-demand autonomous vulnerability hunt + remediation over a whole repo. Five phases — recon → find → triage → report → patch. Proactive whole-tree/whole-history hunt (the part `security-review` and `the-diamantaire` don't cover: they review the pending diff, this hunts the codebase). Findings surface as a structured end-of-run report with checkbox patch proposals; a patch proceeds only after a human ticks it (mirroring custodian's `apply #<id>`), routing through the normal `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` pipeline — never a bespoke fixer. Real scanners (npm audit, bundler-audit, brakeman, pip-audit, govulncheck, semgrep…) are OPTIONAL, runtime-detected adapters; the loop still runs on an LLM code read when none are installed. Trigger when the user says "find and fix bugs", "find and fix vulnerabilities", "security scan this repo", "hunt for vulns", or "run looper-defend". Not cron — on-demand only.
 ---
 
 Proactive whole-repo vulnerability hunt + human-gated remediation. `looper-custodian` GCs and audits the looper system on a cadence; `looper-defend` hunts a TARGET codebase for security defects on demand. Structure mined from Anthropic's `defending-code-reference-harness` (threat-model → scan → triage → patch, plus its `/customize` stack-abstraction) — the STRUCTURE, not its ASAN/Docker/gVisor substrate, which is a hard third-party dependency this family forbids (`[[no-third-party-hosted-tool-reliance]]`).
@@ -14,7 +14,7 @@ Three surfaces already touch security; defend is the one they leave uncovered:
 - **`security-review`** (built-in) and **`the-diamantaire`** (security is one of its review dimensions) both review the **pending diff on the current branch** — reactive, change-scoped. They answer "is this CHANGE safe?"
 - **`looper-defend`** answers "is this REPO safe?" — a proactive hunt over the whole tree (and, where cheap, git history for leaked secrets), reachable code paths, dependency manifests, and trust boundaries, independent of any pending change.
 
-Defend does NOT reimplement diff review: its triage phase MAY invoke `/security-review` as ONE input signal for the pending-diff sub-case, but the hunt is the whole-repo part neither covers. And it does NOT reinvent a patcher — remediation routes through `looper-build` → `looper-verify` → `looper-commit`, the same pipeline every wave uses.
+Defend does NOT reimplement diff review: its triage phase MAY invoke `/security-review` as ONE input signal for the pending-diff sub-case, but the hunt is the whole-repo part neither covers. And it does NOT reinvent a patcher — remediation routes through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit`, the same full pipeline every wave uses.
 
 ## Governing principle: defend PROPOSES, human DISPOSES
 
@@ -22,7 +22,7 @@ Same discipline the loop and custodian hold. An autonomous hunt that auto-rewrit
 
 - **Recon / find / triage / report run automatically** — read-only analysis, no source touched. They enumerate, hunt, verify, and rank.
 - **Patch is propose-only by default** — every remediation lands as a checkbox in the report and proceeds through the build pipeline ONLY after a human ticks it.
-- **One narrow class MAY auto-apply** — a dependency version bump to a pinned CVE-fix version, when the existing suite stays green with ZERO application-code change (diff confined to the manifest/lockfile). It still lands as a reviewable **draft-PR commit** through `looper-build`/`verify`/`commit` — the human gates the MERGE, not the tick. Any condition unmet (no pinned fix version, suite red, diff touches app code) demotes it to propose-only. Everything else — any logic change, any fix touching application code — needs the tick.
+- **One narrow class MAY auto-apply** — a dependency version bump to a pinned CVE-fix version, when the existing suite stays green with ZERO application-code change (diff confined to the manifest/lockfile). It still lands as a reviewable **draft-PR commit** through the same `looper-plan`/`build`/`verify`/`review`/`commit` chain — the human gates the MERGE, not the tick. Any condition unmet (no pinned fix version, suite red, diff touches app code) demotes it to propose-only. Everything else — any logic change, any fix touching application code — needs the tick.
 
 ## Invocation
 
@@ -31,7 +31,7 @@ Noun-verb grammar (`docs/looper-skills.md` → `## Subcommand grammar`), same sh
 | Invocation | Does |
 | ---------- | ---- |
 | `/looper-defend` (or an NL trigger) | the **hunt run**: phases recon → find → triage → report, read-only, ends by emitting the structured report + persisting findings |
-| `/looper-defend apply #<finding-id>` | **patch one finding**: builds a wave brief for that finding and routes it through `looper-build` → `looper-verify` → `looper-commit` |
+| `/looper-defend apply #<finding-id>` | **patch one finding**: builds a wave brief for that finding and routes it through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` |
 | `/looper-defend apply <run-id>` | **patch all ticked findings** in that run's report, idempotently, each as its own wave |
 | `/looper-defend apply #<finding-id> --dry-run` | **preview**: prints the proposed patch brief + the exact diff the fix would attempt, and writes nothing. Consent approves a *previewed* fix, not a *described* one |
 
@@ -81,9 +81,10 @@ Find produces candidates only; it does NOT rank, dedupe, or decide real-vs-noise
 The real-vs-noise gate. For each candidate:
 
 - **Promote candidate → finding** only when confirmed:
-  - an **executable oracle** confirmed it (a scanner hit with an id, or a written repro/failing test that reproduces the defect) → `verified_by: executable`, `outcome: promote`; OR
+  - an **executable oracle** confirmed it (a scanner hit with an id, or an **assertion-style** repro/failing test — see the definition below) → `verified_by: executable`, `outcome: promote`; OR
   - for a class with no runnable oracle, the LLM read is **corroborated** by a second signal (a matching CWE pattern, a reachable data-flow traced end-to-end from an untrusted entry point) AND cited to `file:line` with the exploit path → `verified_by: llm`, `outcome: promote`.
   - A candidate that survives neither is **refuted** (`outcome: refute`) and demoted to informational — reported as noise-suspect, never a patch proposal. Borrows `the-diamantaire`'s refute-or-promote posture and the family's `verified_by` split.
+- **What "repro" means for defend's v1 executable tier — assertion-style, never a live exploit.** The executable oracle is a check on the CODE'S SHAPE or a controlled, non-malicious probe — NOT a weaponized payload fired at the sink. For an injection / SSRF / path-traversal class the repro asserts the *fix invariant*, not the exploit: "the query is parameterized / uses a prepared statement" (CWE-89), "the path is canonicalized and confined before use" (CWE-22), "the outbound URL is validated against the allowlist" (CWE-918). This is deliberately distinct from the harness's exploit-crafting agents, which DO fire crafted payloads and therefore need the sandbox defend forgoes: defend's executable tier never runs a crafted attack input, in any phase, so it carries no sandbox/isolation requirement (`## Safety rails`).
 - **False-positive filters** (mirror the harness's triage): drop findings in **test/fixture code**, findings on **unreachable paths**, and defects that are an **upstream library's responsibility** (report as a dependency finding, not an app-code finding).
 - **Dedupe by root cause, not by line** — group candidates by the underlying defect (same sink reached from two call sites is ONE finding). Dedupe within the run AND against prior runs' `findings.jsonl` in `local/defend/` (key on function/sink identity, not line number, which drifts).
 - **Severity + exploitability** — rate each finding on the harness's dimensions: primitive class (what kind of defect), reachability (accessible from untrusted input?), escalation path (impact if triggered), and constraints. Assign `critical | high | medium | low | info` on that judged rubric (not a keyword scan); carry a CWE/CVE id where one is known. This is not a novel scheme — standard severity mapped to exploitability, no CVSS-tooling dependency.
@@ -91,7 +92,7 @@ The real-vs-noise gate. For each candidate:
 
 ### Report — surface findings (read-only)
 
-**Surface: an end-of-run structured report to the user, NOT a GitHub issue per run.** Custodian opens an issue because it is an unattended cron with nobody watching and `local/` is gitignored; defend is **on-demand and interactive** — the user is present to read the report inline. So the default is a structured report emitted to the user (like `loop-de-looper`'s exit report), plus a persisted `local/defend/<run-id>/report.md` carrying the tickable patch proposals that `apply` reads back. A GitHub issue is **opt-in** (`--issue`) for a shared/CI context where a tracked, persistent notification is wanted; when a target repo is public, the same sanitization discipline as custodian applies (`[[looper-custodian]]` report rules).
+**Surface: an end-of-run structured report to the user, NOT a GitHub issue per run.** Custodian opens an issue because it is an unattended cron with nobody watching and `local/` is gitignored; defend is **on-demand and interactive** — the user is present to read the report inline. So the default is a structured report emitted to the user (like `loop-de-looper`'s exit report), plus a persisted `local/defend/<run-id>/report.md` carrying the tickable patch proposals that `apply` reads back. A GitHub issue is **opt-in** (`--issue`) for a shared/CI context where a tracked, persistent notification is wanted; when a target repo is public, the same sanitization discipline as custodian applies (`looper-custodian` report rules).
 
 - Report body groups findings by severity, each with: id, `file:line`, primitive class + CWE/CVE, reachability/exploitability one-liner, `verified_by`, and the proposed remediation.
 - **Each actionable remediation is a checkbox** tagged `P-<n>` (patch proposal), verbatim evidence inline — the exact checkbox-and-`apply` model custodian uses (`B-merge-<n>` → tick → `apply`).
@@ -101,20 +102,26 @@ The real-vs-noise gate. For each candidate:
 
 ### Patch — remediate through the normal pipeline (gated)
 
-Triggered by `apply` (or auto, for the narrow dep-bump class). Defend does NOT patch directly — it constructs a **wave brief** per finding and routes it through the standard pipeline. For each ticked `P-<n>`:
+Triggered by `apply` (or auto, for the narrow dep-bump class). Defend does NOT patch directly — it feeds each finding through the standard wave loop, the same `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` chain every wave uses (`docs/looper-skills.md` → `## The Flow`). A single-finding remediation is still a real wave: `looper-build` STOPs without a `looper-plan` brief that names a rung (its step 3), and `looper-commit`'s pre-flight will not land the fix without a `looper-review` verdict of `ship`/`fix-blockers-then-ship` (its pre-flight items 1–2). So defend runs the nominal plan and review passes even for a one-line fix rather than shortcutting to build/verify/commit — the plan pass is short because the wave is small, not skipped. For each ticked `P-<n>`:
 
-1. **Build the wave brief** `looper-build` consumes (via `looper-plan`'s brief shape):
-   - `scope`: "remediate finding `<id>`: `<class>` at `<file:line>`" — the smallest change that closes the vuln, nothing beyond.
-   - `constraints`: fix must not change behavior beyond closing the defect; existing suite stays green; smallest blast radius (`looper-build`'s rung discipline).
-   - `target`: the branch/PR the run is landing on; `pr`/`push` directives per `looper-commit`.
-   - `exit criteria`: the finding's repro no longer triggers AND the suite stays green — defend's analog of the harness patch ladder (T0 applies+builds → T1 repro stops → T2 suite passes → optional T3 re-hunt the surface can't re-find it).
-2. **Route it**: `looper-build` (smallest change) → `looper-verify` (confirm repro gone + suite green; the executable completion gate where a repro oracle exists) → `looper-commit` (lands the fix on the draft PR). In a `loop-de-looper` context, hand each as a queued wave to the orchestrator's `the-looper` dispatch instead of invoking the skills directly.
+1. **Run `looper-plan` for the finding** — produce the standard seven-section brief, scoped down to the single remediation. (A finding-fix is a small wave, so the brief is brief; but a rung MUST be named or `looper-build` STOPs, and the mechanized-prediction pass is where the repro oracle gets dry-run.)
+   - **1. Wave scope**: "remediate finding `<id>`: `<class>` at `<file:line>`" — the smallest change that closes the vuln, nothing beyond; `UI: yes|no` per plan's UI-glob.
+   - **2. Constraints (cited)**: fix must not change behavior beyond closing the defect; existing suite stays green; smallest blast radius. Cite the finding's `file:line` + CWE/CVE.
+   - **3. Rung (named)**: the finding fix's minimum-viable rung. A dep-bump is typically rung 3–4; a localized parameterize/canonicalize/allowlist-guard fix is commonly rung 1–2. Rung 6 needs the named justification `looper-plan` demands — `security` is an allowed one, but state it explicitly rather than assuming it.
+   - **4. Mechanized predictions**: dry-run the finding's assertion oracle (triage's executable tier — assert the fix invariant, see `## Triage`) and the suite against the proposed fix; capture the actual output.
+   - **5. Risk register**: residual the mechanized checks can't catch (does the fix narrow legitimate behavior? is the same sink reached from another call site?).
+   - **6. Recovery options**: primary fix + one fallback per predicted failure.
+   - **7. Exit criteria**: the finding's assertion oracle now holds AND the suite stays green — defend's analog of the harness patch ladder (T0 applies+builds → T1 the assertion oracle holds → T2 suite passes → optional T3 re-hunt the surface can't re-find it).
+   - **Auth/authz findings trigger a mandatory `ESCALATE`.** Find explicitly hunts missing-authz / broken-access-control classes (`## Find`). Both `looper-plan` (`## Escalation to specialist` → "public API contract changes (auth surface)") and `looper-build` (its pre-build specialist-gate table → security review, `the-diamantaire` with security framing) mandate a security-review gate for any auth/permission/token surface. So an authz finding's remediation wave WILL emit `ESCALATE: security-review` from plan — defend does NOT swallow it or assume build runs straight through. It hands the escalation to the orchestrator, which fires the specialist, appends its output as `gate outputs`, and re-dispatches the wave at build (the normal `ESCALATE` flow, `docs/looper-framework.md` → plan-absorbs-deterministic note). Under a bare `apply` with no orchestrator present to fire the gate, defend STOPs that finding and reports the gate it needs — never a silently-substituted security judgment.
+2. **Route it**: `looper-build` (smallest change) → `looper-verify` (assertion oracle holds + suite green; the executable completion gate where a repro oracle exists) → `looper-review` (independent qualitative pass; must return `ship` or `fix-blockers-then-ship` with no blockers before `looper-commit`'s pre-flight will land it) → `looper-commit` (lands the fix on the draft PR). In a `loop-de-looper` context, hand each as a queued wave to the orchestrator's `the-looper` dispatch instead of invoking the skills directly.
 3. **Idempotent** — a finding whose fix is already present is a no-op, never a double-patch. Re-running `apply` on the same run is safe.
-4. **Honor tool availability** — if defend cannot actually invoke `looper-build`/`looper-verify`/`looper-commit` (no Skill/Task tool), it logs `ran: false` and hands the constructed briefs back for the user/orchestrator to run — NEVER a claimed-but-unrun patch. Same `task_tool_available: false ⇒ ran: false` discipline as custodian.
+4. **Honor tool availability** — if defend cannot actually invoke `looper-plan`/`looper-build`/`looper-verify`/`looper-review`/`looper-commit` (no Skill/Task tool), it logs `ran: false` on the patch record and hands the constructed brief back for the user/orchestrator to run — NEVER a claimed-but-unrun patch. Same `task_tool_available: false ⇒ ran: false` discipline as custodian.
 
 The narrow auto-patch-eligible class runs steps 1–2 without waiting for a tick, then reports every auto-applied bump explicitly in the run report so the present human sees it — landing as a draft-PR commit, reversible.
 
 ## Artifacts + findings log
+
+`<run-id>` is a timestamp-based run identifier — a UTC start stamp like `2026-07-21T14-30Z` — so it reads distinct at a glance from a `#<finding-id>` (e.g. `#F-3`) at the `apply` call site.
 
 Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `local/custodian/`):
 
@@ -133,26 +140,27 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
   "cwe": "CWE-89",
   "location": "src/api/users.ts:142",
   "reachable_from": "POST /users/search (untrusted query param)",
-  "task_tool_available": true,       // false = could NOT invoke a scanner/sub-skill
-  "ran": true,                       // false when a needed tool was unavailable
+  "task_tool_available": null,       // patch records only; null here (triage) — scanner presence is tracked by the adapter table, not this field
+  "ran": null,                       // patch records only; null on recon/find/triage/report
   "verdict": "reachable SQLi via unparameterized query",
   "outcome": "promote",              // "promote" | "refute" (real-vs-noise), else null
-  "verified_by": "llm",              // "executable" | "llm" | null (null when ran:false)
+  "verified_by": "llm",              // "executable" | "llm" | null (null when a patch record has ran:false)
   "remediation": "P-2",              // proposal tag, or null for informational
-  "auto_eligible": false
+  "auto_patch_eligible": false
 }
 ```
 
-- **`verified_by: executable`** only when a scanner hit or a runnable repro backed the verdict; a cited code-read judgment is `verified_by: llm` — never dressed up as a check that never ran. `null` only when `ran: false`.
+- **`verified_by: executable`** only when a scanner hit or an assertion-style repro backed the verdict; a cited code-read judgment is `verified_by: llm` — never dressed up as a check that never ran. `null` only when a patch record has `ran: false`.
+- **`verdict`** is the triage judgment cited VERBATIM from the evidence, never paraphrased — the same rule `gates.jsonl` holds for its own verdict field (`loop-de-looper` → `## Gate artifacts`, "agent's own words, verbatim — no paraphrase").
 - **`outcome`** is `promote`/`refute` for the triage real-vs-noise decision; `null` on a bare recon/find enumeration record.
-- **`task_tool_available: false ⇒ ran: false ⇒ no invented outcome`** — a scanner or sub-skill defend could not invoke is logged unavailable, never as a passed check with a fabricated finding.
+- **`task_tool_available`/`ran` are patch-record fields only** (`phase: "patch"`). They track whether defend could invoke a sub-skill (`looper-plan`/`build`/`verify`/`review`/`commit`) via the Task/Skill tool: `task_tool_available: false ⇒ ran: false ⇒ no invented outcome` — a patch defend could not run is logged unavailable, never as a claimed-but-unrun fix. Recon/find/triage/report records leave both `null`; a scanner missing from `PATH` is a SEPARATE concern, tracked by the adapter table's own `command -v` presence-detection (`## Stack detection + adapter table`), not by these fields.
 
 ## Safety rails
 
 - **Propose-vs-dispose split is the spine** — recon/find/triage/report read-only auto; patch gated behind a ticked `P-<n>` + explicit `apply`. Only the narrow dep-bump class auto-proceeds, and even it lands as a reviewable draft-PR commit.
-- **Patch routes through the normal pipeline** — `looper-build` → `looper-verify` → `looper-commit`, never a bespoke fixer; the PR diff is the preview, git/PR-close the reversal.
+- **Patch routes through the normal pipeline** — `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit`, the full wave chain, never a bespoke fixer; the PR diff is the preview, git/PR-close the reversal.
 - **Real scanners are optional, runtime-detected** — never a hard dependency, never installed on the fly; the loop runs on an LLM code read when none resolve (`[[no-third-party-hosted-tool-reliance]]`).
-- **No execution of untrusted input in v1** — find is a code read + optional scanner invocation, NOT fuzzing/PoC-execution of malformed inputs. That keeps defend off the sandbox/isolation requirement the harness carries for its exploit-crafting agents; an adapter that ever executes a PoC would need that isolation and is out of v1 scope.
+- **No execution of untrusted input in v1** — neither the hunt nor patch verification ever runs a weaponized exploit payload. Find is a code read + optional scanner invocation; triage's executable oracle and patch's repro are **assertion-style** — they assert the fix invariant (query parameterized, path canonicalized, URL allowlisted) or run a controlled benign probe (`## Triage` → "what 'repro' means"), NOT fuzzing or PoC-execution of malformed inputs. That keeps defend off the sandbox/isolation requirement the harness carries for its exploit-crafting agents; an adapter that ever executed a PoC would need that isolation and is out of v1 scope.
 - **Real-vs-noise is gated, not asserted** — a candidate promotes to a finding only on an executable oracle or a corroborated, cited, reachable judgment; unconfirmed candidates are refuted to informational, never a patch proposal.
 - **Findings dedupe by root cause** — within-run and against prior runs, keyed on sink identity, not drift-prone line numbers.
 - **Tool availability honored** — unavailable scanner/skill ⇒ `ran: false`, no invented finding or claimed-but-unrun patch.
@@ -170,10 +178,10 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 ## What looper-defend does NOT do
 
 - Does NOT auto-fix application code — patch is propose-only; only the narrow dep-bump class auto-proceeds, and even it lands as a reviewable draft-PR commit the human merges.
-- Does NOT reinvent a patcher — remediation routes through `looper-build` → `looper-verify` → `looper-commit`, the same pipeline every wave uses.
+- Does NOT reinvent a patcher — remediation routes through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit`, the same full pipeline every wave uses.
 - Does NOT reimplement `security-review` or `the-diamantaire` — those review the pending diff; defend hunts the whole repo, and may invoke `/security-review` as one input signal, not as its engine.
 - Does NOT take a hard dependency on any hosted scanner/binary/account — adapters are optional and runtime-detected; the loop runs without them (`[[no-third-party-hosted-tool-reliance]]`).
-- Does NOT execute untrusted input or craft/run PoCs in v1 — a code read + optional scanner invocation, so it carries no sandbox requirement.
+- Does NOT execute untrusted input or craft/run PoCs in v1 — the hunt is a code read + optional scanner invocation and patch verification is assertion-style (assert the fix invariant, never fire a crafted payload), so it carries no sandbox requirement.
 - Does NOT parse free-text approval — `P-<n>` checkboxes only, read back from the run report.
 - Does NOT promote a candidate to a reported finding without an executable oracle or a corroborated, cited, reachable judgment — unconfirmed candidates are refuted to informational.
 - Does NOT patch a finding whose fix is an architectural change, or double-patch a finding already fixed (idempotent).
@@ -184,7 +192,7 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 
 ## Integration with existing pieces
 
-- `looper-build` / `looper-verify` / `looper-commit` — the remediation pipeline. Defend builds the wave brief and routes; it never patches directly.
+- `looper-plan` / `looper-build` / `looper-verify` / `looper-review` / `looper-commit` — the remediation pipeline, the full per-wave chain. Defend runs plan to build the wave brief and routes; it never patches directly, and an auth-finding wave's plan-stage `ESCALATE: security-review` is handled the normal way (orchestrator fires the specialist, appends `gate outputs`, resumes at build).
 - `security-review` (built-in) — an optional input signal for the pending-diff sub-case in triage; not defend's engine.
 - `the-diamantaire` — reactive diff-review crew member; defend is the proactive whole-repo complement, and borrows its refute-or-promote posture for triage.
 - `looper-custodian` — the sibling on-a-cadence maintenance layer; defend mirrors its propose/dispose split, `apply #<id>` grammar, `local/<tool>/<id>/` artifacts, and `ran: false` honesty, but hunts a target codebase on demand rather than housekeeping the looper system weekly.
