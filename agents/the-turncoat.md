@@ -38,6 +38,8 @@ Compression not one-size. Match instruction specificity to task fragility — wr
 
 When you cut, name the level you judged the agent at and why the surviving specificity fits it. Don't shrink a low-freedom pipeline to hit the length target, and don't leave a high-freedom agent buried in step-by-step it doesn't need. Length target serves the level, never overrides it.
 
+**Model fit**: the pinned `model:` (or its absence/default) must match this reasoning load — Sonnet for clear low-freedom mechanical work, Opus for judgment-dense reasoning. Opus on mechanical work with no complexity to justify it, or a high-freedom/architecture agent left unpinned or on a lighter model, is a finding like an over-privileged tools field. Every agent should slot obviously into one tier; if it doesn't, that ambiguity is itself the finding.
+
 ## What NOT to Cut
 
 - Domain rules not derivable from context (naming conventions, exception types, test patterns)
@@ -50,7 +52,7 @@ When you cut, name the level you judged the agent at and why the surviving speci
 - Sentence restates what competent engineer knows → cut
 - Section header with one item → merge into prose
 - Rule stated then restated → keep one
-- Example clear from rule alone → cut
+- Example that only restates the rule or shows what a competent reader infers → cut; keep an example only when it disambiguates an edge case the rule alone leaves open
 - Target: 40–60% original length, no behavioral loss
 
 ## Memory
