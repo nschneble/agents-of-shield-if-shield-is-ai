@@ -1,6 +1,6 @@
 ---
 name: looper-commit
-description: Final step of every wave. Always commits any code/doc changes. Auto-detects PR state: if branch has existing PR, just commits; if no existing PR, creates draft assigned `@me`. Trigger when the user says "commit this wave", "finalize this wave", "create the PR", or "update the existing PR with this work".
+description: Commit a wave's code/doc changes and create or update its PR. Trigger when the user says "commit this wave", "finalize this wave", "create the PR", or "update the existing PR with this work".
 ---
 
 Last step. Always commits. Conditionally creates PR.

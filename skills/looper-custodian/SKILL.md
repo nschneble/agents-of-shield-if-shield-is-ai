@@ -1,6 +1,6 @@
 ---
 name: looper-custodian
-description: Scheduled cross-run, cross-repo housekeeping for the looper system. Runs weekly — GCs merged-branch artifacts, audits memory for duplicates/contradictions, mines wave history across repos, and researches external advances — then opens a GitHub report issue with checkbox proposals. Destructive edits (memory merges, agent rewrites via the-turncoat) apply ONLY through a separate human-checked `apply` step, which is previewable (`--dry-run`) and reversible (`undo`). Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", or "looper-custodian history <query>".
+description: Scheduled cross-run, cross-repo housekeeping for the looper system. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", or "looper-custodian history <query>".
 ---
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
