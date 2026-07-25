@@ -108,12 +108,7 @@ Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + pr
 - `pr:` — `create-on-wave-1` (default on a fresh multi-wave branch) | `existing #N` (every wave once the PR exists) | `skip` (explicit, rare — throwaway spike). "Don't flip to ready-for-review" is NOT a `pr:` value; the draft is still created.
 - `target.push: true` — on EVERY wave of an orchestrated run; the orchestrator owns push timing and its default-off is for standalone use, so it must set this explicitly (`## PR lifecycle + push ownership`).
 
-**Brief authoring — four standing quality instructions that pre-empt the most common corrective wave.** Code built to a cleared pre-build contract ships _correct_ on the first build; the corrective waves that still fire are overwhelmingly **untested-invariant**, **stale-docstring**, **orphaned-prose**, and **unverified-duplicate-contract** gaps a crew catches after the fact — all cheaper to prevent in the originating wave than to close with a doc/test-only corrective wave plus re-crew. So every wave brief that ships runtime code carries these standing lines (the third fires only on deletion/removal waves, the fourth only on doc/example waves):
-
-- **Test any NEW cross-layer or dynamic invariant this wave introduces — in BOTH directions if it's a toggle.** Nested-tablist isolation, a predicate that flips an attribute on/off (a panel that gains `tabIndex` when empty and must _re-drop_ it when filled), any state-machine edge — tends to ship the forward assertion and omit the reverse/isolation one, which the chemist flags as a blocker. Name the invariant in the brief and require its round-trip test. Observed twice in one run, each costing a corrective wave + re-crew.
-- **Reconcile the TOP-OF-FILE docstring, not just inline comments, when the change invalidates a file's stated invariant.** A wave making a previously-unconditional behavior conditional (e.g. "panel is always `tabIndex={0}`" → "only when it holds no focusable descendant") reliably fixes the inline comment but leaves the overview docstring asserting the old invariant — now contradicting the file's own new comments; the chronicler flags this as doc-drift. Instruct the-looper to grep the file's header docstring for any claim the change falsifies.
-- **On a DELETION / feature-removal wave, sweep the WHOLE repo for prose referencing the deleted symbol or feature — not just edited files.** A deletion's stale-reference blast radius reaches files it NEVER touches: consumer UI copy, a sibling empty-state panel's instructions, backend `@ApiResponse`/DTO descriptions, DB-schema comments, READMEs. Single costliest recurring corrective-wave cause on removal goals. Brief the-looper to `grep -ri` the deleted feature's name AND public symbols across the whole repo (both apps in a monorepo), reconcile every hit, then re-run the grep to prove none survive. Most dangerous class is **rendered user-facing copy**: a removal can leave an instruction promising a control that no longer exists (SC 3.3.2), shipping green because its test still asserts the stale string. Observed as an interim-crew BLOCKER — a deleted "try it out" form left a WelcomePanel telling users to "hit Send" on a gone form, plus ~15 other stale surfaces across both apps, costing a full doc-only corrective wave + full re-crew. See `[[feedback-deletion-blast-radius-doc-drift]]`.
-- **On a wave that documents or hand-duplicates a trigger condition/config shape/API contract elsewhere (README, example configs, embedded YAML), verify the duplicate against the ACTUAL shipped code path, not just against what an earlier wave's commit message claimed.** A "docs-only" brief that just transcribes intended behavior can ship documentation that is internally consistent but wrong, because the thing it's describing changed underneath it and nobody traced the real trigger/branch logic. Observed: a prior wave taught a permission-gate module to recognize a new partial-approve trigger shape; the project's hand-maintained example workflow's `if:` pre-filter (a separate, intentionally-duplicated copy of part of that same trigger contract) still only matched the OLD shape, so the new trigger could never fire in practice — silently DOA. The interim crew pass on the logic-only diff never caught it, because the example file hadn't been touched yet and wasn't in that diff. It surfaced only because the docs wave's brief explicitly said "read the real code before writing the doc claim, and fix the duplicate if it's wrong" instead of "write the doc." Brief the-looper to trace the real branch/contract in the current code (not the commit message) for every hand-duplicated copy the wave touches, and treat a mismatch as an in-scope bug fix, not a separate finding to defer.
+**Brief authoring — four standing quality instructions that pre-empt the most common corrective wave.** Code built to a cleared pre-build contract ships _correct_ on the first build; the corrective waves that still fire are overwhelmingly **untested-invariant**, **stale-docstring**, **orphaned-prose**, and **unverified-duplicate-contract** gaps a crew catches after the fact — all cheaper to prevent in the originating wave than to close with a doc/test-only corrective wave plus re-crew. So every wave brief that ships runtime code carries these standing lines (the third fires only on deletion/removal waves, the fourth only on doc/example waves). Include `templates/wave-brief-standing.md` verbatim in every runtime-code wave brief — it carries the four instructions with their full observed-incident rationale.
 
 These are prevention, not new scope — they cover the wave's OWN change (and, for a deletion, the references its own removal orphaned), same as the "delete dead code your change orphans" carve-out. A tightly-scoped "implement the contract, nothing beyond" brief is what suppresses them, so the brief must name them explicitly as in-scope.
 
@@ -304,22 +299,7 @@ Every gate the loop runs gets a durable on-disk record. A gate you can't audit i
 
 Write to `local/loops/<branch>/gates.jsonl` — one JSON line appended per gate event, never rewritten. The path is branch-keyed so resume runs and parallel branches don't collide; `jsonl` so a crashed run still leaves every prior gate intact.
 
-Each line records:
-
-```json
-{
-  "wave": 4,
-  "kind": "crew", // "crew" | "pre-build-specialist" | "wave-retry" | "stale-skip"
-  "agent": "the-diamantaire", // crew member or specialist name
-  "task_tool_available": true, // false = orchestrator could NOT invoke; see below
-  "ran": true, // false when task_tool_available is false
-  "verdict": "MERGE-READY", // agent's own words, verbatim — no paraphrase
-  "outcome": "promote", // refutation-posture reviewers only: "refute" | "promote"; else null
-  "verified_by": "llm", // provenance: "executable" | "llm" | null
-  "blockers": 0,
-  "summary": "one line, cited from agent output"
-}
-```
+Each line's field shapes are in `references/state-schemas.md`.
 
 Hard rules:
 
@@ -327,13 +307,7 @@ Hard rules:
 - **Verdicts are cited verbatim** from agent output, matching the `## Voice + style` no-paraphrase rule.
 - **`outcome` is the structured twin of `verdict` for a refutation-posture reviewer — never its replacement, and NOT every crew agent's field.** Only a reviewer whose mandate is _refute-or-promote_ sets it: `the-diamantaire` (its kill-mandate posture) is the one today; the set grows only if another agent adopts that posture. Such a reviewer normalizes its `verdict` to `refute` (a defensible defect that blocks the diff) or `promote` (survived review) so the log is machine-queryable without paraphrasing away the verbatim line. **Every other line carries `outcome: null`** — a non-refutation crew agent (voice/test/doc/refactor findings have no refute/promote shape), a `pre-build-specialist` gate, a `wave-retry`/`stale-skip` event, a `ran: false` line. It never overwrites `verdict`; both ride on the line.
 - **`verified_by` records whether THIS gate's verdict was backed by a runnable check the agent actually executed, or rests on judgment.** `executable` when the agent ran a check — a test, a lint, an oracle, a `jq` assertion — whose result gated the verdict (the same executable-over-judgment axis `looper-verify` draws in `## Executable verification function (where an oracle exists)`); `llm` when the verdict rests on model reasoning alone; `null` only when `ran: false` (nothing gated). It applies to any ran gate, crew or specialist — a code reviewer with Bash _can_ run a check to confirm a finding (`executable`), or reason to it (`llm`). This is the drift-audit the field exists for: a log whose verdicts are all `verified_by: llm` shows no verdict was ever empirically backed — the "unanimous consensus, no empirical check" failure (custodian #21 E-1/E-2) becomes greppable, not buried. Never label a line `executable` without an actual runnable check behind it; an unbacked judgment is `llm`, same honesty as `ran: false`.
-- **Provenance is machine-checkable, not just documented.** The fields earn their keep only if a lint enforces them, so validate a run's log with a `jq` pass over `gates.jsonl` (the same file `scripts/custodian-history.sh` already `jq`-parses) — every ran verdict-bearing gate (`crew` or `pre-build-specialist`) carries `verified_by`, and a refutation-posture reviewer's crew line also carries `outcome`:
-  ```
-  jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"))
-         | select(.verified_by == null
-                  or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null))' gates.jsonl   # must print nothing
-  ```
-  The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope above); the `outcome` check is crew-refutation-only. `wave-retry` / `stale-skip` events aren't verdict-bearing gates, so neither field is required on them. Extend the `.agent ==` clause if another agent takes the refutation posture. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt. A `verified_by: llm`-only run is _valid_ but _flagged_ — the lint proves the fields are present, not that the run used an executable check.
+- **Provenance is machine-checkable, not just documented.** The fields earn their keep only if a lint enforces them, so validate a run's log with a `jq` pass over `gates.jsonl` (the same file `scripts/custodian-history.sh` already `jq`-parses) — every ran verdict-bearing gate (`crew` or `pre-build-specialist`) carries `verified_by`, and a refutation-posture reviewer's crew line also carries `outcome`. The lint command + its scope/legacy-exemption notes are in `references/state-schemas.md`. `wave-retry` / `stale-skip` events aren't verdict-bearing gates, so neither field is required on them. Extend the `.agent ==` clause if another agent takes the refutation posture. A `verified_by: llm`-only run is _valid_ but _flagged_ — the lint proves the fields are present, not that the run used an executable check.
 - **Write before acting on the result** — log the crew pass before looping back or resetting counters (step 3), log the specialist gate before re-dispatch (step 2b). A blocker found is still a gate that ran.
 
 The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
@@ -349,36 +323,7 @@ Two files under `local/loops/<branch>/`, both branch-keyed so resume and paralle
 
 Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
 
-```json
-{
-  "goal": "<scope's goal restatement>",
-  "sizing": "full-orchestration",
-  "queue": [
-    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234" },
-    { "wave": 2, "candidate": "...", "status": "pending", "commit": null }
-  ],
-  "counters": {
-    "waves_shipped": 1,
-    "waves_since_crew": 1,
-    "cumulative_files_changed": 6,
-    "last_review_verdict": "clean",
-    "total_waves": 1,
-    "corrective_waves": 0,
-    "consecutive_no_progress": 0,
-    "wave_retries": 0
-  },
-  "last_crew_wave": 0,
-  "pr": { "number": 214, "url": "...", "state": "draft" },
-  "usage": {
-    "paused": false,
-    "window_reset": 1784258400,
-    "observed_pct": 41,
-    "read_ok": true
-  }
-}
-```
-
-`usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
+The `run-state.json` shape + the `usage` sub-object's fields are in `references/state-schemas.md`.
 
 Resume mode (`/loop-de-looper resume`):
 

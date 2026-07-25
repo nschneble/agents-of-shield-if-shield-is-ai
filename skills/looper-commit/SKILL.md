@@ -94,28 +94,7 @@ Read recent merged PRs to match codebase style:
 gh pr list --limit 5 --state merged
 ```
 
-Clear pattern → emulate. Else default to:
-
-```
-[fix|feat|chore] Short title (under 70 chars)
-
-## Summary
-- 1–3 bullets on what changed and why
-
-## What changed
-- Substantive change 1 (file or area)
-- Substantive change 2
-
-## Test plan
-- [ ] Manual repro / verification step
-- [ ] Edge case 1
-- [ ] Automated test coverage notes
-
-## Notes for reviewer
-- Anything non-obvious in the diff
-- Any known issues consciously deferred (with reason)
-- Any architectural decisions worth a second pair of eyes
-```
+Clear pattern → emulate. Else default to the template in `templates/pr-body.md`.
 
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
 - Attach screenshots for UI changes when available (refer to verify's browser run) — and add the structured recap's UI before/after block (see `## Structured recap (PR-body section)`)
@@ -151,56 +130,15 @@ Composed of three content sub-blocks, rendered in order — plus a skip rule (a 
 
 ### 1. File-tree with change flags
 
-The changed files as an indented tree, one flag per entry. Flags come straight from `git diff --name-status` (`A`/`M`/`D`/`R`):
-
-```
-skills/
-  looper-commit/
-    SKILL.md          [M]
-  looper-recap/
-    SKILL.md          [A]
-src/
-  lib/
-    legacy-pad.ts     [D]
-    format.ts         [R]  (was fmt.ts)
-```
-
-Legend: `[A]` added · `[M]` modified · `[D]` removed · `[R]` renamed. One tree, whole run — this is the map the other blocks index into.
+The changed files as an indented tree, one flag per entry. Flags come straight from `git diff --name-status` (`A`/`M`/`D`/`R`). Tree layout + legend + example: `templates/structured-recap.md`.
 
 ### 2. Collapsed `<details>` diff hunks with annotations
 
-For each load-bearing changed file, a collapsible block GitHub renders natively — collapsed by default so the PR body stays scannable. Budget roughly 3–8 key files; skip pure mechanical churn. Each block holds a REAL diff excerpt (fenced ` ```diff `) plus a few high-signal annotation notes:
-
-````markdown
-<details>
-<summary><code>src/lib/format.ts</code> — drop the legacy pad() path</summary>
-
-```diff
-@@ -12,7 +12,7 @@ export function format(x) {
--  return pad(x, 2)
-+  return x.toString().padStart(2, "0")
-```
-
-- `pad()` is now dead — removed in `legacy-pad.ts` (see tree).
-- Identical output for x < 100; diverges above (old path truncated).
-</details>
-````
-
-Keep each excerpt focused (~<150 lines) — the load-bearing hunk, not the whole file. Annotations answer what changed, why, and any gotcha — not a line-by-line restatement of the diff.
+Format, budget/size guidance + example: `templates/structured-recap.md`.
 
 ### 3. UI before/after ASCII wireframe + a11y risk (UI changes only)
 
-ONLY when the change touches rendered UI: a plain-text before/after sketch of the visible delta, plus a short call-out of the accessibility-relevant risk. The include decision is made upstream (the UI-glob); here we define the shape.
-
-```
-Before                       After
-┌──────────────┐             ┌──────────────┐
-│  [ Submit ]  │             │  [ Submit ▸ ]│
-└──────────────┘             └──────────────┘
-
-a11y risk: the new ▸ glyph is decorative — needs aria-hidden, else the
-button's accessible name reads "Submit right-pointing triangle".
-```
+ONLY when the change touches rendered UI: a plain-text before/after sketch of the visible delta, plus a short call-out of the accessibility-relevant risk. The include decision is made upstream (the UI-glob); here we define the shape. Before/after wireframe example: `templates/structured-recap.md`.
 
 If this block is included, the a11y call-out is mandatory and specific — name the actual risk (contrast, accessible-name, focus order, motion), never a generic "check a11y".
 
