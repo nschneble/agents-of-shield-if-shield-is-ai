@@ -45,18 +45,23 @@ has_frontmatter() {
   [ "$(head -n 1 "$1")" = "---" ]
 }
 
-# --- Reference integrity: backtick'd repo-relative file paths must exist ---
+# --- Reference integrity: backtick'd file paths must exist ---
 # Conservative: only tokens that look like a concrete file under one of the
 # tracked dirs, with no glob/placeholder chars. Skips `skills/*/SKILL.md`,
-# `local/loops/<branch>/...`, prose, and absolute/home paths.
+# `local/loops/<branch>/...`, prose, and absolute/home paths. `templates/...`
+# and `references/...` tokens are skill-relative: resolved against the citing
+# spec's own directory.
 check_references() {
-  local file="$1" token
+  local file="$1" token target
+  local dir; dir=$(dirname "$file")
   # Pull every `backtick`-wrapped token, one per line. The backticks are literal
-  # regex chars, not shell expansion — single quotes are intentional.
+  # regex chars, not shell expansion — single quotes are intentional. Process
+  # substitution (not a pipeline) so warn's counter survives the loop.
   # shellcheck disable=SC2016
-  grep -oE '`[^`]+`' "$file" 2>/dev/null | tr -d '`' | while IFS= read -r token; do
+  while IFS= read -r token; do
     case "$token" in
-      agents/*|skills/*|docs/*|scripts/*) : ;;
+      agents/*|skills/*|docs/*|scripts/*) target="$token" ;;
+      templates/*|references/*) target="$dir/$token" ;;
       *) continue ;;
     esac
     # Skip globs / placeholders / anchors / non-file tokens.
@@ -68,8 +73,8 @@ check_references() {
       *.md|*.sh|*.json|*.yml|*.yaml|*.plist|*.ts|*.tsx) : ;;
       *) continue ;;
     esac
-    [ -e "$token" ] || warn "$file references \`$token\` which does not exist"
-  done
+    [ -e "$target" ] || warn "$file references \`$token\` which does not exist"
+  done < <(grep -oE '`[^`]+`' "$file" 2>/dev/null | tr -d '`')
 }
 
 validate_spec() {
