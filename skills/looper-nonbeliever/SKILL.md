@@ -1,6 +1,6 @@
 ---
 name: looper-nonbeliever
-description: Adversarial pre-flight. Argue with the orchestrator BEFORE scope — force it to justify the goal + intended approach against CLAUDE.md, existing agents, skills, and directives. Also sizes the goal (inline / single-wave / full-orchestration) so trivial asks skip the full loop. Trigger when the user says "challenge this", "play devil's advocate", "stress-test the goal", or runs before looper-scope inside Loop de Looper.
+description: Adversarial pre-flight that challenges the goal and intended approach before scope, and sizes the goal. Trigger when the user says "challenge this", "play devil's advocate", "stress-test the goal", or runs before looper-scope inside Loop de Looper.
 ---
 
 Skeptic gate. Runs ONCE, before `looper-scope`. Input = raw goal + intended approach. Two outputs: a **verdict** (make the orchestrator defend the run before any wave burns) and a **sizing** (how much loop the goal actually warrants). Argue, demand justification, check for contradiction, then YIELD — advisory by default, STOP only on hard conflict.

@@ -1,6 +1,6 @@
 ---
 name: looper-recap
-description: Clean, shareable end-of-run summary. Runs after the final crew pass, just before Loop de Looper terminates. Distills what the loop changed into a few plain sentences anyone can read in 20 seconds. Read-only; facts come from gates.jsonl + git log, never invented. Trigger when the user says "recap this", "summarize the run", or runs at the end of Loop de Looper.
+description: Clean, shareable end-of-run summary of what the loop changed. Trigger when the user says "recap this", "summarize the run", or runs at the end of Loop de Looper.
 ---
 
 End-of-run narrator. Runs ONCE, after the final crew pass, before termination. Input = the run's real state. Output = a short, plain-language summary of what changed, clear enough to paste into a channel without opening the PR. Decides nothing, flips nothing.

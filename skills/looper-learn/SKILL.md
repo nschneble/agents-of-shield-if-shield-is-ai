@@ -1,6 +1,6 @@
 ---
 name: looper-learn
-description: Learn from your experiences. Runs at two altitudes — per-wave (inside the-looper) and run-level (orchestration mode, at the end of Loop de Looper, diagnosing sizing/scope/crew cadence). Trigger when the user says "reflect on this" or "remember what we just did here."
+description: Learn from your experiences. Trigger when the user says "reflect on this" or "remember what we just did here."
 ---
 
 Suite of looper skills ran. Determine how went, capture reusable lessons.

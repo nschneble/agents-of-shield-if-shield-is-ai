@@ -1,6 +1,6 @@
 ---
 name: loop-de-looper
-description: Orchestrator for multi-wave goals. Composes looper-nonbeliever (pre-flight) + looper-scope (queue) + looper-plan (per-wave brief) + the-looper agent (per-wave executor) + crew (periodic + final) + looper-recap (closing summary). Trigger when the user says "loop de looper", "run all the waves", "autonomous loop", or hands a multi-wave goal expecting hands-off execution.
+description: Orchestrator for multi-wave goals. Trigger when the user says "loop de looper", "run all the waves", "autonomous loop", or hands a multi-wave goal expecting hands-off execution.
 ---
 
 Parent orchestrator. Input = raw goal. Output = goal-complete or escalation. Composes existing pieces; no re-invent.
@@ -45,7 +45,7 @@ loop-de-looper(goal)
 └── report exit state to user (incl. PR #/URL)
 ```
 
-`looper-nonbeliever`, `looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper`, `looper-recap` already exist. Crew = `the-auditor`, `the-chemist`, `the-chronicler`, `the-diamantaire`, `the-ghostwriter`, `the-improver`, `the-stickler`: seven agents invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
+`looper-nonbeliever`, `looper-scope`, `looper-plan` (invoked inside the-looper), `the-looper`, `looper-recap` already exist. Crew = seven agents (named with roles in `## Protocol` Step 3), invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
 
 ## Inputs
 
@@ -103,17 +103,12 @@ Invoke `the-looper` agent via Task tool. Pass wave brief from scope's queue + pr
 
 `the-looper` runs full protocol internally: research → plan → build → verify → review → learn → commit. Returns hand-back report (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`).
 
-**Brief authoring — PR + push directives.** Every wave brief carries two SEPARATE flags. Never bundle them into one "No PR, nothing flipped to ready" phrase — that conflation collapses two different actions and orphaned PR creation in a real run (every wave deferred PR to "the end," and the end had no PR action, so none was ever created). See `## PR lifecycle + push ownership`.
+**Brief authoring — PR + push directives.** Every wave brief carries two SEPARATE flags; never bundle them into one "No PR, nothing flipped to ready" phrase — that conflation collapses two different actions and orphaned PR creation in a real run (`## PR lifecycle + push ownership`).
 
 - `pr:` — `create-on-wave-1` (default on a fresh multi-wave branch) | `existing #N` (every wave once the PR exists) | `skip` (explicit, rare — throwaway spike). "Don't flip to ready-for-review" is NOT a `pr:` value; the draft is still created.
-- `target.push: true` — on EVERY wave of an orchestrated run. PR creation and a current remote both require the branch pushed. The orchestrator owns push timing (per `looper-commit`); its default-off is for standalone use, so the orchestrator must set this explicitly.
+- `target.push: true` — on EVERY wave of an orchestrated run; the orchestrator owns push timing and its default-off is for standalone use, so it must set this explicitly (`## PR lifecycle + push ownership`).
 
-**Brief authoring — four standing quality instructions that pre-empt the most common corrective wave.** Code built to a cleared pre-build contract ships _correct_ on the first build; the corrective waves that still fire are overwhelmingly **untested-invariant**, **stale-docstring**, **orphaned-prose**, and **unverified-duplicate-contract** gaps a crew catches after the fact — all cheaper to prevent in the originating wave than to close with a doc/test-only corrective wave plus re-crew. So every wave brief that ships runtime code carries these standing lines (the third fires only on deletion/removal waves, the fourth only on doc/example waves):
-
-- **Test any NEW cross-layer or dynamic invariant this wave introduces — in BOTH directions if it's a toggle.** Nested-tablist isolation, a predicate that flips an attribute on/off (a panel that gains `tabIndex` when empty and must _re-drop_ it when filled), any state-machine edge — tends to ship the forward assertion and omit the reverse/isolation one, which the chemist flags as a blocker. Name the invariant in the brief and require its round-trip test. Observed twice in one run, each costing a corrective wave + re-crew.
-- **Reconcile the TOP-OF-FILE docstring, not just inline comments, when the change invalidates a file's stated invariant.** A wave making a previously-unconditional behavior conditional (e.g. "panel is always `tabIndex={0}`" → "only when it holds no focusable descendant") reliably fixes the inline comment but leaves the overview docstring asserting the old invariant — now contradicting the file's own new comments; the chronicler flags this as doc-drift. Instruct the-looper to grep the file's header docstring for any claim the change falsifies.
-- **On a DELETION / feature-removal wave, sweep the WHOLE repo for prose referencing the deleted symbol or feature — not just edited files.** A deletion's stale-reference blast radius reaches files it NEVER touches: consumer UI copy, a sibling empty-state panel's instructions, backend `@ApiResponse`/DTO descriptions, DB-schema comments, READMEs. Single costliest recurring corrective-wave cause on removal goals. Brief the-looper to `grep -ri` the deleted feature's name AND public symbols across the whole repo (both apps in a monorepo), reconcile every hit, then re-run the grep to prove none survive. Most dangerous class is **rendered user-facing copy**: a removal can leave an instruction promising a control that no longer exists (SC 3.3.2), shipping green because its test still asserts the stale string. Observed as an interim-crew BLOCKER — a deleted "try it out" form left a WelcomePanel telling users to "hit Send" on a gone form, plus ~15 other stale surfaces across both apps, costing a full doc-only corrective wave + full re-crew. See `[[feedback-deletion-blast-radius-doc-drift]]`.
-- **On a wave that documents or hand-duplicates a trigger condition/config shape/API contract elsewhere (README, example configs, embedded YAML), verify the duplicate against the ACTUAL shipped code path, not just against what an earlier wave's commit message claimed.** A "docs-only" brief that just transcribes intended behavior can ship documentation that is internally consistent but wrong, because the thing it's describing changed underneath it and nobody traced the real trigger/branch logic. Observed: a prior wave taught a permission-gate module to recognize a new partial-approve trigger shape; the project's hand-maintained example workflow's `if:` pre-filter (a separate, intentionally-duplicated copy of part of that same trigger contract) still only matched the OLD shape, so the new trigger could never fire in practice — silently DOA. The interim crew pass on the logic-only diff never caught it, because the example file hadn't been touched yet and wasn't in that diff. It surfaced only because the docs wave's brief explicitly said "read the real code before writing the doc claim, and fix the duplicate if it's wrong" instead of "write the doc." Brief the-looper to trace the real branch/contract in the current code (not the commit message) for every hand-duplicated copy the wave touches, and treat a mismatch as an in-scope bug fix, not a separate finding to defer.
+**Brief authoring — four standing quality instructions that pre-empt the most common corrective wave.** Code built to a cleared pre-build contract ships _correct_ on the first build; the corrective waves that still fire are overwhelmingly **untested-invariant**, **stale-docstring**, **orphaned-prose**, and **unverified-duplicate-contract** gaps a crew catches after the fact — all cheaper to prevent in the originating wave than to close with a doc/test-only corrective wave plus re-crew. So every wave brief that ships runtime code carries these standing lines (the third fires only on deletion/removal waves, the fourth only on doc/example waves). Include `templates/wave-brief-standing.md` verbatim in every runtime-code wave brief — it carries the four instructions with their full observed-incident rationale.
 
 These are prevention, not new scope — they cover the wave's OWN change (and, for a deletion, the references its own removal orphaned), same as the "delete dead code your change orphans" carve-out. A tightly-scoped "implement the contract, nothing beyond" brief is what suppresses them, so the brief must name them explicitly as in-scope.
 
@@ -233,7 +228,7 @@ Blockers found → loop back: produce mini-brief for blocker fixes, invoke `the-
 
 Re-crew scope follows the corrective diff, not ceremony. Re-run the agents whose findings the fix targeted (to confirm CLEARED), plus any whose domain the corrective diff actually touched. An agent that was clean AND whose domain the fix never entered need not re-run — e.g. a docs+test corrective wave that only deletes a dead attribute doesn't re-summon the correctness/a11y reviewers, provided the byte-identical/behavior-unchanged claim is verified. State which agents you re-ran and why; do NOT silently drop a clean agent whose domain the fix DID touch.
 
-After every crew pass, write the gate artifact (see `## Gate artifacts`) BEFORE looping back or resetting counters. The artifact records which crew agents actually ran, whether the Task tool was available, and each verdict — so the pass is auditable on disk, not just narrated in the final report.
+After every crew pass, write the gate artifact BEFORE looping back or resetting counters — which agents ran, Task availability, each verdict (`## Gate artifacts`).
 
 The crew summary in any report (interim or final) enumerates ALL SEVEN agents by name with each verdict — even when clean. Listing only the agents that found something silently drops the rest; a reader can't tell "ran, clean" from "never ran" (the-improver was dropped from a clean report once exactly this way). A clean agent is reported as clean, not omitted.
 
@@ -306,22 +301,7 @@ Every gate the loop runs gets a durable on-disk record. A gate you can't audit i
 
 Write to `local/loops/<branch>/gates.jsonl` — one JSON line appended per gate event, never rewritten. The path is branch-keyed so resume runs and parallel branches don't collide; `jsonl` so a crashed run still leaves every prior gate intact.
 
-Each line records:
-
-```json
-{
-  "wave": 4,
-  "kind": "crew", // "crew" | "pre-build-specialist" | "wave-retry" | "stale-skip"
-  "agent": "the-diamantaire", // crew member or specialist name
-  "task_tool_available": true, // false = orchestrator could NOT invoke; see below
-  "ran": true, // false when task_tool_available is false
-  "verdict": "MERGE-READY", // agent's own words, verbatim — no paraphrase
-  "outcome": "promote", // refutation-posture reviewers only: "refute" | "promote"; else null
-  "verified_by": "llm", // provenance: "executable" | "llm" | null
-  "blockers": 0,
-  "summary": "one line, cited from agent output"
-}
-```
+Each line's field shapes are in `references/state-schemas.md`.
 
 Hard rules:
 
@@ -329,13 +309,7 @@ Hard rules:
 - **Verdicts are cited verbatim** from agent output, matching the `## Voice + style` no-paraphrase rule.
 - **`outcome` is the structured twin of `verdict` for a refutation-posture reviewer — never its replacement, and NOT every crew agent's field.** Only a reviewer whose mandate is _refute-or-promote_ sets it: `the-diamantaire` (its kill-mandate posture) is the one today; the set grows only if another agent adopts that posture. Such a reviewer normalizes its `verdict` to `refute` (a defensible defect that blocks the diff) or `promote` (survived review) so the log is machine-queryable without paraphrasing away the verbatim line. **Every other line carries `outcome: null`** — a non-refutation crew agent (voice/test/doc/refactor findings have no refute/promote shape), a `pre-build-specialist` gate, a `wave-retry`/`stale-skip` event, a `ran: false` line. It never overwrites `verdict`; both ride on the line.
 - **`verified_by` records whether THIS gate's verdict was backed by a runnable check the agent actually executed, or rests on judgment.** `executable` when the agent ran a check — a test, a lint, an oracle, a `jq` assertion — whose result gated the verdict (the same executable-over-judgment axis `looper-verify` draws in `## Executable verification function (where an oracle exists)`); `llm` when the verdict rests on model reasoning alone; `null` only when `ran: false` (nothing gated). It applies to any ran gate, crew or specialist — a code reviewer with Bash _can_ run a check to confirm a finding (`executable`), or reason to it (`llm`). This is the drift-audit the field exists for: a log whose verdicts are all `verified_by: llm` shows no verdict was ever empirically backed — the "unanimous consensus, no empirical check" failure (custodian #21 E-1/E-2) becomes greppable, not buried. Never label a line `executable` without an actual runnable check behind it; an unbacked judgment is `llm`, same honesty as `ran: false`.
-- **Provenance is machine-checkable, not just documented.** The fields earn their keep only if a lint enforces them, so validate a run's log with a `jq` pass over `gates.jsonl` (the same file `scripts/custodian-history.sh` already `jq`-parses) — every ran verdict-bearing gate (`crew` or `pre-build-specialist`) carries `verified_by`, and a refutation-posture reviewer's crew line also carries `outcome`:
-  ```
-  jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"))
-         | select(.verified_by == null
-                  or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null))' gates.jsonl   # must print nothing
-  ```
-  The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope above); the `outcome` check is crew-refutation-only. `wave-retry` / `stale-skip` events aren't verdict-bearing gates, so neither field is required on them. Extend the `.agent ==` clause if another agent takes the refutation posture. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt. A `verified_by: llm`-only run is _valid_ but _flagged_ — the lint proves the fields are present, not that the run used an executable check.
+- **Provenance is machine-checkable, not just documented.** The fields earn their keep only if a lint enforces them, so validate a run's log with a `jq` pass over `gates.jsonl` (the same file `scripts/custodian-history.sh` already `jq`-parses) — every ran verdict-bearing gate (`crew` or `pre-build-specialist`) carries `verified_by`, and a refutation-posture reviewer's crew line also carries `outcome`. The lint command + its scope/legacy-exemption notes are in `references/state-schemas.md`. `wave-retry` / `stale-skip` events aren't verdict-bearing gates, so neither field is required on them. Extend the `.agent ==` clause if another agent takes the refutation posture. A `verified_by: llm`-only run is _valid_ but _flagged_ — the lint proves the fields are present, not that the run used an executable check.
 - **Write before acting on the result** — log the crew pass before looping back or resetting counters (step 3), log the specialist gate before re-dispatch (step 2b). A blocker found is still a gate that ran.
 
 The final report's crew/gate claims must be backed by these lines. If `gates.jsonl` shows a gate as `ran: false`, the report says so plainly — it does not claim the gate passed.
@@ -351,36 +325,7 @@ Two files under `local/loops/<branch>/`, both branch-keyed so resume and paralle
 
 Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
 
-```json
-{
-  "goal": "<scope's goal restatement>",
-  "sizing": "full-orchestration",
-  "queue": [
-    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234" },
-    { "wave": 2, "candidate": "...", "status": "pending", "commit": null }
-  ],
-  "counters": {
-    "waves_shipped": 1,
-    "waves_since_crew": 1,
-    "cumulative_files_changed": 6,
-    "last_review_verdict": "clean",
-    "total_waves": 1,
-    "corrective_waves": 0,
-    "consecutive_no_progress": 0,
-    "wave_retries": 0
-  },
-  "last_crew_wave": 0,
-  "pr": { "number": 214, "url": "...", "state": "draft" },
-  "usage": {
-    "paused": false,
-    "window_reset": 1784258400,
-    "observed_pct": 41,
-    "read_ok": true
-  }
-}
-```
-
-`usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
+The `run-state.json` shape + the `usage` sub-object's fields are in `references/state-schemas.md`.
 
 Resume mode (`/loop-de-looper resume`):
 
@@ -410,9 +355,9 @@ The governor rails on _churn_; this rails on the _account usage window_ — the 
 
 **This is NOT the token-metering the governor refuses.** The governor's "no fake gauge" rule bans _inventing_ a spend number a Skill orchestrator can't read. This guard reads a **real first-party observable** — the enforced rate-limit window the host returns on every API response (`anthropic-ratelimit-unified-*` headers), the same window Claude Code's own statusline renders — so it clears the same honesty bar the context-pressure handoff does ("observed, not metered"). The signal is measured, not guessed.
 
-- **Read the real window at the wave boundary.** In step 2c, after the governor, run `scripts/usage-window-probe.sh`. It locates the Claude Code OAuth token (macOS Keychain service `Claude Code-credentials`, or a `~/.claude/.credentials.json` fallback), fires one `max_tokens:1` probe at `/v1/messages`, and parses the `anthropic-ratelimit-unified-{5h,7d}-{utilization,status,reset}` response headers into one JSON line: `{read_ok, five_hour:{utilization,status,reset}, weekly:{...}, representative}`. `utilization` is a real 0–1 fraction of the enforced window; `reset` is a unix epoch. This is a read, not a wave — it does not touch counters. It costs one tiny call, which is why it runs at the boundary and never in a loop. It is NOT ccusage: ccusage measures dollar/token _cost_ against a fabricated limit — a different axis that never matches what actually rejects a request (see the probe-unavailable bullet on why there's no cost-axis fallback).
+- **Read the real window at the wave boundary.** In step 2c, after the governor, run `scripts/usage-window-probe.sh`. It locates the Claude Code OAuth token (macOS Keychain service `Claude Code-credentials`, or a `~/.claude/.credentials.json` fallback), fires one `max_tokens:1` probe at `/v1/messages`, and parses the `anthropic-ratelimit-unified-{5h,7d}-{utilization,status,reset}` response headers into one JSON line: `{read_ok, five_hour:{utilization,status,reset}, weekly:{...}, representative}`. `utilization` is a real 0–1 fraction of the enforced window; `reset` is a unix epoch. This is a read, not a wave — it does not touch counters. It costs one tiny call, which is why it runs at the boundary and never in a loop. It is NOT ccusage (a different axis — see the probe-unavailable bullet on why there's no cost-axis fallback).
 - **Pause at 95%, or on a server reject.** Do NOT dispatch the next wave if, for the 5-hour OR the weekly window, `utilization >= 0.95` OR `status == "rejected"`. `status` is the server's _authoritative_ reject signal; `utilization` is only the proxy — a window can reject below 95% on a claim- or model-specific sub-limit, so honor both (`allowed_warning` corroborates the utilization threshold but is not itself a hard stop). A window whose `utilization` is `null` (header absent) is _unread_ — skip that window, never read null as 0. Threshold is tunable (`## Crew trigger + budget tuning`); the default is 95% of the _window utilization_, never a dollar figure (a cost cap is one account's private guardrail, not a portable rule).
-- **Finish the in-flight wave first, never interrupt it.** Same discipline as every other halt: let the current `the-looper` dispatch commit at its clean point, write `run-state.json`, then pause BEFORE the next dispatch. A half-built wave is the loss this avoids, not the cure.
+- **Finish the in-flight wave first, never interrupt it.** Same wave-boundary discipline as every other halt — let the current dispatch commit at its clean point, write `run-state.json`, pause BEFORE the next dispatch (`## Context-pressure handoff`).
 - **This halt self-resumes — it does not wait on a human.** Unlike a governor rail or context pressure (which need the user to raise a ceiling or start a fresh context), a usage pause clears on a _known schedule_. Schedule a wakeup (`ScheduleWakeup`) off the over-threshold window's `reset` (unix epoch **seconds** — keep `now` in seconds too): `min(3600, max(60, reset - now))` for a 5-hour pause; for a _weekly_ pause, back the cadence off to `min(3600, max(1800, reset - now))` — a 7-day window drains slowly, and hourly re-probes would spend ~150 calls against the very window they wait on. If the runtime clamps the delay, chain wakeups. Each wake RE-PROBES. **The resume gate is the fresh probe, stated once: resume ONLY when the re-probed `utilization < threshold` AND `status != "rejected"` for every window.** `now >= reset` (the snapshotted epoch) is corroboration that the window _should_ have rolled, never the resume trigger on its own — trusting elapsed wall-clock alone misfires on a slept Mac, a clock skew, or a paused laptop. Reschedule if the fresh probe still trips the pause gate.
 - **Report both the pause and the auto-resume.** The halt line names which window is over, the observed utilization as a percent, and the scheduled wake (`~HH:MM local, when the 5-hour window clears`), AND still emits `` `/loop-de-looper resume` `` so the user can force-resume earlier if they've raised their own limit. Names the next command either way (`## Voice + style`).
 - **Probe-unavailable ⇒ do NOT guard, and say so.** The probe emits `{read_ok:false, reason}` when it can't read the window — `no_credentials` (non-Claude-Code host, creds elsewhere), `token_expired` (refresh is the Claude Code client's job, not the guard's), `probe_failed` (no network — but then the loop can't dispatch a wave anyway), `no_ratelimit_headers` (API drift), or a macOS Keychain ACL prompt a headless run can't answer. Per `[[feedback-task-tool-availability]]`: log that the usage read did not run, continue WITHOUT a usage pause (the governor + context handoff still bound the run), and note in the report that the window was unguarded this run. NEVER invent a percentage or a fake pause — an unread window is unread, not "0%". There is deliberately no cost-axis fallback. ccusage was considered and dropped: it reads a different axis (dollar/token _cost_ against a limit it can't know, so any percent off it is exactly the fabricated gauge the governor already bans). In the network-down case it can't run either; in the others (`no_credentials`, `token_expired`, Keychain-ACL) it _would_ run — but its cost number doesn't match the enforced rate window, so honest "unguarded" still beats a plausible-but-wrong percent. The residual blind spot is real and accepted: a headless run whose creds sit in a nonstandard path and whose window is genuinely near exhaustion goes unguarded (the governor + context handoff remain the backstop).
@@ -430,10 +375,10 @@ So context pressure is a **wave-boundary handoff**, not a mid-wave abort:
 
 ## Stop conditions
 
-- **Nonbeliever STOP verdict**: goal hard-conflicts with CLAUDE.md/directive, smuggles a user-authority decision, or substitutes orchestrator judgment for a required gate → STOP before scope, surface nonbeliever output to user
-- **Scope refuses goal**: open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output to user
+- **Nonbeliever STOP verdict**: hard rule conflict / smuggled user-authority decision / required-gate substitution → STOP before scope, surface nonbeliever output (`## Protocol` Step 0)
+- **Scope refuses goal**: open-ended, conflicts with rules, candidates all high-risk same-specialist → STOP, surface scope output (`## Protocol` Step 1)
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
-- **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → ONE from-scratch retry first if retryable (`## Protocol` 2b-retry); STOP + surface agent output only after the retry also fails (or immediately, for a non-retryable stop)
+- **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → ONE from-scratch retry first if retryable, STOP + surface only after the retry also fails or immediately if non-retryable (`## Protocol` 2b-retry)
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
 - **Budget governor rail hit**: `max_total_waves` / `max_corrective_waves` / `consecutive_no_progress` / `max_wave_retries` exceeded → STOP, escalate with the persisted state report (`## Budget governor`); resumable after the user raises a ceiling
 - **Context pressure at a wave boundary**: a compaction fired or in-context state had to be re-derived from `run-state.json` → finish the wave, halt BEFORE the next dispatch, emit `/loop-de-looper resume` (`## Context-pressure handoff`). Clean handoff, not a failure.
@@ -445,27 +390,27 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 
 ## What loop-de-looper does NOT do
 
-- Does NOT execute waves directly — every wave goes through `the-looper`, no bypass. (`inline` sizing is not an exception: there the loop never starts; it hands the one-liner back and exits.)
-- Does NOT skip crew passes. Trigger fires → pass runs, no "ship anyway." (`single-wave` sizing skips the crew _cadence_ — no cumulative drift to catch — an up-front sizing decision, not a mid-run skip.)
+- Does NOT execute waves directly — every wave goes through `the-looper`, no bypass (`inline` sizing is not an exception: the loop never starts, it hands the one-liner back and exits).
+- Does NOT skip crew passes — trigger fires → pass runs, no "ship anyway" (`single-wave` sizing skips the crew _cadence_, an up-front sizing decision, not a mid-run skip).
 - Does NOT auto-revert commits when crew finds a blocker. Surfaces; user decides.
 - Does NOT silently swap specialist gates for built-in checks. `ESCALATE` → orchestrator invokes specialist; no "I checked it myself."
-- Does NOT let a UI-touching wave build without accessibility-lead — the accessibility hook never fires inside the executor, so the UI-glob mandates the gate up-front; plan's `ESCALATE: accessibility-lead` is the reactive backstop (`## Protocol` 2b pre-mandated). Neither path skippable.
-- Does NOT record a gate as passed when it didn't run. Task tool unavailable / agent never invoked → `gates.jsonl` logs `ran: false`, report says so. No invented verdicts, no prose-only gate claims.
-- Does NOT flip draft PR to ready-for-review (user decision per `looper-commit`). DOES create the draft (wave 1 or termination backstop) — creating ≠ flipping.
+- Does NOT let a UI-touching wave build without accessibility-lead — UI-glob mandates the gate up-front, plan `ESCALATE` is the reactive backstop, neither skippable (`## Protocol` 2b pre-mandated).
+- Does NOT record a gate as passed when it didn't run — Task-tool-unavailable / never-invoked logs `ran: false`, report says so; no invented verdicts, no prose-only gate claims (`## Gate artifacts`).
+- Does NOT flip draft PR to ready-for-review (user's call); DOES create the draft (wave 1 or termination backstop) — creating ≠ flipping (`## PR lifecycle + push ownership`).
 - Does NOT declare goal-complete with committed work and no PR. PR finalization (Step 4) is mandatory on every path.
 - Does NOT defer PR creation to "the end" with no owner, and does NOT bundle "no PR" with "don't flip to ready" in a brief (`## PR lifecycle + push ownership`).
 - Does NOT re-scope mid-run. Goal shifts → user issues a new run.
-- Does NOT loop unbounded — the budget governor caps total/corrective/no-progress/retry churn; a rail hit is a STOP. It does NOT meter token spend (unreadable from a Skill orchestrator), so it rails only on what it observes.
-- Does NOT invent a usage percentage or dispatch into a near-exhausted window. The usage-window guard reads the REAL enforced rate-limit window (`anthropic-ratelimit-unified-*` headers via `scripts/usage-window-probe.sh`) at the wave boundary and pauses at 95% utilization, self-resuming when it clears (`## Usage-window guard`); if the probe can't read it logs not-run and leaves the window unguarded — never a fabricated pause or percent, and never a cost-axis substitute.
+- Does NOT loop unbounded — budget governor caps total/corrective/no-progress/retry churn (rail hit = STOP), railing on observed churn never metered token spend (`## Budget governor`).
+- Does NOT invent a usage percentage or dispatch into a near-exhausted window — reads the REAL rate-limit window, pauses at 95%, self-resumes; probe-unread logs not-run + unguarded, never a fabricated pause/percent or cost-axis substitute (`## Usage-window guard`).
 - Does NOT defer a wave's cross-file-incompleteness flag to the crew — a dangling reference it created is triaged immediately (`## Protocol` 2b-flags).
-- Does NOT retry a deterministic stop (write-gate, governor rail, scope refusal — same wall every time, bubble up). Only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns ONE from-scratch retry per wave — a fresh-context re-dispatch reverting to the next ranked plan, never a resume (`## Protocol` 2b-retry).
-- Does NOT keep run state only in-context. Queue + counters persist to `run-state.json` (atomic) every wave; in-context is a cache, not the source of truth.
-- Does NOT dispatch into a degraded context or interrupt a wave mid-flight to save context. On observed pressure it halts at the NEXT wave boundary and hands off with `/loop-de-looper resume` — never a mid-wave abort or invented context-% gauge (`## Context-pressure handoff`).
+- Does NOT retry a deterministic stop (write-gate, governor rail, scope refusal — same wall every time, bubble up); only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns ONE fresh-context retry reverting to the next ranked plan, never a resume (`## Protocol` 2b-retry).
+- Does NOT keep run state only in-context — queue + counters persist to `run-state.json` (atomic) every wave; in-context is a cache (`## State tracking`).
+- Does NOT dispatch into a degraded context or interrupt a wave mid-flight — on observed pressure it halts at the NEXT wave boundary and hands off with `/loop-de-looper resume`, never a mid-wave abort or invented context-% gauge (`## Context-pressure handoff`).
 - Does NOT halt without naming the next command — every STOP / escalation / handoff / required-not-loopable termination ends with the literal runnable line (`## Voice + style`).
-- Does NOT skip nonbeliever pre-flight or halt on a mere challenge. Only a STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope.
-- Does NOT skip run-level learn on a success path — the only step diagnosing the orchestration itself. It only WRITES lessons; it does NOT gate, flip, revert, or re-open the run.
-- Does NOT let recap decide, fix, or flip anything, or replace the structured exit report. Read-only narration on top; facts trace to `gates.jsonl` / git log.
-- Does NOT invent diff facts in the structured-recap PR-body refresh. Tree, flags, hunks are byte-exact excerpts of the real whole-run diff; the wireframe is a diff-constrained reconstruction, never invented beyond it; anything beyond the diff is marked `inferred:`, secrets redacted (`looper-commit`'s `## Structured recap` rule; `## Protocol` Step 4).
+- Does NOT skip nonbeliever pre-flight or halt on a mere challenge — only a STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope (`## Protocol` Step 0).
+- Does NOT skip run-level learn on a success path — the only step diagnosing the orchestration itself; it only WRITES lessons, does NOT gate/flip/revert/re-open the run (`## Protocol` Step 4).
+- Does NOT let recap decide, fix, or flip anything, or replace the structured exit report — read-only narration on top; facts trace to `gates.jsonl` / git log (`## Protocol` Step 4).
+- Does NOT invent diff facts in the structured-recap PR-body refresh — tree/flags/hunks are byte-exact excerpts of the real whole-run diff, the wireframe a diff-constrained reconstruction, anything beyond the diff marked `inferred:`, secrets redacted (`## Protocol` Step 4).
 - Does NOT block termination on a failed structured-recap refresh — best-effort enhancement, never a gate; a refresh that errors logs and continues to goal-complete (`## Protocol` Step 4).
 
 ## Crew trigger + budget tuning
