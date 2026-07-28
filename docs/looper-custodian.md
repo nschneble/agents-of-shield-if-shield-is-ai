@@ -262,6 +262,94 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     and 16: a run that finishes its work but can't ship its report is another
     half-done-looks-done failure, closed by making the shippable shape the default.
 
+Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopted):
+
+18. **Phase C gains a guardrail replay (the Sefz graft).** Sefz (arXiv
+    2605.13044) translates a natural-language skill guardrail into "a
+    reachability goal over an annotated execution trace, reducing violation
+    checking to a deterministic graph query," and found violations in 120 of 402
+    real skills using only benign inputs. `gates.jsonl` — rolled up cross-repo
+    into `history-index.jsonl` — is exactly such a trace, so three of the loop's
+    own guardrails now replay as `jq` predicates (`scripts/custodian-guardrails.sh`,
+    wired into Phase C): **G1** no verdict without a run, **G2** the provenance
+    lint reused **verbatim** from `state-schemas.md` (one source of truth, not a
+    fork), **G3** no committed wave without an execution-evidence gate line — the
+    informational cap-overflow item from the same #29 report, now mechanized.
+    The legacy exemption is load-bearing, not cosmetic: pre-schema lines (no
+    `verified_by` key) are reported EXEMPT, never violations — the validate-by
+    replay over the 586-line index confirmed the naive form floods on the 387
+    legacy lines, while the era-gated form is clean (G1 0 / G2 0 / G3 6, the six
+    being genuine modern built-and-shipped waves whose gate lines recorded only
+    `llm`/`null` verification, no `executable` — real findings, not false alarms).
+    Get the exemption's provenance straight: `state-schemas.md`'s legacy note
+    prescribes a *temporal, per-file* exemption (a whole pre-schema `gates.jsonl`
+    predates the fields and is exempt). This replay runs over the cross-repo
+    `history-index.jsonl`, which *mixes eras line by line*, so it needs a per-*line*
+    era test — this repo's own extension of that note, NOT something state-schemas.md
+    prescribes; the script comment and the skill say exactly that rather than claiming
+    prescription. Three design choices the replay forced: (a) G3's "committed wave" is
+    **post-build activity** (crew / review / ship gate lines, or a commit-SHA named in
+    a summary), NOT the index's `files` field — the indexer resolves `files` once per
+    run, so it is branch-uniform and cannot tell which wave committed; keying G3 on it
+    flagged pre-build-only gate waves that never shipped. (b) The replay is read-only
+    digest signal, on the auto side of the propose/dispose line — it never edits, same
+    as the rest of Phase C. (c) The era test keys on key-*absence*, so the ingest
+    writer (`custodian-history.sh`) must copy `verified_by`/`outcome` into a record
+    ONLY when the source line carried them. The original writer defaulted the key to
+    `null` on every line, which silently erased the exemption on the next
+    `history --rebuild`: the re-derived legacy lines came back WITH the key present,
+    reclassifying all 387 modern and flooding false G2/G3 violations against an index
+    the docs call "safe anytime" to rebuild. The writer now emits the two keys
+    conditionally, so key-absence in the index mirrors key-absence in source and the
+    exemption survives a rebuild. Faithful to Sefz's *pattern* (trace-as-query);
+    rejects a tool/store — pure `jq`, `[[no-third-party-hosted-tool-reliance]]`.
+    Tested both directions: `scripts/custodian-guardrails.test.sh` proves each
+    guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the cite
+    surfaces), that a clean fixture and a legacy line stay green, that a legacy source
+    line pushed through the REAL ingest transform still classifies legacy/exempt after
+    a rebuild while a modern `verified_by:null` line stays modern (null ≠ absent), and
+    that G2 selects the same lines as `state-schemas.md`'s canonical provenance lint.
+
+19. **Phase B gains a skill-spec lint (the Agent Skills schema port).** Phase E's
+    rotating documentation-scheme track surfaced that the SKILL.md format is now a
+    citable open standard (agentskills.io/specification, corroborated by the Claude
+    Code skills docs): required `name`/`description`, exactly four optional fields
+    (`license`/`compatibility`/`metadata`/`allowed-tools`), and a three-phase
+    progressive-disclosure budget (~100-token discovery, <5000-token activation
+    body, and on-demand `references/` files under a ~5000-token cap). Two indie
+    linters publish concrete machine-checkable tables. Ported into
+    `scripts/custodian-skill-lint.sh` — pure bash + awk + grep, no hosted tool —
+    which Phase B now runs over the tracked `skills/` tree as a propose-only signal.
+    Two tiers, deliberately split so the exit code carries only hard-spec breakage:
+    **structural** (frontmatter allowlist, name pattern/length/dir-match, empty or
+    over-length description, broken intra-skill links, reference nesting past one
+    level, a narrow secret-leak scan) exits 1 and can route a concrete finding to a
+    `D-turncoat-<n>`; **advisory** (the token/line budgets) is INFO-only, never a
+    violation, and informs *extraction* (split a fat body into `references/`), never
+    prose smoothing — the war-story prose is deliberate
+    (`[[project-skill-slimming-yields]]`). Token counting is approximate (chars/4,
+    the standard rough BPE proxy) and
+    conservative in the flag direction: markdown/code-ish text tokenizes hotter than
+    chars/4, so the proxy under-reports and anything it flags as over-budget is over
+    for real — it only risks missing a marginal case, acceptable for an advisory that
+    never gates. Two scoping choices keep it false-positive-averse: a *bare* subdir
+    path token in prose (`scripts/foo.sh`) is intra-skill only when the skill
+    actually *bundles* that subdir, else it's a repo-relative reference (out of
+    scope, already covered by `validate-looper-config.sh`) — but an explicit
+    markdown `](references/foo.md)` link is always validated, so a dangling target
+    is a violation whether or not the subdir exists; and a `[[wiki-link]]` is validated only when the
+    skill uses local wiki-links at all (≥1 slug resolves in-dir), so cross-scope
+    memory `[[links]]` are never flagged. Description *edits* are out of scope —
+    findings only, human disposes. Validated E-1's `validate-by` by running it over
+    all 13 skills today: **0 structural violations, 3 body-budget advisories**
+    (`loop-de-looper`, `looper-custodian`, `looper-defend` over the ~5000-token soft
+    ceiling — extraction candidates, not defects).
+    `[[no-third-party-hosted-tool-reliance]]`: mine the check tables, not the
+    linters. Both-directions test:
+    `scripts/custodian-skill-lint.test.sh`. (Numbering note: decision 18 above,
+    from the same issue #29 Phase E, is E-2's guardrail replay — landed via PR #31;
+    this is 19.)
+
 Refined 2026-07-28 by the custodian's own Phase E (issue #29, E-3 adopted):
 
 20. **`looper-verify` gains a held-out composition check.** Phase E's SpecBench
