@@ -193,120 +193,135 @@ lint_skill() {
   local skill; skill=$(basename "$dir")
   local f="$dir/SKILL.md"
 
+  # Classify the frontmatter WITHOUT early-returning. A malformed block (missing
+  # SKILL.md, missing opening fence, or no closing fence) only disables the checks
+  # that need PARSED frontmatter keys. Every frontmatter-INDEPENDENT scan below
+  # (body/link/wiki-link, reference nesting, and — critically — the secret scan)
+  # must still run, so a broken fence in one skill can never silence a security
+  # scan across that skill's own files and references.
+  local fm_ok=1
   if [ ! -f "$f" ]; then
     viol "frontmatter-missing" "$dir" "no SKILL.md in skill directory"
-    return
-  fi
-  if ! has_frontmatter "$f"; then
+    fm_ok=0
+  elif ! has_frontmatter "$f"; then
     viol "frontmatter-missing" "$f" "must start with a \`---\` frontmatter fence (if the fence looks present, check for a leading BOM or CRLF line endings)"
-    return
-  fi
-  # A closing `---` must exist before we treat any body line as a key, or an
-  # unterminated block either passes silently or cascades bogus unknown-field
-  # findings that never name the real fault. Flag it and skip the key parse.
-  if ! frontmatter_terminated "$f"; then
+    fm_ok=0
+  elif ! frontmatter_terminated "$f"; then
+    # A closing `---` must exist before we treat any body line as a key, or an
+    # unterminated block either passes silently or cascades bogus unknown-field
+    # findings that never name the real fault. Flag it and skip the key parse.
     viol "frontmatter-unterminated" "$f" "opened with \`---\` but has no closing \`---\` fence — body lines cannot be parsed as frontmatter keys"
-    return
+    fm_ok=0
   fi
 
-  # Frontmatter allowlist + required fields.
-  local key seen_name=0 seen_desc=0
-  while IFS= read -r key; do
-    [ -n "$key" ] || continue
-    [ "$key" = "name" ] && seen_name=1
-    [ "$key" = "description" ] && seen_desc=1
-    if ! in_list "$key" "$REQUIRED_FIELDS $OPTIONAL_FIELDS"; then
-      viol "frontmatter-unknown-field" "$f" "\`$key\` is not in the spec allowlist (name/description + license/compatibility/metadata/allowed-tools)"
-    fi
-  done < <(frontmatter_keys "$f")
-  [ "$seen_name" -eq 1 ] || viol "frontmatter-required" "$f" "missing required \`name:\`"
-  [ "$seen_desc" -eq 1 ] || viol "frontmatter-required" "$f" "missing required \`description:\`"
-
-  # name: pattern / length / dir match.
-  local name; name=$(frontmatter_value "$f" name)
-  name="${name#[\"\']}"; name="${name%[\"\']}"
-  if [ -n "$name" ]; then
-    [ "${#name}" -le "$NAME_MAX" ] || viol "name-length" "$f" "name is ${#name} chars (max $NAME_MAX)"
-    if ! printf '%s' "$name" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$' || printf '%s' "$name" | grep -q -- '--'; then
-      viol "name-pattern" "$f" "name \`$name\` must be lowercase a-z/0-9/hyphen, no leading/trailing or consecutive hyphens"
-    fi
-    [ "$name" = "$skill" ] || viol "name-mismatch" "$f" "name \`$name\` does not match directory \`$skill\`"
-  fi
-
-  # description: presence / length (structural); opener + trigger-cue (advisory).
-  local desc; desc=$(frontmatter_value "$f" description)
-  desc="${desc#[\"\']}"; desc="${desc%[\"\']}"
-  if [ -z "$desc" ]; then
-    [ "$seen_desc" -eq 1 ] && viol "description-empty" "$f" "\`description:\` is present but empty"
-  else
-    [ "${#desc}" -le "$DESC_MAX" ] || viol "description-length" "$f" "description is ${#desc} chars (max $DESC_MAX)"
-    case "$desc" in
-      I\ *|I\'*) info "adv-description-firstperson" "$f" "description opens first-person (\"I …\") — lead with the capability" ;;
-    esac
-    if ! printf '%s' "$desc" | grep -qiE 'when|use this|trigger|invoke'; then
-      info "adv-description-trigger" "$f" "description has no obvious usage/trigger cue (when to invoke)"
-    fi
-    local disc_tok; disc_tok=$(( $(est_str_tokens "$name") + $(est_str_tokens "$desc") ))
-    [ "$disc_tok" -le "$DISCOVERY_TOKEN_BUDGET" ] || info "adv-discovery-budget" "$f" "name+description ~${disc_tok} tokens > ${DISCOVERY_TOKEN_BUDGET} discovery budget"
-  fi
-
-  # compatibility length (if present).
-  local compat; compat=$(frontmatter_value "$f" compatibility)
-  compat="${compat#[\"\']}"; compat="${compat%[\"\']}"
-  if [ -n "$compat" ]; then
-    [ "${#compat}" -le "$COMPAT_MAX" ] || viol "compatibility-length" "$f" "compatibility is ${#compat} chars (max $COMPAT_MAX)"
-  fi
-
-  # Body budgets (advisory).
-  local btok blines
-  btok=$(est_file_tokens "$f")
-  blines=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
-  [ "$btok" -le "$BODY_TOKEN_BUDGET" ] || info "adv-body-budget" "$f" "body ~${btok} tokens > ${BODY_TOKEN_BUDGET} (consider extracting to references/ — informs extraction, not prose smoothing)"
-  [ "${blines:-0}" -le "$BODY_LINE_BUDGET" ] || info "adv-body-lines" "$f" "${blines} lines > ${BODY_LINE_BUDGET} recommended"
-
-  # Broken internal links from SKILL.md. Only refs into a subdir the skill
-  # actually BUNDLES (references/ templates/ assets/ scripts/) are in-scope — a
-  # `scripts/foo.sh` when the skill has no scripts/ dir is a REPO-relative
-  # reference (the repo's own scripts/), out of scope for the intra-skill check
-  # and already covered by validate-looper-config.sh. Scoping on subdir existence
-  # is what keeps that distinction false-positive-averse.
-  local ref seg
-  while IFS= read -r ref; do
-    [ -n "$ref" ] || continue
-    case "$ref" in
-      references/*|scripts/*|assets/*|templates/*) ;;
-      *) continue ;;
-    esac
-    seg="${ref%%/*}"
-    [ -d "$dir/$seg" ] || continue   # subdir not bundled here → repo/external ref
-    resolve_ref "$dir" "$dir" "$ref" >/dev/null || viol "broken-link" "$f" "reference \`$ref\` does not resolve to a file in the skill"
-  done < <(extract_refs "$f")
-
-  # Intra-skill [[wiki-links]]: only validated when the skill actually uses them
-  # locally (>=1 slug resolves to a same-skill file). Cross-scope memory `[[links]]`
-  # — which never resolve inside the skill dir — stay out of scope, so real looper
-  # skills (all memory-style links) are never false-flagged.
-  local slug resolved=0 total=0 slugs
-  slugs=$(grep -oE '\[\[[A-Za-z0-9._-]+\]\]' "$f" 2>/dev/null | sed -E 's/^\[\[//; s/\]\]$//' || true)
-  if [ -n "$slugs" ]; then
-    while IFS= read -r slug; do
-      [ -n "$slug" ] || continue
-      total=$((total + 1))
-      if [ -f "$dir/$slug.md" ] || [ -f "$dir/references/$slug.md" ] || [ -f "$dir/$slug" ]; then
-        resolved=$((resolved + 1))
+  # ── Frontmatter-DEPENDENT checks: run only when the block parses cleanly ──────
+  if [ "$fm_ok" -eq 1 ]; then
+    # Frontmatter allowlist + required fields.
+    local key seen_name=0 seen_desc=0
+    while IFS= read -r key; do
+      [ -n "$key" ] || continue
+      [ "$key" = "name" ] && seen_name=1
+      [ "$key" = "description" ] && seen_desc=1
+      if ! in_list "$key" "$REQUIRED_FIELDS $OPTIONAL_FIELDS"; then
+        viol "frontmatter-unknown-field" "$f" "\`$key\` is not in the spec allowlist (name/description + license/compatibility/metadata/allowed-tools)"
       fi
-    done < <(printf '%s\n' "$slugs")
-    if [ "$resolved" -gt 0 ]; then
+    done < <(frontmatter_keys "$f")
+    [ "$seen_name" -eq 1 ] || viol "frontmatter-required" "$f" "missing required \`name:\`"
+    [ "$seen_desc" -eq 1 ] || viol "frontmatter-required" "$f" "missing required \`description:\`"
+
+    # name: pattern / length / dir match.
+    local name; name=$(frontmatter_value "$f" name)
+    name="${name#[\"\']}"; name="${name%[\"\']}"
+    if [ -n "$name" ]; then
+      [ "${#name}" -le "$NAME_MAX" ] || viol "name-length" "$f" "name is ${#name} chars (max $NAME_MAX)"
+      if ! printf '%s' "$name" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$' || printf '%s' "$name" | grep -q -- '--'; then
+        viol "name-pattern" "$f" "name \`$name\` must be lowercase a-z/0-9/hyphen, no leading/trailing or consecutive hyphens"
+      fi
+      [ "$name" = "$skill" ] || viol "name-mismatch" "$f" "name \`$name\` does not match directory \`$skill\`"
+    fi
+
+    # description: presence / length (structural); opener + trigger-cue (advisory).
+    local desc; desc=$(frontmatter_value "$f" description)
+    desc="${desc#[\"\']}"; desc="${desc%[\"\']}"
+    if [ -z "$desc" ]; then
+      [ "$seen_desc" -eq 1 ] && viol "description-empty" "$f" "\`description:\` is present but empty"
+    else
+      [ "${#desc}" -le "$DESC_MAX" ] || viol "description-length" "$f" "description is ${#desc} chars (max $DESC_MAX)"
+      case "$desc" in
+        I\ *|I\'*) info "adv-description-firstperson" "$f" "description opens first-person (\"I …\") — lead with the capability" ;;
+      esac
+      if ! printf '%s' "$desc" | grep -qiE 'when|use this|trigger|invoke'; then
+        info "adv-description-trigger" "$f" "description has no obvious usage/trigger cue (when to invoke)"
+      fi
+      local disc_tok; disc_tok=$(( $(est_str_tokens "$name") + $(est_str_tokens "$desc") ))
+      [ "$disc_tok" -le "$DISCOVERY_TOKEN_BUDGET" ] || info "adv-discovery-budget" "$f" "name+description ~${disc_tok} tokens > ${DISCOVERY_TOKEN_BUDGET} discovery budget"
+    fi
+
+    # compatibility length (if present).
+    local compat; compat=$(frontmatter_value "$f" compatibility)
+    compat="${compat#[\"\']}"; compat="${compat%[\"\']}"
+    if [ -n "$compat" ]; then
+      [ "${#compat}" -le "$COMPAT_MAX" ] || viol "compatibility-length" "$f" "compatibility is ${#compat} chars (max $COMPAT_MAX)"
+    fi
+  fi
+
+  # ── Frontmatter-INDEPENDENT checks: run regardless of a malformed fence ───────
+
+  # Body/link/wiki scans read SKILL.md directly (no parsed keys), so they cover a
+  # malformed-but-present fence too — they only need the file itself to exist.
+  if [ -f "$f" ]; then
+    # Body budgets (advisory).
+    local btok blines
+    btok=$(est_file_tokens "$f")
+    blines=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
+    [ "$btok" -le "$BODY_TOKEN_BUDGET" ] || info "adv-body-budget" "$f" "body ~${btok} tokens > ${BODY_TOKEN_BUDGET} (consider extracting to references/ — informs extraction, not prose smoothing)"
+    [ "${blines:-0}" -le "$BODY_LINE_BUDGET" ] || info "adv-body-lines" "$f" "${blines} lines > ${BODY_LINE_BUDGET} recommended"
+
+    # Broken internal links from SKILL.md. Only refs into a subdir the skill
+    # actually BUNDLES (references/ templates/ assets/ scripts/) are in-scope — a
+    # `scripts/foo.sh` when the skill has no scripts/ dir is a REPO-relative
+    # reference (the repo's own scripts/), out of scope for the intra-skill check
+    # and already covered by validate-looper-config.sh. Scoping on subdir existence
+    # is what keeps that distinction false-positive-averse.
+    local ref seg
+    while IFS= read -r ref; do
+      [ -n "$ref" ] || continue
+      case "$ref" in
+        references/*|scripts/*|assets/*|templates/*) ;;
+        *) continue ;;
+      esac
+      seg="${ref%%/*}"
+      [ -d "$dir/$seg" ] || continue   # subdir not bundled here → repo/external ref
+      resolve_ref "$dir" "$dir" "$ref" >/dev/null || viol "broken-link" "$f" "reference \`$ref\` does not resolve to a file in the skill"
+    done < <(extract_refs "$f")
+
+    # Intra-skill [[wiki-links]]: only validated when the skill actually uses them
+    # locally (>=1 slug resolves to a same-skill file). Cross-scope memory `[[links]]`
+    # — which never resolve inside the skill dir — stay out of scope, so real looper
+    # skills (all memory-style links) are never false-flagged.
+    local slug resolved=0 total=0 slugs
+    slugs=$(grep -oE '\[\[[A-Za-z0-9._-]+\]\]' "$f" 2>/dev/null | sed -E 's/^\[\[//; s/\]\]$//' || true)
+    if [ -n "$slugs" ]; then
       while IFS= read -r slug; do
         [ -n "$slug" ] || continue
-        if [ ! -f "$dir/$slug.md" ] && [ ! -f "$dir/references/$slug.md" ] && [ ! -f "$dir/$slug" ]; then
-          viol "broken-link" "$f" "intra-skill link \`[[$slug]]\` resolves to no file in the skill"
+        total=$((total + 1))
+        if [ -f "$dir/$slug.md" ] || [ -f "$dir/references/$slug.md" ] || [ -f "$dir/$slug" ]; then
+          resolved=$((resolved + 1))
         fi
       done < <(printf '%s\n' "$slugs")
+      if [ "$resolved" -gt 0 ]; then
+        while IFS= read -r slug; do
+          [ -n "$slug" ] || continue
+          if [ ! -f "$dir/$slug.md" ] && [ ! -f "$dir/references/$slug.md" ] && [ ! -f "$dir/$slug" ]; then
+            viol "broken-link" "$f" "intra-skill link \`[[$slug]]\` resolves to no file in the skill"
+          fi
+        done < <(printf '%s\n' "$slugs")
+      fi
     fi
   fi
 
-  # references/ files: budget (advisory) + one-level nesting (structural).
+  # references/ files: budget (advisory) + one-level nesting (structural). Operates
+  # on the references/ dir, so it needs no SKILL.md and runs for a malformed skill.
   if [ -d "$dir/references" ]; then
     local rf rtok r target
     for rf in "$dir/references"/*; do
@@ -328,7 +343,9 @@ lint_skill() {
     done
   fi
 
-  # Secret scan across the skill's text files.
+  # Secret scan across the skill's text files. Runs LAST and unconditionally —
+  # even with a missing or unterminated SKILL.md — so a malformed frontmatter can
+  # never suppress a credential finding anywhere in the skill directory.
   local tf
   while IFS= read -r tf; do
     [ -n "$tf" ] || continue

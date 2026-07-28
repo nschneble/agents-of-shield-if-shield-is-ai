@@ -133,11 +133,47 @@ Example: this line looks like a key.
 Note: so does this one.
 EOF
 
+# A broken fence must NOT silence the frontmatter-independent secret scan. Each of
+# the three malformed-frontmatter shapes (unterminated fence, missing opening
+# fence, missing SKILL.md entirely) pairs its frontmatter violation with an AKIA
+# secret planted in references/notes.md; both findings must surface in one pass.
+
+# (1) unterminated fence + secret in references.
+d="$temp_dir/red-unterm-secret"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: red-unterm-secret
+description: Use this when a broken fence must not silence the secret scan.
+Body prose with no closing fence.
+EOF
+cat > "$d/references/notes.md" <<'EOF'
+Leaked example key: AKIAIOSFODNN7EXAMPLE
+EOF
+
+# (2) missing opening fence + secret in references.
+d="$temp_dir/red-nofm-secret"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+# no frontmatter fence here
+Use this when the fence is missing entirely.
+EOF
+cat > "$d/references/notes.md" <<'EOF'
+Leaked example key: AKIAIOSFODNN7EXAMPLE
+EOF
+
+# (3) no SKILL.md at all + secret in references: the dir-level secret scan must
+# still run with zero SKILL.md present.
+d="$temp_dir/red-nofile-secret"; mkdir -p "$d/references"
+cat > "$d/references/notes.md" <<'EOF'
+Leaked example key: AKIAIOSFODNN7EXAMPLE
+EOF
+
 out=$("$linter" \
   "$temp_dir/red-unknown" "$temp_dir/red-nodesc" "$temp_dir/red-badname" \
   "$temp_dir/red-nofm" "$temp_dir/red-brokenlink" "$temp_dir/red-nesting" \
   "$temp_dir/red-secret" "$temp_dir/red-wikilink" \
-  "$temp_dir/red-unterm-prose" "$temp_dir/red-unterm-words")
+  "$temp_dir/red-unterm-prose" "$temp_dir/red-unterm-words" \
+  "$temp_dir/red-unterm-secret" "$temp_dir/red-nofm-secret" \
+  "$temp_dir/red-nofile-secret")
 rc=$?
 
 [ "$rc" -eq 1 ] && result=0 || result=1;                          check "RED: exit code is 1" "$result"
@@ -158,6 +194,15 @@ printf '%s\n' "$out" | grep -q 'frontmatter-unterminated.*red-unterm-prose'; che
 printf '%s\n' "$out" | grep -q 'frontmatter-unterminated.*red-unterm-words'; check "RED: unterminated frontmatter (word-line body) flagged" $?
 # The word:-line body must NOT cascade misleading frontmatter-unknown-field findings.
 ! printf '%s\n' "$out" | grep -q 'frontmatter-unknown-field.*red-unterm-words'; check "RED: unterminated body does not cascade unknown-field" $?
+
+# A malformed frontmatter must NOT suppress the secret scan: each shape emits BOTH
+# its frontmatter violation AND the references/ secret leak, in one pass.
+printf '%s\n' "$out" | grep -q 'frontmatter-unterminated.*red-unterm-secret';       check "RED: unterminated+secret — fence flagged" $?
+printf '%s\n' "$out" | grep -q 'secret-leak.*red-unterm-secret.*notes.md';          check "RED: unterminated+secret — secret still scanned" $?
+printf '%s\n' "$out" | grep -q 'frontmatter-missing.*red-nofm-secret';              check "RED: no-fence+secret — fence flagged" $?
+printf '%s\n' "$out" | grep -q 'secret-leak.*red-nofm-secret.*notes.md';            check "RED: no-fence+secret — secret still scanned" $?
+printf '%s\n' "$out" | grep -q 'frontmatter-missing.*red-nofile-secret';            check "RED: no-SKILL.md+secret — missing file flagged" $?
+printf '%s\n' "$out" | grep -q 'secret-leak.*red-nofile-secret.*notes.md';          check "RED: no-SKILL.md+secret — secret still scanned" $?
 
 # ── GREEN fixture: fully spec-clean, all four optional fields, resolving refs ───
 d="$temp_dir/green-skill"; mkdir -p "$d/references"
