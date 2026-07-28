@@ -110,13 +110,37 @@ Body.
 EOF
 echo "terms" > "$d/glossary.md"
 
+# unterminated frontmatter, prose body: opened with `---`, no closing fence, the
+# body is plain prose (no `key:` lines). Without the structural check this passes
+# silently clean — the fault must be named as its own violation.
+d="$temp_dir/red-unterm-prose"; mkdir -p "$d"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: red-unterm-prose
+description: Use this when the closing fence is forgotten.
+Body prose with no closing fence.
+EOF
+
+# unterminated frontmatter, word:-line body: body lines (`Example:`, `Note:`) look
+# like frontmatter keys. Without the structural check these cascade into misleading
+# frontmatter-unknown-field findings that never name the real (missing-fence) fault.
+d="$temp_dir/red-unterm-words"; mkdir -p "$d"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: red-unterm-words
+description: Use this when body lines masquerade as keys.
+Example: this line looks like a key.
+Note: so does this one.
+EOF
+
 out=$("$linter" \
   "$temp_dir/red-unknown" "$temp_dir/red-nodesc" "$temp_dir/red-badname" \
   "$temp_dir/red-nofm" "$temp_dir/red-brokenlink" "$temp_dir/red-nesting" \
-  "$temp_dir/red-secret" "$temp_dir/red-wikilink")
+  "$temp_dir/red-secret" "$temp_dir/red-wikilink" \
+  "$temp_dir/red-unterm-prose" "$temp_dir/red-unterm-words")
 rc=$?
 
-[ "$rc" -eq 1 ] && r=0 || r=1;                                     check "RED: exit code is 1" "$r"
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "RED: exit code is 1" "$result"
 printf '%s\n' "$out" | grep -q 'frontmatter-unknown-field.*red-unknown';    check "RED: unknown field flagged" $?
 printf '%s\n' "$out" | grep -q 'frontmatter-required.*red-nodesc';          check "RED: missing description flagged" $?
 printf '%s\n' "$out" | grep -q 'name-pattern.*red-badname';                 check "RED: bad name pattern flagged" $?
@@ -130,6 +154,10 @@ printf '%s\n' "$out" | grep -q 'secret-leak.*red-secret';                    che
 printf '%s\n' "$out" | grep -q 'broken-link.*ghost';                        check "RED: dangling wiki-link flagged" $?
 # The resolving wiki-link must NOT be flagged.
 ! printf '%s\n' "$out" | grep -q 'glossary';                                check "RED: resolving wiki-link not flagged" $?
+printf '%s\n' "$out" | grep -q 'frontmatter-unterminated.*red-unterm-prose'; check "RED: unterminated frontmatter (prose body) flagged" $?
+printf '%s\n' "$out" | grep -q 'frontmatter-unterminated.*red-unterm-words'; check "RED: unterminated frontmatter (word-line body) flagged" $?
+# The word:-line body must NOT cascade misleading frontmatter-unknown-field findings.
+! printf '%s\n' "$out" | grep -q 'frontmatter-unknown-field.*red-unterm-words'; check "RED: unterminated body does not cascade unknown-field" $?
 
 # ── GREEN fixture: fully spec-clean, all four optional fields, resolving refs ───
 d="$temp_dir/green-skill"; mkdir -p "$d/references"
@@ -149,7 +177,7 @@ EOF
 echo "# reference, no deeper links" > "$d/references/REFERENCE.md"
 
 out=$("$linter" "$temp_dir/green-skill"); rc=$?
-[ "$rc" -eq 0 ] && r=0 || r=1;                                    check "GREEN: exit code is 0" "$r"
+[ "$rc" -eq 0 ] && result=0 || result=1;                         check "GREEN: exit code is 0" "$result"
 printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0';             check "GREEN: zero violations" $?
 ! printf '%s\n' "$out" | grep -q '^VIOLATION';                   check "GREEN: no VIOLATION lines" $?
 
@@ -169,7 +197,7 @@ d="$temp_dir/adv-skill"; mkdir -p "$d"
 } > "$d/SKILL.md"
 
 out=$("$linter" "$temp_dir/adv-skill"); rc=$?
-[ "$rc" -eq 0 ] && r=0 || r=1;                                    check "ADVISORY: exit code is 0 (advisory never fails)" "$r"
+[ "$rc" -eq 0 ] && result=0 || result=1;                         check "ADVISORY: exit code is 0 (advisory never fails)" "$result"
 printf '%s\n' "$out" | grep -q 'adv-body-budget.*adv-skill';     check "ADVISORY: body token budget flagged as INFO" $?
 printf '%s\n' "$out" | grep -q 'adv-body-lines.*adv-skill';      check "ADVISORY: body line budget flagged as INFO" $?
 printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0';            check "ADVISORY: zero structural violations" $?
@@ -178,7 +206,7 @@ printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0';            check "ADVISORY
 cf="$temp_dir/CLAUDE.md"
 i=0; while [ "$i" -lt 160 ]; do echo "context line $i"; i=$((i + 1)); done > "$cf"
 out=$("$linter" "$cf"); rc=$?
-[ "$rc" -eq 0 ] && r=0 || r=1;                                    check "CONTEXT: over-long context file exits 0" "$r"
+[ "$rc" -eq 0 ] && result=0 || result=1;                         check "CONTEXT: over-long context file exits 0" "$result"
 printf '%s\n' "$out" | grep -q 'adv-context-lines.*CLAUDE.md';   check "CONTEXT: line budget flagged as INFO" $?
 
 printf '\n%d failure(s)\n' "$fails"

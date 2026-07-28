@@ -43,13 +43,20 @@
 # opener, a trigger-cue presence heuristic) — no editorial judgement, and edits
 # are out of scope: the linter reports, a human disposes.
 #
+# ── Known limitations ───────────────────────────────────────────────────────────
+# A `[[wiki-link]]` shown inside a fenced code block is NOT exempted from the
+# intra-skill link check — a documented example slug is resolved like a live link.
+# Not worth a fence parser for a hypothetical; noted so a future false positive is
+# understood, not chased. (Frontmatter scalars are read single-line only — see the
+# `frontmatter_value` note.)
+#
 # Mirrors scripts/custodian-history.sh conventions: set -euo pipefail, env-override
 # paths, subcommand dispatch, usage-on-stderr exit 2. Grep/awk that may legitimately
 # return non-zero (no match) are guarded so pipefail never turns a clean scan fatal.
 #
 # Usage:
 #   custodian-skill-lint.sh [lint] [<skill-dir|SKILL.md|context.md> ...]
-#     no path args ⇒ lints every skills/<name>/ plus root CLAUDE.md/AGENTS.md.
+#     no path args ⇒ lints every skills/<name>/ plus root CLAUDE.md/AGENTS.md if present.
 #   custodian-skill-lint.sh -h | --help
 set -euo pipefail
 
@@ -83,6 +90,20 @@ est_str_tokens() { echo $(( ${#1} / 4 )); }
 
 # --- Frontmatter helpers (block between the first two `---` fences) ---
 has_frontmatter() { [ "$(head -n 1 "$1" 2>/dev/null)" = "---" ]; }
+
+# True (rc 0) when a closing column-0 `---` fence exists after the opening one.
+# Without it the frontmatter block is unterminated: the key/value awk below would
+# run to EOF and misread body lines as keys (either silently — a prose body has no
+# `key:` lines so the file passes clean — or as a misleading unknown-field cascade
+# when body lines like `Example:`/`Note:` look like keys). Callers assert this
+# before any key parsing and emit `frontmatter-unterminated` when it fails.
+frontmatter_terminated() { # file
+  awk '
+    NR == 1 { next }              # opener already checked by has_frontmatter
+    $0 == "---" { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$1" 2>/dev/null
+}
 
 # Top-level frontmatter keys, one per line. Column-0 `key:` only, so nested
 # entries under `metadata:` (indented) are correctly ignored.
@@ -177,7 +198,14 @@ lint_skill() {
     return
   fi
   if ! has_frontmatter "$f"; then
-    viol "frontmatter-missing" "$f" "must start with a \`---\` frontmatter fence"
+    viol "frontmatter-missing" "$f" "must start with a \`---\` frontmatter fence (if the fence looks present, check for a leading BOM or CRLF line endings)"
+    return
+  fi
+  # A closing `---` must exist before we treat any body line as a key, or an
+  # unterminated block either passes silently or cascades bogus unknown-field
+  # findings that never name the real fault. Flag it and skip the key parse.
+  if ! frontmatter_terminated "$f"; then
+    viol "frontmatter-unterminated" "$f" "opened with \`---\` but has no closing \`---\` fence — body lines cannot be parsed as frontmatter keys"
     return
   fi
 
@@ -356,7 +384,7 @@ run_lint() {
 
 usage() {
   echo "usage: $0 [lint] [<skill-dir|SKILL.md|context.md> ...]" >&2
-  echo "  no path args ⇒ lints skills/<name>/ + root CLAUDE.md/AGENTS.md" >&2
+  echo "  no path args ⇒ lints skills/<name>/ + root CLAUDE.md/AGENTS.md if present" >&2
   echo "  structural violations ⇒ exit 1; advisory-only ⇒ exit 0" >&2
 }
 

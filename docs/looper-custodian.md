@@ -270,7 +270,8 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
     Code skills docs): required `name`/`description`, exactly four optional fields
     (`license`/`compatibility`/`metadata`/`allowed-tools`), and a three-phase
     progressive-disclosure budget (~100-token discovery, <5000-token activation
-    body). Two indie linters publish concrete machine-checkable tables. Ported into
+    body, and on-demand `references/` files under a ~5000-token cap). Two indie
+    linters publish concrete machine-checkable tables. Ported into
     `scripts/custodian-skill-lint.sh` — pure bash + awk + grep, no hosted tool —
     which Phase B now runs over the tracked `skills/` tree as a propose-only signal.
     Two tiers, deliberately split so the exit code carries only hard-spec breakage:
@@ -279,8 +280,9 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
     level, a narrow secret-leak scan) exits 1 and can route a concrete finding to a
     `D-turncoat-<n>`; **advisory** (the token/line budgets) is INFO-only, never a
     violation, and informs *extraction* (split a fat body into `references/`), never
-    prose smoothing — the war-story prose is deliberate (`[[project-skill-slimming-yields]]`).
-    Token counting is approximate (chars/4, the standard rough BPE proxy) and
+    prose smoothing — the war-story prose is deliberate
+    (`[[project-skill-slimming-yields]]`). Token counting is approximate (chars/4,
+    the standard rough BPE proxy) and
     conservative in the flag direction: markdown/code-ish text tokenizes hotter than
     chars/4, so the proxy under-reports and anything it flags as over-budget is over
     for real — it only risks missing a marginal case, acceptable for an advisory that
@@ -293,8 +295,9 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
     findings only, human disposes. Validated E-1's `validate-by` by running it over
     all 13 skills today: **0 structural violations, 3 body-budget advisories**
     (`loop-de-looper`, `looper-custodian`, `looper-defend` over the ~5000-token soft
-    ceiling — extraction candidates, not defects). `[[no-third-party-hosted-tool-reliance]]`:
-    mine the check tables, not the linters. Both-directions test:
+    ceiling — extraction candidates, not defects).
+    `[[no-third-party-hosted-tool-reliance]]`: mine the check tables, not the
+    linters. Both-directions test:
     `scripts/custodian-skill-lint.test.sh`. (Numbering note: PR #31 adds decision 18
     from the same issue #29 Phase E, E-2's guardrail replay — this is 19; if the two
     merge out of order, keep 18=guardrails, 19=skill-lint.)
