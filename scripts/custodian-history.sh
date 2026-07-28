@@ -51,7 +51,7 @@ ingest() {
     rr="$REPOS_ROOT/$repo"
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }
     while IFS= read -r gates; do
-      branch=$(basename "$(dirname "$gates")")
+      branch=${gates#"$rr/local/loops/"}; branch=${branch%/gates.jsonl}
       mtime=$(stat -f %m "$gates" 2>/dev/null || echo 0)
       files_json=$(resolve_files "$rr" "$gates")
       jq -c \
