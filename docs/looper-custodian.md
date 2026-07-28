@@ -261,3 +261,35 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     propose/dispose deference the whole custodian holds. Sibling of decisions 15
     and 16: a run that finishes its work but can't ship its report is another
     half-done-looks-done failure, closed by making the shippable shape the default.
+
+Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 adopted):
+
+18. **Phase C gains a guardrail replay (the Sefz graft).** Sefz (arXiv
+    2605.13044) translates a natural-language skill guardrail into "a
+    reachability goal over an annotated execution trace, reducing violation
+    checking to a deterministic graph query," and found violations in 120 of 402
+    real skills using only benign inputs. `gates.jsonl` — rolled up cross-repo
+    into `history-index.jsonl` — is exactly such a trace, so three of the loop's
+    own guardrails now replay as `jq` predicates (`scripts/custodian-guardrails.sh`,
+    wired into Phase C): **G1** no verdict without a run, **G2** the provenance
+    lint reused **verbatim** from `state-schemas.md` (one source of truth, not a
+    fork), **G3** no committed wave without an execution-evidence gate line — the
+    informational cap-overflow item from the same #29 report, now mechanized.
+    The legacy exemption is load-bearing, not cosmetic: pre-schema lines (no
+    `verified_by` key) are reported EXEMPT, never violations — the validate-by
+    replay over the 586-line index confirmed the naive form floods on the 387
+    legacy lines, while the era-gated form is clean (G1 0 / G2 0 / G3 6, the six
+    being genuine modern built-and-shipped waves whose gate lines recorded only
+    `llm`/`null` verification, no `executable` — real findings, not false alarms).
+    Two design choices the
+    replay forced: (a) G3's "committed wave" is **post-build activity** (crew /
+    review / ship gate lines, or a commit-SHA named in a summary), NOT the
+    index's `files` field — the indexer resolves `files` once per run, so it is
+    branch-uniform and cannot tell which wave committed; keying G3 on it flagged
+    pre-build-only gate waves that never shipped. (b) The replay is read-only
+    digest signal, on the auto side of the propose/dispose line — it never edits,
+    same as the rest of Phase C. Faithful to Sefz's *pattern* (trace-as-query);
+    rejects a tool/store — pure `jq`, `[[no-third-party-hosted-tool-reliance]]`.
+    Tested both directions: `scripts/custodian-guardrails.test.sh` proves each
+    guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the
+    cite surfaces) and that a clean fixture and a legacy line stay green.
