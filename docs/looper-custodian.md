@@ -280,20 +280,23 @@ Refined 2026-07-28 by the custodian's own Phase E (issue #29, E-3 adopted):
     executable oracle; doc/trivial waves exempt; ONE scenario per wave, not a parallel
     suite. Reporting is split: a held-out FAIL on a visible-green wave is a
     first-class verify failure on the normal fail path, never a footnote, and records
-    `verified_by: "executable"` (the token PR #31's G3 guardrail greps for).
-    **VALIDATE-BY (shadow-run against E-1).** A fresh context authored a held-out
+    `verified_by: executable` (the value PR #31's G3 guardrail checks with the
+    `jq` predicate `.verified_by == "executable"`).
+    `validate-by: shadow-run against E-1`. A fresh context authored a held-out
     scenario from E-1's brief-level contract ALONE — blind to
     `custodian-skill-lint.test.sh` — composing multiple structural classes plus an
     advisory against clean controls. E-1's visible suite is CI-green (PR #32
-    `statusCheckRollup` SUCCESS, 2026-07-28); the held-out scenario passed 9/10
-    brief-contract assertions and surfaced three gaps the green suite does not fail
-    on: (a) a broken intra-skill link is flagged only when a `references/` dir already
-    exists — a link to `references/gone.md` in a skill with no `references/` dir exits
-    0; (b) the "one-level reference nesting" structural rule never fires —
-    `references/a/b/c.md` exits 0, though the walker demonstrably reaches depth-2 (a
-    secret planted there is caught); (c) the same broken link is emitted twice,
-    inflating the structural count. Recorded as findings for PR #32, not blockers here
-    — and themselves the proof of the axis: a blind, brief-derived check caught what a
-    green visible suite missed. (Numbering note: 18 = E-2 guardrail replay (PR #31),
-    19 = E-1 skill-lint (PR #32), 20 = E-3 held-out verify (this); if they merge out
-    of order, keep 18=guardrails, 19=skill-lint, 20=held-out-verify.)
+    `statusCheckRollup` SUCCESS, 2026-07-28); the held-out scenario passed all 9
+    brief-contract assertions and surfaced three gaps the green suite did not
+    fail on: (a) a broken intra-skill link was flagged only when a `references/`
+    dir already existed — a link to `references/gone.md` in a skill with no
+    `references/` dir exited 0; (b) the "one-level reference nesting"
+    structural rule never fired — `references/a/b/c.md` exited 0, though the
+    walker demonstrably reached depth-2 (a secret planted there was caught); (c)
+    the same broken link was emitted twice, inflating the structural count (all
+    three fixed in PR #32, `6afa4b3`). Recorded as findings for PR #32, not
+    blockers here — and themselves the proof of the axis: a blind, brief-derived
+    check caught what a green visible suite missed. (Numbering note: 18 = E-2
+    guardrail replay (PR #31), 19 = E-1 skill-lint (PR #32), 20 = E-3 held-out
+    verify (this); if they merge out of order, keep 18=guardrails, 19=skill-lint,
+    20=held-out-verify.)
