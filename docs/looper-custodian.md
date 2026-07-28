@@ -281,15 +281,31 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 adopted):
     legacy lines, while the era-gated form is clean (G1 0 / G2 0 / G3 6, the six
     being genuine modern built-and-shipped waves whose gate lines recorded only
     `llm`/`null` verification, no `executable` — real findings, not false alarms).
-    Two design choices the
-    replay forced: (a) G3's "committed wave" is **post-build activity** (crew /
-    review / ship gate lines, or a commit-SHA named in a summary), NOT the
-    index's `files` field — the indexer resolves `files` once per run, so it is
-    branch-uniform and cannot tell which wave committed; keying G3 on it flagged
-    pre-build-only gate waves that never shipped. (b) The replay is read-only
-    digest signal, on the auto side of the propose/dispose line — it never edits,
-    same as the rest of Phase C. Faithful to Sefz's *pattern* (trace-as-query);
+    Get the exemption's provenance straight: `state-schemas.md`'s legacy note
+    prescribes a *temporal, per-file* exemption (a whole pre-schema `gates.jsonl`
+    predates the fields and is exempt). This replay runs over the cross-repo
+    `history-index.jsonl`, which *mixes eras line by line*, so it needs a per-*line*
+    era test — this repo's own extension of that note, NOT something state-schemas.md
+    prescribes; the script comment and the skill say exactly that rather than claiming
+    prescription. Three design choices the replay forced: (a) G3's "committed wave" is
+    **post-build activity** (crew / review / ship gate lines, or a commit-SHA named in
+    a summary), NOT the index's `files` field — the indexer resolves `files` once per
+    run, so it is branch-uniform and cannot tell which wave committed; keying G3 on it
+    flagged pre-build-only gate waves that never shipped. (b) The replay is read-only
+    digest signal, on the auto side of the propose/dispose line — it never edits, same
+    as the rest of Phase C. (c) The era test keys on key-*absence*, so the ingest
+    writer (`custodian-history.sh`) must copy `verified_by`/`outcome` into a record
+    ONLY when the source line carried them. The original writer defaulted the key to
+    `null` on every line, which silently erased the exemption on the next
+    `history --rebuild`: the re-derived legacy lines came back WITH the key present,
+    reclassifying all 387 modern and flooding false G2/G3 violations against an index
+    the docs call "safe anytime" to rebuild. The writer now emits the two keys
+    conditionally, so key-absence in the index mirrors key-absence in source and the
+    exemption survives a rebuild. Faithful to Sefz's *pattern* (trace-as-query);
     rejects a tool/store — pure `jq`, `[[no-third-party-hosted-tool-reliance]]`.
     Tested both directions: `scripts/custodian-guardrails.test.sh` proves each
-    guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the
-    cite surfaces) and that a clean fixture and a legacy line stay green.
+    guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the cite
+    surfaces), that a clean fixture and a legacy line stay green, that a legacy source
+    line pushed through the REAL ingest transform still classifies legacy/exempt after
+    a rebuild while a modern `verified_by:null` line stays modern (null ≠ absent), and
+    that G2 selects the same lines as `state-schemas.md`'s canonical provenance lint.

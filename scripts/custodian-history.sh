@@ -61,8 +61,6 @@ ingest() {
         {
           repo:$repo, branch:$branch,
           wave, kind, agent, verdict,
-          outcome: (.outcome // null),
-          verified_by: (.verified_by // null),
           blockers: (.blockers // 0),
           ran: (.ran // null),
           task_tool_available: (.task_tool_available // null),
@@ -70,7 +68,17 @@ ingest() {
           files: $files,
           mtime: $mtime,
           cite: ($cbase + ":" + (input_line_number|tostring))
-        }' "$gates" >> "$cand"
+        }
+        # Era-detection keys: copy verified_by/outcome into the record ONLY when the
+        # SOURCE line carried them, so key-absence in the index faithfully mirrors
+        # key-absence in source. This is load-bearing: the guardrail replays legacy
+        # exemption (custodian-guardrails.sh) keys on the ABSENCE of verified_by, so a
+        # blanket `// null` default would forge the key onto pre-schema lines and flip
+        # them modern on the next `rebuild` — flooding false G2/G3 violations. Keep it
+        # conditional so the exemption survives rebuild (custodian-guardrails.test.sh
+        # proves this with a rebuild-simulation case).
+        + (if has("verified_by") then {verified_by} else {} end)
+        + (if has("outcome")     then {outcome}     else {} end)' "$gates" >> "$cand"
     done < <(find "$rr/local/loops" -name gates.jsonl 2>/dev/null)
   done
   # anti-join by cite: keep only candidates not already in the index

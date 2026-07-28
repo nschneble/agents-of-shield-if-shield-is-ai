@@ -22,11 +22,17 @@
 #       that shipped a commit must have >=1 gate line with verified_by=="executable".
 #
 # Legacy exemption (HARD RULE): lines from runs predating the verified_by/outcome
-# schema are EXEMPT — counted + reported separately, NEVER violations. Era is
-# detected by field absence exactly as state-schemas.md's legacy note prescribes:
-# the ingest writer emits `verified_by` (possibly null) on every modern line, so a
-# line with NO `verified_by` key predates the schema. Without this, a naive replay
-# floods hundreds of false G2/G3 violations on archived pre-schema runs.
+# schema are EXEMPT — counted + reported separately, NEVER violations. Provenance,
+# stated straight: state-schemas.md's legacy note prescribes a TEMPORAL, per-FILE
+# exemption (a whole pre-schema gates.jsonl predates the fields). This replay runs
+# over the cross-repo history-index.jsonl, which MIXES eras line by line, so it needs
+# a per-LINE era test — this repo's own extension of that note, NOT something
+# state-schemas.md prescribes. Era is detected by field ABSENCE: custodian-history.sh's
+# ingest writer copies verified_by/outcome into a record ONLY when the source line
+# carried them, so a record with NO `verified_by` key is a pre-schema line. This is
+# load-bearing — the writer must preserve that absence so the exemption survives
+# `history --rebuild` (custodian-history.sh + custodian-guardrails.test.sh). Without
+# it, a naive replay floods hundreds of false G2/G3 violations on archived runs.
 #
 # Reads the cross-repo index (survives Phase A reaps); pure bash + jq, no third-party
 # tools, no SQLite. Per-violation output cites the record's `cite` field verbatim.
@@ -61,7 +67,12 @@ report=$(jq -rn --arg index "$INDEX" '
   def g1_applicable: (.verdict != null);          # subject only to verdict-bearing lines
   def g1_violation:  ((.ran == false) or (.task_tool_available == false));
 
-  # --- G2: provenance lint, VERBATIM from state-schemas.md ## Provenance lint ---
+  # --- G2: the provenance lint from state-schemas.md ## Provenance lint ---
+  # Same predicate, single source of truth — reused, not forked. The quote below is
+  # re-indented for standalone reading (the doc aligns its continuation under a
+  # jq -c prefix), so it is token-identical, not byte-identical to the doc.
+  # custodian-guardrails.test.sh asserts the runner G2 selects EXACTLY what that
+  # canonical lint selects, so any drift in either fails loudly.
   # select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"))
   # | select(.verified_by == null
   #          or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null))
@@ -113,7 +124,7 @@ report=$(jq -rn --arg index "$INDEX" '
     ($g1viol[] | "    VIOLATION  \(.cite)  verdict=\(.verdict|tostring) ran=\(.ran|tostring) task_tool_available=\(.task_tool_available|tostring)"),
     "",
     "G2  provenance on every ran verdict-bearing gate",
-    "    (verbatim provenance lint — skills/loop-de-looper/references/state-schemas.md)",
+    "    (provenance lint — skills/loop-de-looper/references/state-schemas.md ## Provenance lint)",
     "    lines: checked \($g2checked | length) · legacy-exempt \($g2exempt) · violations \($v2)",
     ($g2viol[] | "    VIOLATION  \(.cite)  kind=\(.kind) agent=\(.agent) verified_by=\(.verified_by|tostring) outcome=\(.outcome|tostring)"),
     "",
