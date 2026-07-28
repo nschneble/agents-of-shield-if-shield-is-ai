@@ -262,7 +262,53 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     and 16: a run that finishes its work but can't ship its report is another
     half-done-looks-done failure, closed by making the shippable shape the default.
 
-Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
+Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopted):
+
+18. **Phase C gains a guardrail replay (the Sefz graft).** Sefz (arXiv
+    2605.13044) translates a natural-language skill guardrail into "a
+    reachability goal over an annotated execution trace, reducing violation
+    checking to a deterministic graph query," and found violations in 120 of 402
+    real skills using only benign inputs. `gates.jsonl` — rolled up cross-repo
+    into `history-index.jsonl` — is exactly such a trace, so three of the loop's
+    own guardrails now replay as `jq` predicates (`scripts/custodian-guardrails.sh`,
+    wired into Phase C): **G1** no verdict without a run, **G2** the provenance
+    lint reused **verbatim** from `state-schemas.md` (one source of truth, not a
+    fork), **G3** no committed wave without an execution-evidence gate line — the
+    informational cap-overflow item from the same #29 report, now mechanized.
+    The legacy exemption is load-bearing, not cosmetic: pre-schema lines (no
+    `verified_by` key) are reported EXEMPT, never violations — the validate-by
+    replay over the 586-line index confirmed the naive form floods on the 387
+    legacy lines, while the era-gated form is clean (G1 0 / G2 0 / G3 6, the six
+    being genuine modern built-and-shipped waves whose gate lines recorded only
+    `llm`/`null` verification, no `executable` — real findings, not false alarms).
+    Get the exemption's provenance straight: `state-schemas.md`'s legacy note
+    prescribes a *temporal, per-file* exemption (a whole pre-schema `gates.jsonl`
+    predates the fields and is exempt). This replay runs over the cross-repo
+    `history-index.jsonl`, which *mixes eras line by line*, so it needs a per-*line*
+    era test — this repo's own extension of that note, NOT something state-schemas.md
+    prescribes; the script comment and the skill say exactly that rather than claiming
+    prescription. Three design choices the replay forced: (a) G3's "committed wave" is
+    **post-build activity** (crew / review / ship gate lines, or a commit-SHA named in
+    a summary), NOT the index's `files` field — the indexer resolves `files` once per
+    run, so it is branch-uniform and cannot tell which wave committed; keying G3 on it
+    flagged pre-build-only gate waves that never shipped. (b) The replay is read-only
+    digest signal, on the auto side of the propose/dispose line — it never edits, same
+    as the rest of Phase C. (c) The era test keys on key-*absence*, so the ingest
+    writer (`custodian-history.sh`) must copy `verified_by`/`outcome` into a record
+    ONLY when the source line carried them. The original writer defaulted the key to
+    `null` on every line, which silently erased the exemption on the next
+    `history --rebuild`: the re-derived legacy lines came back WITH the key present,
+    reclassifying all 387 modern and flooding false G2/G3 violations against an index
+    the docs call "safe anytime" to rebuild. The writer now emits the two keys
+    conditionally, so key-absence in the index mirrors key-absence in source and the
+    exemption survives a rebuild. Faithful to Sefz's *pattern* (trace-as-query);
+    rejects a tool/store — pure `jq`, `[[no-third-party-hosted-tool-reliance]]`.
+    Tested both directions: `scripts/custodian-guardrails.test.sh` proves each
+    guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the cite
+    surfaces), that a clean fixture and a legacy line stay green, that a legacy source
+    line pushed through the REAL ingest transform still classifies legacy/exempt after
+    a rebuild while a modern `verified_by:null` line stays modern (null ≠ absent), and
+    that G2 selects the same lines as `state-schemas.md`'s canonical provenance lint.
 
 19. **Phase B gains a skill-spec lint (the Agent Skills schema port).** Phase E's
     rotating documentation-scheme track surfaced that the SKILL.md format is now a
@@ -300,6 +346,6 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
     ceiling — extraction candidates, not defects).
     `[[no-third-party-hosted-tool-reliance]]`: mine the check tables, not the
     linters. Both-directions test:
-    `scripts/custodian-skill-lint.test.sh`. (Numbering note: PR #31 adds decision 18
-    from the same issue #29 Phase E, E-2's guardrail replay — this is 19; if the two
-    merge out of order, keep 18=guardrails, 19=skill-lint.)
+    `scripts/custodian-skill-lint.test.sh`. (Numbering note: decision 18 above,
+    from the same issue #29 Phase E, is E-2's guardrail replay — landed via PR #31;
+    this is 19.)
