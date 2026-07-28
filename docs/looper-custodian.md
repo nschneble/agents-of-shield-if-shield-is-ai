@@ -388,3 +388,23 @@ Refined 2026-07-28 by the custodian's own Phase E (issue #29, E-3 adopted):
     guardrail replay (PR #31), 19 = E-1 skill-lint (PR #32), 20 = E-3 held-out
     verify (this); if they merge out of order, keep 18=guardrails, 19=skill-lint,
     20=held-out-verify.)
+
+Refined 2026-07-28 from user feedback on the report issue (issue #29):
+
+21. **Report checkboxes lead with plain language; detail follows.** The custodian's
+    own report proposals read "like legal treatises or compiler manuals" — precise
+    but unskimmable — so the report-issue spec gains a hard rule: every checkbox
+    opens with a one-or-two-sentence plain-language explanation of what it is and why
+    you'd tick it (no jargon, cite syntax, field names, or file paths), and the
+    detailed technical body — verbatim evidence, failed relocation search, paths,
+    `validate-by` — FOLLOWS that lead. The verbatim-citation rail (decision 8) is
+    untouched: evidence is still quoted exactly, it just no longer opens the item. A
+    concrete before/after `B-retire` template ships inline in `SKILL.md` so the
+    headless cron has a shape to copy, and the same lead-with-plain rule extends to
+    each phase section's intro and to the Phase B/E proposal-output lines. Sibling of
+    decision 17: both close a legibility gap between "the work is correct" and "a
+    human can act on it" — 17 for a public-repo classifier, this for a human reader.
+    (Numbering note: decisions 18/19/20 are reserved by PRs #31/#32/#33 from the same
+    issue #29 Phase E — 18 = E-2 guardrail replay, 19 = E-1 skill-lint, 20 = E-3
+    held-out verify; this is 21. A same-anchor merge conflict with those siblings is
+    expected and trivial — keep all five in order.)
