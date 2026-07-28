@@ -14,3 +14,5 @@ jobs:
         run: ./scripts/validate-looper-config.sh
       - name: Guardrail replay predicates (both directions)
         run: ./scripts/custodian-guardrails.test.sh
+      - name: Skill spec lint (both directions)
+        run: ./scripts/custodian-skill-lint.test.sh
