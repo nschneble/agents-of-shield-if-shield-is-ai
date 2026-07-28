@@ -142,6 +142,28 @@ extract_refs() { # file -> candidate relative refs, one per line
   } || true
 }
 
+# --- In-scope refs for the broken-link check (deduped) ---
+# Markdown `](target)` links are ALWAYS in scope: an explicit intra-skill link
+# whose target is missing is the violation regardless of whether the subdir
+# exists — that is what makes a dangling `](references/gone.md)` a violation even
+# with no references/ dir present. Bare path tokens found in prose are in scope
+# only when the skill actually BUNDLES that subdir; otherwise they are
+# repo-relative mentions (e.g. the repo's own scripts/), out of scope here and
+# already covered by validate-looper-config.sh. `sort -u` collapses a target that
+# appears as BOTH a markdown link and a matching bare token (the two greps both
+# match on one line) to a single ref, so one broken link is counted exactly once.
+scoped_refs() { # skill_dir file -> in-scope relative refs, deduped, one per line
+  local dir="$1" file="$2" bref seg
+  {
+    grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//'
+    while IFS= read -r bref; do
+      [ -n "$bref" ] || continue
+      seg="${bref%%/*}"
+      [ -d "$dir/$seg" ] && printf '%s\n' "$bref"
+    done < <(grep -oE '(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null || true)
+  } | sort -u || true
+}
+
 # Resolve a relative ref against a base dir, returning 0 + echoing the path when
 # it names an EXISTING file inside the skill dir. Skips URLs, anchors, absolute /
 # home paths, `../` escapes, and glob/placeholder tokens.
@@ -277,23 +299,22 @@ lint_skill() {
     [ "$btok" -le "$BODY_TOKEN_BUDGET" ] || info "adv-body-budget" "$f" "body ~${btok} tokens > ${BODY_TOKEN_BUDGET} (consider extracting to references/ — informs extraction, not prose smoothing)"
     [ "${blines:-0}" -le "$BODY_LINE_BUDGET" ] || info "adv-body-lines" "$f" "${blines} lines > ${BODY_LINE_BUDGET} recommended"
 
-    # Broken internal links from SKILL.md. Only refs into a subdir the skill
-    # actually BUNDLES (references/ templates/ assets/ scripts/) are in-scope — a
-    # `scripts/foo.sh` when the skill has no scripts/ dir is a REPO-relative
-    # reference (the repo's own scripts/), out of scope for the intra-skill check
-    # and already covered by validate-looper-config.sh. Scoping on subdir existence
-    # is what keeps that distinction false-positive-averse.
-    local ref seg
+    # Broken internal links from SKILL.md. scoped_refs decides scope per ref: a
+    # markdown `](target)` link is an explicit intra-skill link (in scope even
+    # when the subdir is absent — a dangling target is the violation), while a
+    # bare `scripts/foo.sh` prose token with no bundled scripts/ dir is a
+    # REPO-relative reference (the repo's own scripts/), out of scope here and
+    # already covered by validate-looper-config.sh. The refs arrive deduped, so a
+    # single broken link surfaces exactly once.
+    local ref
     while IFS= read -r ref; do
       [ -n "$ref" ] || continue
       case "$ref" in
         references/*|scripts/*|assets/*|templates/*) ;;
         *) continue ;;
       esac
-      seg="${ref%%/*}"
-      [ -d "$dir/$seg" ] || continue   # subdir not bundled here → repo/external ref
       resolve_ref "$dir" "$dir" "$ref" >/dev/null || viol "broken-link" "$f" "reference \`$ref\` does not resolve to a file in the skill"
-    done < <(extract_refs "$f")
+    done < <(scoped_refs "$dir" "$f")
 
     # Intra-skill [[wiki-links]]: only validated when the skill actually uses them
     # locally (>=1 slug resolves to a same-skill file). Cross-scope memory `[[links]]`
@@ -322,14 +343,24 @@ lint_skill() {
 
   # references/ files: budget (advisory) + one-level nesting (structural). Operates
   # on the references/ dir, so it needs no SKILL.md and runs for a malformed skill.
+  # Walk the tree with `find` (recursive) rather than a `references/*` glob: the
+  # glob only matched DIRECT children, so a file physically nested in a subdir
+  # (references/a/b/c.md) was never scanned and the depth predicate never fired.
   if [ -d "$dir/references" ]; then
-    local rf rtok r target
-    for rf in "$dir/references"/*; do
-      [ -f "$rf" ] || continue
+    local rf rtok r target rel
+    while IFS= read -r rf; do
+      [ -n "$rf" ] || continue
       rtok=$(est_file_tokens "$rf")
       [ "$rtok" -le "$REFERENCE_TOKEN_BUDGET" ] || info "adv-reference-budget" "$rf" "reference ~${rtok} tokens > ${REFERENCE_TOKEN_BUDGET} — keep reference files focused"
-      # A reference file that itself links to another existing skill-local file is
-      # a second-level chain (deeper than one level from SKILL.md).
+      # Directory-depth nesting: a reference file must be a DIRECT child of
+      # references/ (one level from SKILL.md). A file inside a subdirectory
+      # (references/a/b/c.md → rel `a/b/c.md`) is nested deeper than one level.
+      rel="${rf#"$dir/references/"}"
+      case "$rel" in
+        */*) viol "reference-nesting" "$rf" "reference file is nested at \`references/$rel\` — reference files must stay one level deep from SKILL.md" ;;
+      esac
+      # Link-chain nesting: a reference file that itself links to another existing
+      # skill-local file is a second-level chain (deeper than one level too).
       while IFS= read -r r; do
         [ -n "$r" ] || continue
         if target=$(resolve_ref "$(dirname "$rf")" "$dir" "$r"); then
@@ -340,7 +371,7 @@ lint_skill() {
           viol "reference-nesting" "$rf" "references \`$r\` — reference chains must stay one level deep from SKILL.md"
         fi
       done < <(extract_refs "$rf")
-    done
+    done < <(find "$dir/references" -type f 2>/dev/null || true)
   fi
 
   # Secret scan across the skill's text files. Runs LAST and unconditionally —

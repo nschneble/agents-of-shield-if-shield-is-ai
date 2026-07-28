@@ -254,5 +254,56 @@ out=$("$linter" "$cf"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1;                         check "CONTEXT: over-long context file exits 0" "$result"
 printf '%s\n' "$out" | grep -q 'adv-context-lines.*CLAUDE.md';   check "CONTEXT: line budget flagged as INFO" $?
 
+# ── G-a: a dangling markdown link is a violation with NO references/ dir ────────
+# The link target's nonexistence is the violation; the subdir's existence is
+# irrelevant. The resolving-link direction (green) is covered by the GREEN
+# fixture above, whose references/REFERENCE.md link resolves cleanly.
+d="$temp_dir/ga-nodir"; mkdir -p "$d"      # deliberately NO references/ subdir
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: ga-nodir
+description: Use this when a markdown link dangles with no references dir.
+---
+See [notes](references/gone.md).
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                         check "G-a: dangling link without references/ dir exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'broken-link.*ga-nodir.*references/gone.md'; check "G-a: dangling link flagged with no references/ dir" $?
+n=$(printf '%s\n' "$out" | grep -c '^VIOLATION')
+[ "$n" -eq 1 ] && result=0 || result=1;                          check "G-a: exactly one violation, no spurious extras" "$result"
+
+# ── G-c: a single broken link is counted exactly ONCE ─────────────────────────
+# The target matches both the markdown-link grep and the bare-token grep on the
+# same line; the two must collapse to one finding, not inflate the count.
+d="$temp_dir/gc-count"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gc-count
+description: Use this when one broken link must count once.
+---
+See [x](references/gone.md).
+EOF
+out=$("$linter" "$d")
+n=$(printf '%s\n' "$out" | grep -c 'broken-link')
+[ "$n" -eq 1 ] && result=0 || result=1;                          check "G-c: single broken link yields exactly one broken-link finding" "$result"
+printf '%s\n' "$out" | grep -q 'structural violations: 1';       check "G-c: structural count is 1, not double-counted" $?
+
+# ── G-b: a reference file nested deeper than one level is a violation ──────────
+# references/a/b/c.md (two subdir levels deep) with a link to it → nesting
+# violation. The direct-child (green) direction is covered by the GREEN fixture
+# (references/REFERENCE.md) and the red-nesting fixture's depth-1 files.
+d="$temp_dir/gb-deep"; mkdir -p "$d/references/a/b"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gb-deep
+description: Use this when a reference file is nested too deep.
+---
+See [deep](references/a/b/c.md).
+EOF
+echo "leaf" > "$d/references/a/b/c.md"
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                         check "G-b: two-level nested reference exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'reference-nesting.*a/b/c.md';    check "G-b: nested reference file cited in nesting violation" $?
+
 printf '\n%d failure(s)\n' "$fails"
 [ "$fails" -eq 0 ]

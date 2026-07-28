@@ -286,10 +286,12 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-1 adopted):
     conservative in the flag direction: markdown/code-ish text tokenizes hotter than
     chars/4, so the proxy under-reports and anything it flags as over-budget is over
     for real — it only risks missing a marginal case, acceptable for an advisory that
-    never gates. Two scoping choices keep it false-positive-averse: a subdir ref
-    (`scripts/foo.sh`) is intra-skill only when the skill actually *bundles* that
-    subdir, else it's a repo-relative reference (out of scope, already covered by
-    `validate-looper-config.sh`); and a `[[wiki-link]]` is validated only when the
+    never gates. Two scoping choices keep it false-positive-averse: a *bare* subdir
+    path token in prose (`scripts/foo.sh`) is intra-skill only when the skill
+    actually *bundles* that subdir, else it's a repo-relative reference (out of
+    scope, already covered by `validate-looper-config.sh`) — but an explicit
+    markdown `](references/foo.md)` link is always validated, so a dangling target
+    is a violation whether or not the subdir exists; and a `[[wiki-link]]` is validated only when the
     skill uses local wiki-links at all (≥1 slug resolves in-dir), so cross-scope
     memory `[[links]]` are never flagged. Description *edits* are out of scope —
     findings only, human disposes. Validated E-1's `validate-by` by running it over
