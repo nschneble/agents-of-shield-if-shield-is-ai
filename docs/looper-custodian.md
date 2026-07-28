@@ -261,3 +261,39 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     propose/dispose deference the whole custodian holds. Sibling of decisions 15
     and 16: a run that finishes its work but can't ship its report is another
     half-done-looks-done failure, closed by making the shippable shape the default.
+
+Refined 2026-07-28 by the custodian's own Phase E (issue #29, E-3 adopted):
+
+20. **`looper-verify` gains a held-out composition check.** Phase E's SpecBench
+    read ([arXiv 2605.21384](https://arxiv.org/abs/2605.21384)) found that "while
+    every frontier agent saturates the visible suite, reward hacking persists" on
+    held-out tests composing the same features — "all visible checks pass" is not a
+    sufficient verify signal. So `looper-verify`'s executable-VF doctrine gains one
+    new axis (not a sibling section): a held-out scenario whose defining property is
+    INDEPENDENCE from the build's own visible tests, PRE-REGISTERED from the plan
+    brief before build begins, parked verbatim, and run UNMODIFIED at verify —
+    authoring it after the build, or editing it to pass, voids it. Blindness is named
+    in two strengths: *procedural* in a single executor context (same agent authored
+    both, independence rests on pre-registration alone) and *structural* in an
+    orchestrated run (the orchestrator or a fresh dispatch authors it from the brief
+    alone). Scoped to the same line the oracle rule draws — runtime-code waves with an
+    executable oracle; doc/trivial waves exempt; ONE scenario per wave, not a parallel
+    suite. Reporting is split: a held-out FAIL on a visible-green wave is a
+    first-class verify failure on the normal fail path, never a footnote, and records
+    `verified_by: "executable"` (the token PR #31's G3 guardrail greps for).
+    **VALIDATE-BY (shadow-run against E-1).** A fresh context authored a held-out
+    scenario from E-1's brief-level contract ALONE — blind to
+    `custodian-skill-lint.test.sh` — composing multiple structural classes plus an
+    advisory against clean controls. E-1's visible suite is CI-green (PR #32
+    `statusCheckRollup` SUCCESS, 2026-07-28); the held-out scenario passed 9/10
+    brief-contract assertions and surfaced three gaps the green suite does not fail
+    on: (a) a broken intra-skill link is flagged only when a `references/` dir already
+    exists — a link to `references/gone.md` in a skill with no `references/` dir exits
+    0; (b) the "one-level reference nesting" structural rule never fires —
+    `references/a/b/c.md` exits 0, though the walker demonstrably reaches depth-2 (a
+    secret planted there is caught); (c) the same broken link is emitted twice,
+    inflating the structural count. Recorded as findings for PR #32, not blockers here
+    — and themselves the proof of the axis: a blind, brief-derived check caught what a
+    green visible suite missed. (Numbering note: 18 = E-2 guardrail replay (PR #31),
+    19 = E-1 skill-lint (PR #32), 20 = E-3 held-out verify (this); if they merge out
+    of order, keep 18=guardrails, 19=skill-lint, 20=held-out-verify.)
