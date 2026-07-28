@@ -21,6 +21,17 @@ REPOS=(linklater tuffgal tuffgal-action agents-of-shield-if-shield-is-ai rss-rea
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
 
+# Portable file mtime in epoch seconds. macOS/BSD stat speaks `-f %m`; GNU
+# coreutils speaks `-c %Y`. Trap (this broke CI on ubuntu): under GNU, `stat -f`
+# selects FILESYSTEM status and `%m` is the MOUNT POINT, so `stat -f %m` SUCCEEDS
+# with a non-epoch ("/") — a plain `stat -f %m || stat -c %Y` fallback never
+# reaches the GNU form. So probe which flavor this host speaks once, up front.
+if stat -c %Y / >/dev/null 2>&1; then
+  file_mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }   # GNU coreutils
+else
+  file_mtime() { stat -f %m "$1" 2>/dev/null || echo 0; }   # BSD / macOS
+fi
+
 # Resolve the files a run touched, from commit SHAs named in its summaries.
 # SHA-based (not branch-ref) so it still resolves after the branch is merged +
 # deleted. Best-effort: no git, no repo, or no resolvable SHA ⇒ [] (never invented).
@@ -52,7 +63,9 @@ ingest() {
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }
     while IFS= read -r gates; do
       branch=${gates#"$rr/local/loops/"}; branch=${branch%/gates.jsonl}
-      mtime=$(stat -f %m "$gates" 2>/dev/null || echo 0)
+      mtime=$(file_mtime "$gates"); [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
+      # ^ numeric guard: mtime feeds `jq --argjson`, which aborts the script under
+      #   set -euo pipefail on any non-integer (the exact GNU-stat failure above).
       files_json=$(resolve_files "$rr" "$gates")
       jq -c \
         --arg repo "$repo" --arg branch "$branch" \

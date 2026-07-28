@@ -105,6 +105,15 @@ check "REBUILD: legacy source line stays key-absent (classifies legacy) after re
 jq -e 'select(.branch=="modern-null") | has("verified_by")' "$simindex" >/dev/null 2>&1
 check "REBUILD: modern verified_by:null line keeps the key (classifies modern) after rebuild" $?
 
+# Numeric-mtime invariant (portable stat). Every ingested record must carry a real
+# epoch, not the mount-point string GNU `stat -f %m` returns — that non-integer
+# aborted ingest mid-rebuild under set -euo pipefail (empty index → the failures
+# above). Freshly written fixtures have mtime > 0, so this holds on BOTH platforms.
+jq -e 'select(.branch=="legacy-src") | (.mtime|type=="number") and (.mtime > 0)' "$simindex" >/dev/null 2>&1
+check "REBUILD: ingested legacy record has numeric mtime > 0 (portable stat)" $?
+jq -e 'select(.branch=="modern-null") | (.mtime|type=="number") and (.mtime > 0)' "$simindex" >/dev/null 2>&1
+check "REBUILD: ingested modern record has numeric mtime > 0 (portable stat)" $?
+
 # And the guardrail runner over the rebuilt index must exempt the legacy line and
 # check the modern one — the end-to-end proof the exemption survives rebuild.
 simout=$("$runner" --index "$simindex")
