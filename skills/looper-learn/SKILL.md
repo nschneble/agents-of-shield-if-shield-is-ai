@@ -50,6 +50,14 @@ Match lesson to right persistence layer:
 | **Agent body** (cross-project) | Orchestration patterns, subagent invocation rules                                      | "Web UI requires plan ESCALATE → a11y-lead gate"                            |
 | **Loop de Looper body**        | Multi-wave orchestration patterns (crew cadence, queue management, escalation routing) | "For token-retirement waves, plan must run multi-extension orphan grep"     |
 
+**When the invoking agent has its own memory (`memory: user` in its agent frontmatter — `the-looper` does), "Memory (per project)" is NOT automatically where a write lands.** That agent's default memory write goes to its own cross-project namespace (`~/.claude/agent-memory/<agent-name>/`) — reusable craft knowledge (testing-library gotchas, protocol-discipline misses, tool-version quirks) that follows the agent into every repo it runs in, not just this one. Project memory and agent memory don't sync automatically — `looper-custodian` Phase B audits both, but only after the fact, on a weekly cadence.
+
+At save time, classify the lesson honestly, don't default to "the agent's own write already covered it":
+
+- **Cross-run craft, agent-agnostic** (a testing pattern, a protocol miss, a tool quirk that would recur in any repo) → agent memory, its default destination. No extra action.
+- **A fact specific to THIS project** (a security invariant this codebase enforces, a dependency version this repo pins, a convention not yet in this repo's CLAUDE.md) → project memory (`~/.claude/projects/<project>/memory/`) explicitly. It will NOT appear there just because the agent's own memory write succeeded — that write is invisible to the orchestrator's context, to crew agents, and to any other agent type until a project-memory copy exists.
+- **Both** (reusable craft that also documents a fact about this project — e.g. "this codebase's SSRF-hardened fetch has an undici cross-version dispatch trap, and here's the general pattern for catching it") → dual-write, once to each namespace.
+
 Skill caused failure (missing checklist item, vague advice, blind spot) → propose edit to skill body. Don't leave just memory. Memories = evidence; skill edits = fixes.
 
 ## Recurring failure → durable guardrail (not just a note)
