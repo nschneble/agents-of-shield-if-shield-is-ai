@@ -408,3 +408,37 @@ Refined 2026-07-28 from user feedback on the report issue (issue #29):
     issue #29 Phase E — 18 = E-2 guardrail replay, 19 = E-1 skill-lint, 20 = E-3
     held-out verify; this is 21. A same-anchor merge conflict with those siblings is
     expected and trivial — keep all five in order.)
+
+Found 2026-07-29 during a `linklater` metadata-fetch bugfix run, root-caused live:
+
+22. **Phase B now audits `memory: user` agent namespaces too, and gains a fifth
+    condition (`B-migrate`).** A `the-looper` wave's hand-back claimed three memory
+    writes; the orchestrator spot-checked its own project memory dir, found nothing,
+    and (twice, across two separate incidents) wrongly recorded the writes as lost.
+    Root cause: `the-looper`'s agent frontmatter carries `memory: user`, a harness
+    feature giving it its own persistent, **cross-project** namespace at
+    `~/.claude/agent-memory/the-looper/` (with its own `MEMORY.md` index) —
+    completely separate from a project's `~/.claude/projects/<project>/memory/`
+    that `looper-learn`'s save-table assumed was the only "Memory" destination. Both
+    writes had actually landed; the orchestrator was checking the wrong directory.
+    Considered and rejected a live sync/bridge between the two namespaces: agent
+    memory is deliberately GLOBAL (no per-project subdir in its path) so a blind
+    mirror would leak one project's facts (a dependency version, a security
+    invariant) into every OTHER repo that agent touches, and vice versa pollute
+    agent memory's cross-project craft lessons with one-off project noise. Fixed at
+    two layers instead, same propose/dispose split the custodian already holds: (1)
+    `looper-learn`'s "Save lessons at the right level" section gains an explicit
+    save-time classification — cross-run craft → agent memory (default, no action);
+    project-specific fact → project memory (explicit, won't appear otherwise); both
+    → dual-write; (2) Phase B, the existing weekly safety net for exactly this shape
+    of drift, now also enumerates every `memory: user` agent's namespace (glob
+    `~/.claude/agents/*.md` frontmatter, once per run — global, not per-repo) in the
+    same audit pass, and gains a fifth condition, **Misplaced**: an entry whose
+    content reads as project-specific but sits in agent memory, or reads as
+    agent-agnostic craft but sits in one project's memory. Propose-only like the
+    other four conditions — `B-migrate` copies the entry to the correct namespace
+    (with its own index line) and leaves a `[[breadcrumb]]` in the original, never
+    deletes it, same non-destructive shape as `B-repoint` but across two namespaces
+    instead of one file. No new governance model: `B-migrate` is a sixth checkbox
+    tag in an existing propose-only phase, applied through the existing Phase D
+    path.
