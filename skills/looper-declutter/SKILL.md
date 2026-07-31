@@ -42,10 +42,10 @@ Run in order. Each logs to `local/declutter/<run-id>/findings.jsonl` before the 
 
 ### Scan — find candidates (read-only, mechanical)
 
-Run the detector over the target tree:
+Run the detector over the target tree. It ships in the looper definitions repo and deploys to `~/.claude/scripts/`, so it resolves from any cwd — including a target repo like Linklater, where a repo-relative path would not:
 
 ```
-scripts/doc-bloat-scan.sh [<path> ...]
+~/.claude/scripts/doc-bloat-scan.sh [<path> ...]
 ```
 
 It emits one JSONL candidate per hit — `{file, line, kind, text}` — across four kinds (v1, C-style `//` and `/* */`, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
@@ -156,7 +156,7 @@ Under `local/declutter/<run-id>/` (gitignored, same status as `local/defend/` an
 
 ## Integration with existing pieces
 
-- `scripts/doc-bloat-scan.sh` — the mechanical detector; declutter's only scan engine.
+- `scripts/doc-bloat-scan.sh` (deployed to `~/.claude/scripts/`, so it resolves from any target repo) — the mechanical detector; declutter's only scan engine.
 - `the-chronicler` / `the-ghostwriter` / `the-improver` — the comment-rule owners; declutter applies their rules, never duplicates them.
 - `looper-review` — the reactive, change-scoped crew pass that trims NEW comment bloat; declutter is the proactive whole-repo complement, the same way `looper-defend` complements `security-review`.
 - `looper-plan` / `looper-build` / `looper-verify` / `looper-review` / `looper-commit` — the snip pipeline, the full per-wave chain.
