@@ -89,12 +89,21 @@ Reject on sight, in any surface:
 
 - the em-dash `—`
 - emoji in comments or commits
-- slop vocabulary: `delve`, `leverage`, `utilize`, `robust`, `seamless`, `boasts`, `nestled`, `elevate`, `in today's fast-paced…`, `unlock`, `empower`, `streamline` (as filler), `ensure` (as filler)
+- slop vocabulary: `delve`, `leverage`, `utilize`, `robust`, `seamless`, `boasts`, `nestled`, `elevate`, `in today's fast-paced…`, `unlock`, `empower`, `streamline` (as filler), `ensure` (as filler), `actually`, `additionally`, `testament`, `pivotal`
 - hedge-stacking (`it's worth noting that`, `it's important to remember`)
 - Title-Case headings where he uses Sentence case
 - a trailing period on a commit subject or single-line comment
 - three-dot `...` where a real `…` belongs
 - corporate cheerfulness (`We're thrilled to…`, `Say hello to…`)
+- sycophantic closers: `I hope this helps!`, `Let me know if you need anything`, and cutoff disclaimers
+- filler constructions: `serves as` → `is`, `in order to` → `to`, `could potentially possibly` → `may`
+- significance inflation: `a pivotal moment`, `a testament to`, `plays a vital role`: cut the framing, state the fact
+- vague attribution: `experts believe`, `studies show`, `it is widely regarded` with no named source
+- promotional adjectives: `breathtaking`, `stunning`, `must-see`: show the specific, don't sell it
+
+**Specificity comes from the source, never invented.** A rewrite that strips inflation must not add a fact, name, date, or citation the original didn't carry.
+
+Provenance: the rhetorical tells above (significance inflation, vague attribution, filler constructions, sycophancy) are mined from Wikipedia's AI-cleanup patterns, surfaced by `blader/humanizer`: the PATTERNS, not the tool. No plugin dependency; the family stays self-contained (`[[no-third-party-hosted-tool-reliance]]`). Rules that fight Nick's register are deliberately NOT adopted: the en-dash `–` stays (it lives in the per-surface matrix), terse and telegraphic phrasing stays (it is the house voice), and headings stay Sentence case rather than forced lowercase.
 
 ## Comment cleanup mandate
 

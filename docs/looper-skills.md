@@ -24,6 +24,7 @@ Structured invocations today:
 | `loop-de-looper`   | `/loop-de-looper resume`                                                          |
 | `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`          |
 | `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>` |
+| `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>` |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
 explicitly** — a new operation is a new named verb, never folded into a
@@ -272,6 +273,37 @@ checkbox that applies only after a human ticks it and runs `/looper-defend
 apply`. One narrow class — a dependency CVE bump with zero app-code change —
 may auto-apply, and even it lands as a reviewable draft-PR commit. Design
 rationale + full decision log live in `docs/looper-defend.md`.
+
+---
+
+## On-demand cleanup
+
+### Looper "declutter"
+
+**File:** `skills/looper-declutter/SKILL.md`
+
+**Trigger:** "kill doc bloat", "declutter this repo", "trim the comments", "run looper-declutter", or `/looper-declutter apply #<snip-id>`
+
+On-demand proactive comment-bloat sweep + human-gated snips over a whole
+target repo. The whole-repo counterpart to the reactive `looper-review`
+comment pass (`the-chronicler` + `the-ghostwriter`), which trims only the
+pending diff. Not cron — on-demand only.
+
+There are four phases:
+
+1. Scan: `scripts/doc-bloat-scan.sh` finds candidates — over-narrated blocks,
+   stacked `//`, over-75 lines, Capitalized `//`
+2. Triage: route each to its owner rule, keep load-bearing comments, dedupe
+3. Report: surface candidates with checkbox snip proposals
+4. Snip: trim ticked candidates through the normal wave pipeline
+
+Governing rail: declutter proposes, human disposes. Scan/triage/report run
+read-only and automatically; every snip is a checkbox that applies only after
+a human ticks it and runs `/looper-declutter apply`. No auto-apply class — a
+comment trim is always a judgment call. It reuses the existing comment-rule
+owners (`the-chronicler`, `the-ghostwriter`, `the-improver`) rather than
+duplicating them. Design rationale + full decision log live in
+`docs/looper-declutter.md`.
 
 ---
 

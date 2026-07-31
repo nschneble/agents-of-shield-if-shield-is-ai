@@ -20,7 +20,7 @@ Legend: `[A]` added · `[M]` modified · `[D]` removed · `[R]` renamed. One tre
 
 ## 2. Collapsed `<details>` diff hunks with annotations
 
-For each load-bearing changed file, a collapsible block GitHub renders natively — collapsed by default so the PR body stays scannable. Budget roughly 3–8 key files; skip pure mechanical churn. Each block holds a REAL diff excerpt (fenced ` ```diff `) plus a few high-signal annotation notes:
+For each load-bearing changed file, a collapsible block GitHub renders natively — collapsed by default so the PR body stays scannable. Budget roughly 2–4 key files; skip pure mechanical churn. Each block holds a REAL diff excerpt (fenced ` ```diff `) plus a few high-signal annotation notes:
 
 ````markdown
 <details>
@@ -37,7 +37,7 @@ For each load-bearing changed file, a collapsible block GitHub renders natively 
 </details>
 ````
 
-Keep each excerpt focused (~<150 lines) — the load-bearing hunk, not the whole file. Annotations answer what changed, why, and any gotcha — not a line-by-line restatement of the diff.
+Keep each excerpt tight (~<40 lines) — the load-bearing hunk, not the whole file. Annotations answer what changed, why, and any gotcha — not a line-by-line restatement of the diff.
 
 ## 3. UI before/after ASCII wireframe + a11y risk
 

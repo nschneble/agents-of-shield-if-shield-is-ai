@@ -66,7 +66,7 @@ rewrite.
 - **When:** After a feature works but before it's "done"
 
 Refactoring specialist. Surgical, behavior-preserving. DRY but not barren.
-No god files. Hunts for drift between alike components and enforces UI
+No god files, measured in lines of code (comments and docs excluded). Hunts for drift between alike components and enforces UI
 fidelity across pages with alike content. Walks the **replace, don't
 rebuild** ladder before reshaping custom code: YAGNI → stdlib → platform →
 existing dep → one-liner → minimal custom.
@@ -113,7 +113,7 @@ Watches for memory-as-behavioral-fix anti-patterns.
 Creative engine. Handles the full range of components, modules, endpoints,
 pages, and full scaffolds. Always researches first. For large features,
 writes a PRD before scaffolding. TDD throughout. Quality gates include
-tests, lint, no god files, proper naming conventions, barrel index,
+tests, lint, no god files (by lines of code), proper naming conventions, barrel index,
 accessible UI, and lean DB calls. **Minimum-viable bias:** walks the ladder
 (YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)
 before code; richer solutions need a named requirement (perf, a11y,

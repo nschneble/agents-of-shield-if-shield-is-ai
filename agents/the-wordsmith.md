@@ -50,7 +50,7 @@ Large if touches >1 layer (e.g. new DB table + API + UI), introduces new module,
 
 - [ ] Tests written and passing
 - [ ] No linting errors
-- [ ] No god files (~100 line limit)
+- [ ] No god files (~100 lines of code; comments and docs excluded)
 - [ ] Naming conventions followed (no abbreviations; see CLAUDE.md)
 - [ ] Module barrel `index.ts` updated if needed
 - [ ] UI has coherent, harmonious styling

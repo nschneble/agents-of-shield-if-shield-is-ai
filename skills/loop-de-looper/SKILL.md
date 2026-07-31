@@ -267,6 +267,7 @@ Refresh the PR body ONCE, at termination, with the structured recap (`looper-com
 - **Source diff.** Build every block from the WHOLE-RUN diff — the SAME base the final crew derives (`git diff <wave1>^..HEAD`, Step 3). Reuse it; do NOT reinvent a base.
 - **UI-glob gate.** Reuse the EXISTING UI-glob detector (`## Protocol` 2b pre-mandated). Matched → INCLUDE the before/after wireframe + a11y call-out; no match → omit.
 - **Small-diff skip.** Honor `looper-commit`'s small-diff skip — a genuinely tiny run gets NO refresh; the raw diff reviews faster.
+- **Brevity + voice.** Assemble the body per `looper-commit`'s PR-body guidelines (lean sections, no diff restatement, no AI-attribution trailer), then run it through `the-ghostwriter` (sentence case, no em-dash, no slop) BEFORE the `gh pr edit`. This terminal refresh is the run's one pass at the whole-run body; make it read right.
 - **Best-effort, never a gate.** A failed refresh (API error, body too long) LOGS and continues to goal-complete; the backstop above owns the PR's existence, the recap only enriches it.
 - **Skip on the STOP/escalation path** — same discipline as recap and run-level learn.
 
