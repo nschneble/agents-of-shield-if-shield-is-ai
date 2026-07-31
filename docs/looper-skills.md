@@ -291,9 +291,11 @@ pending diff. Not cron — on-demand only.
 
 There are four phases:
 
-1. Scan: `scripts/doc-bloat-scan.sh` finds candidates — over-narrated blocks,
-   stacked `//`, over-75 lines, Capitalized `//`
-2. Triage: route each to its owner rule, keep load-bearing comments, dedupe
+1. Scan: `scripts/doc-bloat-scan.sh` finds candidates — over-narrated blocks
+   (free-form and JSDoc), stacked `//`, over-75 lines, Capitalized `//`
+2. Triage: route each to its owner rule; only declaration-position headers (file
+   top or before a symbol) and genuine one-liners survive, everything
+   mid-execution and multi-line is a snip; dedupe
 3. Report: surface candidates with checkbox snip proposals
 4. Snip: trim ticked candidates through the normal wave pipeline
 

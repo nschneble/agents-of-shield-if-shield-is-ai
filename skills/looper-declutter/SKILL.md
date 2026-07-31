@@ -18,7 +18,7 @@ Declutter does NOT reimplement those rules. It contributes exactly two new thing
 
 ## Governing principle: declutter PROPOSES, human DISPOSES
 
-Same discipline the loop, custodian, and defend hold. A comment is a judgment call — an autonomous pass that auto-rewrites every flagged comment will flatten a deliberate GOTCHA, lowercase a proper noun, or truncate the one line that earned its length. So:
+Same discipline the loop, custodian, and defend hold. A comment is a judgment call — an autonomous pass that auto-rewrites every flagged comment will flatten a deliberate GOTCHA, lowercase a proper noun, or truncate the one line that carries the real gotcha. So:
 
 - **Scan / triage / report run automatically** — read-only, no source touched. They find, route, and rank candidates.
 - **Snip is propose-only** — every trim lands as a checkbox in the report and proceeds through the build pipeline ONLY after a human ticks it. There is NO auto-apply class here (unlike defend's dep-bump): a comment edit is never mechanical enough to skip the tick.
@@ -48,9 +48,10 @@ Run the detector over the target tree. It ships in the looper definitions repo a
 ~/.claude/scripts/doc-bloat-scan.sh [<path> ...]
 ```
 
-It emits one JSONL candidate per hit — `{file, line, kind, text}` — across four kinds (v1, C-style `//` and `/* */`, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
+It emits one JSONL candidate per hit — `{file, line, kind, text}` — across five kinds (v1, C-style `//` and `/* */`, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
 
-- `block-overexplained` — a `/*` or `/**` opener with more than one `*` line below it
+- `block-overexplained` — a bare `/* … */` block spanning multiple lines (at least one content line between opener and closer), `*`-prefixed or free-form prose alike. The primary quarry: a multi-line block wedged mid-execution. A free-form block whose lines don't start with `*` used to be invisible — the worst offender slipped the net; it no longer does.
+- `jsdoc-block` — the same shape but a `/**` opener, i.e. a doc header. Kept by default; snipped only when it is NOT actually a header.
 - `stacked-slashes` — two or more consecutive `//` lines
 - `over-75` — a comment line longer than 75 chars (break belongs at column 76)
 - `capitalized-slash` — a single-line `//` whose first word is Capitalized
@@ -59,9 +60,22 @@ The detector is the ONLY mechanical scan; it never edits and never gates (exit 0
 
 ### Triage — route + rank (read-only)
 
-For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). Suppress noise BEFORE it reaches the report:
+For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "single-line WHY only, no multi-line comment blocks mid-execution" (`the-chronicler.md` `## Comment Style Rules`), and the global CLAUDE.md says the same. Declutter ENFORCES that rule; it does not soften it. Exactly two things survive; everything else is a snip.
 
-- **Load-bearing comments survive.** A `// GOTCHA:`, `// TODO:`, `// KNOWN ISSUE:`, a cited invariant, or a genuinely non-obvious WHY that happens to run long is kept — flagged `keep`, reported as informational without a checkbox. `over-75` on a line that cannot be tightened without losing meaning is a keep, not a snip.
+**What survives:**
+
+- **Declaration-position doc blocks.** A `/**` (or `/*`) block against the file top or immediately before an `interface`/`type`/`function`/`export`/prop — context pushed UP out of the execution flow, where both `the-chronicler.md` and the global CLAUDE.md say longer context belongs. These are the `jsdoc-block` kind and are KEEP-LEANING: the aggression is aimed at mid-execution, not headers. NOT a blanket pass, though — a multi-line block on a self-evident prop, or one echoing the type signature, is still a snip (`the-chronicler.md` `## Do NOT document`). A genuine header carrying real content is dropped in triage like generated code — no report line, no checkbox.
+- **Genuine one-liners.** A single-line `// loads metadata in an async job`, or a one-line `// GOTCHA:` / `// TODO:` / `// KNOWN ISSUE:` marker. One line, kept.
+
+**What burns** — everything else, default verb DESTROY. A "non-obvious WHY" does NOT earn length; it earns ONE line or the axe. These are the reason this skill exists, and the reactive crew keeps letting them stand:
+
+- **Explains a language / framework / library primitive** the reader already knows — what Tailwind's `group` does, what a hook or a keyword does. The reader is a working engineer, not a student. → `the-improver` deletes it.
+- **Glosses the author's own named design** — narrating a hand-written style, token, color, or CSS variable (`border-shadow`) that IS the answer, as if the author had never seen it. → `the-chronicler` `## Do NOT document` (a design-token/color value needs no gloss).
+- **Restates what the code plainly does.** → `the-improver` deletes it.
+- **A multi-line WHY mid-execution** — inside a function body, JSX, or an expression. If a real gotcha is buried in it, collapse to ONE line that keeps the gotcha; otherwise delete. No multi-line block survives between statements — this is `the-chronicler.md` line-for-line.
+
+**Then dedupe, drop generated, rank:**
+
 - **Dedupe by comment, not by kind.** One comment can trip several kinds (a stacked block that is also over-75 and Capitalized). Group them into ONE snip candidate for that comment, listing every kind it hit — never four separate checkboxes for one comment.
 - **Generated / vendored code is out of scope.** The detector already honors `.gitignore` via `git ls-files`; triage additionally drops anything under obvious generated paths (`*.d.ts`, migrations, snapshots).
 - **Rank** by density — files with the most snip candidates first, so a reviewer trims the worst offenders in one wave.
@@ -90,8 +104,9 @@ The heart of the skill. Each kind maps to an existing rule; declutter applies th
 
 | Kind                  | Owner rule (source of truth)                                                                                                                             |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `block-overexplained` | `the-chronicler` `## Comment Style Rules` — no multi-line blocks mid-execution; collapse to a single WHY line. Restates code? `the-improver` deletes it. |
-| `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line                                                                                                     |
+| `block-overexplained` | the primary quarry — a free-form `/* … */` block mid-execution. Collapse to ONE `// WHY` line or delete (`the-chronicler` `## Comment Style Rules`: no multi-line blocks mid-execution). Explains a known primitive / restates code → `the-improver` deletes it; glosses a design-token/color/style that IS the answer → `the-chronicler` `## Do NOT document`. |
+| `jsdoc-block`         | a `/**` doc header — KEEP-LEANING (declaration-position context; `the-chronicler`: longer context lives in the overview). Snip only when it is not a genuine header: a self-evident per-field block, one echoing the type, or a `/**` stranded mid-execution — then treat as `block-overexplained`. |
+| `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line, or delete if it only narrates the code                                                             |
 | `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                                                                       |
 | `capitalized-slash`   | `the-chronicler` — lowercase the first word of a single-line `//`                                                                                        |
 | every surviving line  | `the-ghostwriter` `## Comment cleanup mandate` + `## AI-slop blocklist` — de-slop, kill commit/wave archaeology, no em-dash                              |
@@ -138,7 +153,7 @@ Under `local/declutter/<run-id>/` (gitignored, same status as `local/defend/` an
 
 ## Stop conditions / escalation to the user
 
-- **A "snip" would lose meaning** — the comment carries a non-obvious WHY, an invariant, or a GOTCHA that cannot be tightened without dropping information → keep it, report as informational, never a snip proposal.
+- **A snip would drop a real gotcha** — a genuine invariant or GOTCHA is buried in the block → collapse to ONE line that keeps the gotcha, never keep the multi-line essay. Length is never how meaning is preserved; a header or a one-liner is. Comment-survival keeps are narrow: declaration-position headers and genuine one-liners. (A proper noun or identifier a mechanical snip would corrupt is held separately — next.)
 - **A candidate points at a proper noun or identifier** the lowercase/wrap rule would corrupt → keep, flag for human judgment.
 - **`looper-verify` fails twice on the same file** (a snip keeps touching non-comment bytes) → STOP that file's wave, report it unsnipped.
 - **The target is not the current repo** — declutter hunts the repo it is run in; it does not reach across repos.

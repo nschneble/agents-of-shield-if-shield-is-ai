@@ -9,9 +9,14 @@
 # exit is always 0.
 #
 # ── What it flags (JSONL, one candidate per line) ───────────────────────────────
-#   block-overexplained : a `/*` or `/**` opener with MORE THAN ONE `*`-prefixed
-#                         continuation line before the close (the over-narrated
-#                         block the doc-bloat rule targets).
+#   block-overexplained : a bare `/* … */` block spanning multiple lines — at
+#                         least one content line between opener and closer,
+#                         `*`-prefixed OR free-form prose alike, so an un-starred
+#                         inline essay is not invisible. The primary quarry: a
+#                         multi-line block wedged mid-execution.
+#   jsdoc-block         : the same shape, but a `/**` opener — a doc header,
+#                         kept by default (top-of-file/symbol context). The skill
+#                         snips it only when it is NOT actually a header.
 #   stacked-slashes     : two or more consecutive full-line `//` comments (a wall
 #                         of `//` that wants collapsing to a single WHY line).
 #   over-75             : a comment line whose length exceeds 75 chars (content
@@ -70,7 +75,8 @@ function flush_slashes() {
   slash_run = 0
 }
 function reset() {           # per-file state
-  in_block = 0; block_stars = 0; block_line = 0; block_file = ""
+  in_block = 0; block_body = 0; block_line = 0; block_file = ""
+  block_first = ""; block_kind = ""; block_open = ""
   slash_run = 0; slash_line = 0; slash_text = ""; slash_file = ""
 }
 FNR == 1 { flush_slashes(); reset() }
@@ -82,11 +88,20 @@ FNR == 1 { flush_slashes(); reset() }
 
   if (in_block) {
     if (len > 75) emit(FILENAME, FNR, "over-75", t)
-    # a `* …` continuation that is not the bare closer counts toward the tally
-    if (t ~ /^\*/ && t !~ /^\*\//) block_stars++
-    if (index(line, "*/") > 0) {
-      if (block_stars > 1) emit(block_file, block_line, "block-overexplained", "block comment")
-      in_block = 0; block_stars = 0
+    is_close = (index(line, "*/") > 0)
+    body = t
+    sub(/[ \t]*\*\/.*$/, "", body)  # drop the closer first, so a bare `*/`…
+    sub(/^\*+[ \t]*/, "", body)     # …then a leading `*` if JSDoc-style
+    # count every interior CONTENT line, `*`-prefixed or free-form prose alike,
+    # so a non-starred `/* … */` block is no longer invisible; a bare closer
+    # strips to empty and does not count
+    if (body != "") { block_body++; if (block_first == "") block_first = body }
+    if (is_close) {
+      # >= 1 content line means a genuine multi-line block (opener, content,
+      # closer) — the-chronicler bans any multi-line block mid-execution
+      if (block_body >= 1)
+        emit(block_file, block_line, block_kind, block_open " " block_first)
+      in_block = 0; block_body = 0; block_first = ""
     }
     next
   }
@@ -97,7 +112,11 @@ FNR == 1 { flush_slashes(); reset() }
     if (len > 75) emit(FILENAME, FNR, "over-75", t)
     # single-line `/* … */` is not a block
     if (index(t, "*/") > 1 || t ~ /\*\/$/) { next }
-    in_block = 1; block_stars = 0; block_line = FNR; block_file = FILENAME
+    in_block = 1; block_body = 0; block_first = ""
+    block_line = FNR; block_file = FILENAME
+    # `/**` is a doc header (keep-leaning); a bare `/*` mid-code is the quarry
+    block_kind = (t ~ /^\/\*\*/) ? "jsdoc-block" : "block-overexplained"
+    block_open = (t ~ /^\/\*\*/) ? "/**" : "/*"
     next
   }
 
@@ -121,9 +140,10 @@ END { flush_slashes() }
 AWK
 
 scan_files() {  # scan the NUL-delimited file list on stdin
-  # xargs batches large lists; each file is whole within a batch, and the awk
-  # per-file reset makes batch boundaries harmless.
-  grep -zEi "$EXT_RE" 2>/dev/null | xargs -0 awk "$AWK_PROG" 2>/dev/null || true
+  # xargs batches large lists; the awk per-file reset makes batch boundaries
+  # harmless. LC_ALL=C reads bytes not multibyte, so one stray non-UTF8 byte
+  # can't abort awk mid-batch and silently drop every file after it.
+  grep -zEi "$EXT_RE" 2>/dev/null | xargs -0 env LC_ALL=C awk "$AWK_PROG" 2>/dev/null || true
 }
 
 list_dir() {    # emit NUL-delimited file paths under a dir
