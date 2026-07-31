@@ -27,12 +27,12 @@ Same discipline the loop, custodian, and defend hold. A comment is a judgment ca
 
 Noun-verb grammar (`docs/looper-skills.md` → `## Subcommand grammar`), same shape as custodian and defend:
 
-| Invocation                                        | Does                                                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/looper-declutter` (or an NL trigger)            | the **sweep run**: scan → triage → report, read-only, ends by emitting the structured report + persisting candidates                        |
-| `/looper-declutter apply #<snip-id>`              | **snip one candidate**: builds a doc-wave brief and routes it through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` |
-| `/looper-declutter apply <run-id>`                | **snip all ticked candidates** in that run, grouped one wave per file, idempotently                                                         |
-| `/looper-declutter apply #<snip-id> --dry-run`    | **preview**: prints the proposed brief + the exact diff the snip would attempt, and writes nothing                                          |
+| Invocation                                     | Does                                                                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/looper-declutter` (or an NL trigger)         | the **sweep run**: scan → triage → report, read-only, ends by emitting the structured report + persisting candidates                                       |
+| `/looper-declutter apply #<snip-id>`           | **snip one candidate**: builds a doc-wave brief and routes it through `looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit` |
+| `/looper-declutter apply <run-id>`             | **snip all ticked candidates** in that run, grouped one wave per file, idempotently                                                                        |
+| `/looper-declutter apply #<snip-id> --dry-run` | **preview**: prints the proposed brief + the exact diff the snip would attempt, and writes nothing                                                         |
 
 `apply` is the verb, `#<snip-id>`/`<run-id>` the arg, `--dry-run` the flag — the exact model custodian and defend use. Snip writes nothing without an `apply`. No bespoke `undo`: snips land as git commits on a **draft PR**, so the PR diff IS the preview and `git`/PR-close IS the reversal.
 
@@ -88,13 +88,13 @@ Triggered by `apply`. Declutter does NOT edit directly — it feeds ticked candi
 
 The heart of the skill. Each kind maps to an existing rule; declutter applies the owner's rule, it does not restate it:
 
-| Kind                  | Owner rule (source of truth)                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| Kind                  | Owner rule (source of truth)                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `block-overexplained` | `the-chronicler` `## Comment Style Rules` — no multi-line blocks mid-execution; collapse to a single WHY line. Restates code? `the-improver` deletes it. |
-| `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line                                                      |
-| `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                        |
-| `capitalized-slash`   | `the-chronicler` — lowercase the first word of a single-line `//`                                          |
-| every surviving line  | `the-ghostwriter` `## Comment cleanup mandate` + `## AI-slop blocklist` — de-slop, kill commit/wave archaeology, no em-dash |
+| `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line                                                                                                     |
+| `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                                                                       |
+| `capitalized-slash`   | `the-chronicler` — lowercase the first word of a single-line `//`                                                                                        |
+| every surviving line  | `the-ghostwriter` `## Comment cleanup mandate` + `## AI-slop blocklist` — de-slop, kill commit/wave archaeology, no em-dash                              |
 
 The snip brief cites the owning rule per candidate. Declutter carries no comment-style constants of its own; if an owner's rule changes, declutter inherits it automatically. This is the anti-duplication contract — the agents explicitly guard against a second pass doing the same work (`the-chronicler.md`, `the-ghostwriter.md` cross-reference each other), and declutter honors it.
 

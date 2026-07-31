@@ -1,23 +1,35 @@
 # PR body guidelines
 
-How to write AND update a PR description. The diff is right there; the body orients the reviewer, it does not re-narrate the change. Lean beats complete.
+How to write and update a PR description. The diff is there. The body text
+orients the reviewer. It does not re-narrate changes. Lean is best.
 
 ## Writing
 
-- Lead with WHY in 1–2 sentences. Skip the preamble
+- Lead with WHY in 1–2 sentences. No preamble
 - Bullets over paragraphs. One line per substantive change
-- Never restate the diff line-by-line. Annotations answer what / why / gotcha
-- Link the ticket (Jira, Linear, GitHub issue) at the top
+- Never restate the diff line-by-line. Annotations answer what/why/gotchas
+- Link the ticket (Jira, GitHub issue, etc) at the top
 - Test plan is checkboxes, not prose
-- No empty sections. Drop `## Notes for reviewer` unless something is genuinely non-obvious
+- No empty sections
+- Drop `## Additional notes` unless something is genuinely non-obvious
 
 ## Budgets
 
 - Summary: ≤ 2 sentences
-- What changed: 1 line per change, substantive changes only (skip mechanical churn)
-- Structured recap (optional, gated): 2–4 key files, each hunk ~< 40 lines. A small or obvious diff → skip it (SKILL.md `## Structured recap (PR-body section)` → small-diff skip)
+- Changed: 1 line per change, substantive changes only
+- Optional structured recap
+  - 2–4 key files
+  - Each hunk < 40 lines
+  - Skip for small or obvious diffs
 
 ## Voice + attribution
 
-- Run the assembled body through `the-ghostwriter` before submitting: sentence case, no em-dash (`—`), no slop vocabulary (`leverage`, `seamless`, `robust`, `delve`…), real `…` not `...`, straight quotes
-- No AI-attribution trailer: no `Co-Authored-By`, no "Generated with Claude Code", no other marker
+- Run the assembled body through `the-ghostwriter` before submitting
+  - Sentence case
+  - No em-dashes (`—`)
+  - No slop vocabulary (`leverage`, `seamless`, `robust`, etc)
+  - Real `…` not `...`
+- No AI-attribution trailers
+  - No `Co-Authored-By`
+  - No "Generated with Claude Code"
+  - No other markers

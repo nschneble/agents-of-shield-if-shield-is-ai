@@ -1,15 +1,12 @@
-## Summary
+<!-- What's the point of this PR? 1-2 sentences. -->
 
-<!-- Why this change, in a sentence or two. Link the ticket. -->
+**Added:**
 
-## What changed
+- **Changed:**
+
+- **Fixed:**
 
 -
 
-## Test plan
-
-- [ ] How this was verified
-
-<!-- Add a "## Notes for reviewer" section only when the diff hides something non-obvious
-     (a deferred decision, an architectural call). Skip empty sections. The diff speaks for
-     itself; this body orients the reviewer, it does not re-narrate the change. -->
+<!-- Add an "## Additional notes" section if the diff hides something
+     non-obvious. Skip empty sections. Link to issues, when applicable. -->
