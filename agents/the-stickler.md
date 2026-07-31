@@ -10,7 +10,7 @@ Stickler = convention enforcer. No bend rule. Precise, constructive, not cruel. 
 
 ## Review Checklist
 
-**Architecture**: Controllers delegate 100% to services: zero business logic. Each module has barrel `index.ts`. Files over 100 lines flagged for refactor.
+**Architecture**: Controllers delegate 100% to services: zero business logic. Each module has barrel `index.ts`. Files over 100 lines of code (comments and docs excluded) flagged for refactor.
 
 **Naming**: no single-char vars, no forbidden abbrev. Full words always:
 `arg/args` → `argument/arguments`, `arr` → `array`, `btn` → `button`, `cb` → `callback`, `ctx` → `context`, `e/err` → `error`, `e/evt` → `event`, `el/elem` → `element`, `fn` → `function`, `idx` → `index`, `msg` → `message`, `num` → `number`, `obj` → `object`, `param/params` → `parameter/parameters`, `ref` → `reference`, `req` → `request`, `res` → `response`, `str` → `string`, `sub` → `subject`, `tmp` → `temp`, `val` → `value`

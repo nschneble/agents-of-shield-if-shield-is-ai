@@ -68,7 +68,7 @@ If commit fails (pre-commit hook failure, signing failure, etc), STOP; fix under
 
 ## Step 2: PR detection
 
-Check if this branch has a tracked PR. Query by explicit branch, not `gh pr view` — `gh pr view` only reads the *current* branch and errors noisily when none exists, which is fragile in detached or non-current-branch contexts:
+Check if this branch has a tracked PR. Query by explicit branch, not `gh pr view` — `gh pr view` only reads the _current_ branch and errors noisily when none exists, which is fragile in detached or non-current-branch contexts:
 
 ```
 gh pr list --head <branch> --state all --json number,url,state,isDraft
@@ -86,15 +86,18 @@ Three cases:
 
 ## Step 3: Create draft PR (only if no existing)
 
-> **Brief semantics.** A brief that says "don't flip to ready-for-review" does NOT suppress this step — draft *creation* and the draft→ready *flip* are different actions (see `## What looper-commit does NOT do`). Only an explicit `pr: skip` directive suppresses creation. In an orchestrated multi-wave run the brief carries `pr: create-on-wave-1` (this step runs, branch must be pushed first) or `pr: existing #N` (Step 2 detects it → this step is skipped, commit lands in the existing PR). Never read "no new PR needed" out of a directive that only forbids the ready flip. See loop-de-looper `## PR lifecycle + push ownership`.
+> **Brief semantics.** A brief that says "don't flip to ready-for-review" does NOT suppress this step — draft _creation_ and the draft→ready _flip_ are different actions (see `## What looper-commit does NOT do`). Only an explicit `pr: skip` directive suppresses creation. In an orchestrated multi-wave run the brief carries `pr: create-on-wave-1` (this step runs, branch must be pushed first) or `pr: existing #N` (Step 2 detects it → this step is skipped, commit lands in the existing PR). Never read "no new PR needed" out of a directive that only forbids the ready flip. See loop-de-looper `## PR lifecycle + push ownership`.
 
-Read recent merged PRs to match codebase style:
+Template precedence, first that applies:
 
-```
-gh pr list --limit 5 --state merged
-```
+1. Target repo has a `.github/PULL_REQUEST_TEMPLATE.md` → that is the house template; honor it.
+2. Recent merged PRs show a clear house style → emulate it:
+   ```
+   gh pr list --limit 5 --state merged
+   ```
+3. Else default to `templates/pr-body.md`.
 
-Clear pattern → emulate. Else default to the template in `templates/pr-body.md`.
+Keep the body lean whichever wins. `templates/pr-guidelines.md` governs brevity, voice, and the no-AI-attribution rule.
 
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
 - Attach screenshots for UI changes when available (refer to verify's browser run) — and add the structured recap's UI before/after block (see `## Structured recap (PR-body section)`)
@@ -122,9 +125,9 @@ Pass body via HEREDOC to preserve format.
 
 ## Structured recap (PR-body section)
 
-The emitted `## Structured recap` block in the PR body gives the reviewer the *shape* of the diff before they read it. Dependency-free reimplementation of Builder.io's `visual-recap` taxonomy — same review-acceleration value, PLAIN GitHub markdown, NO hosted / MCP tool (standing directive: no third-party hosted-tool reliance). Stands on its own; a reader who never saw `visual-recap` needs nothing else.
+The emitted `## Structured recap` block in the PR body gives the reviewer the _shape_ of the diff before they read it. Dependency-free reimplementation of Builder.io's `visual-recap` taxonomy — same review-acceleration value, PLAIN GitHub markdown, NO hosted / MCP tool (standing directive: no third-party hosted-tool reliance). Stands on its own; a reader who never saw `visual-recap` needs nothing else.
 
-This section defines the FORMAT only. WHEN a recap is emitted (which waves, the UI-glob that gates the wireframe block) is decided upstream — not here.
+This section defines the FORMAT only. WHEN a recap is emitted (which waves, the UI-glob that gates the wireframe block) is decided upstream — not here. Brevity budgets live in `templates/pr-guidelines.md`: keep every block tight and never restate the diff.
 
 Composed of three content sub-blocks, rendered in order — plus a skip rule (a guard that suppresses the whole section, not a fourth block that gets rendered):
 
@@ -144,7 +147,7 @@ If this block is included, the a11y call-out is mandatory and specific — name 
 
 ### Small-diff skip (guard, not a rendered block)
 
-A genuinely tiny change — one file, a handful of obvious lines, no behavioural subtlety, no UI delta — gets NO structured recap. It reviews faster as the raw diff; a recap is pure noise on it. Skip the whole section, don't emit an empty one. When genuinely unsure, include it — the cost of a recap on a small diff is low; the cost of omitting it on a subtle one is a missed review.
+A genuinely tiny change — one file, a handful of obvious lines, no behavioural subtlety, no UI delta — gets NO structured recap. It reviews faster as the raw diff; a recap is pure noise on it. Skip the whole section, don't emit an empty one. When unsure, skip: the raw diff is always still there to read. Reserve the recap for genuinely large or subtle changes whose shape isn't obvious from the diff alone.
 
 ### Grounding + secret redaction (every block)
 

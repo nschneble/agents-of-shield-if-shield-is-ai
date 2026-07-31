@@ -43,7 +43,7 @@ No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP
 ## Quality bars
 
 - No comments explain WHAT; well-named identifiers carry that. Comments only for non-obvious WHY.
-- No god files. Refactor when files cross project threshold (often 100 lines per CLAUDE.md).
+- No god files. Refactor when a file's lines of code cross the project threshold (often 100 per CLAUDE.md; comments and docs don't count).
 - Follow project style: import order, naming conventions, class-ordering rules (e.g. Tailwind ordering in CLAUDE.md).
 - No untrusted optimization. Chase only proven hot paths.
 - Trust internal code. Validate only at system boundaries (user input, external APIs).

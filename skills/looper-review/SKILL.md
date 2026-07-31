@@ -33,7 +33,7 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 - **`the-chemist`** (test coverage and quality): every error branch covered, real-behavior assertions over mocked plumbing, role/label queries, at least one real-user-flow integration test.
 - **`the-chronicler`** (documentation): external contracts thorough, internal comments WHY-only, comment-style conformance.
 - **`the-ghostwriter`** (voice and tone): prose surfaces read like Nick wrote them — no em-dashes, no slop vocabulary, no commit-linked comment archaeology, per-surface case/punctuation matrix respected. Findings only in crew mode, no edits.
-- **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split, extract only at real repetition, behavior preserved, no drive-by scope.
+- **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split (by lines of code, docs excluded), extract only at real repetition, behavior preserved, no drive-by scope.
 
 ## What to look for
 

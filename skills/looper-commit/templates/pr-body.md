@@ -1,24 +1,23 @@
 # Default PR body template
 
-Fallback when recent merged PRs show no clear house style (SKILL.md `## Step 3: Create draft PR (only if no existing)`). Copy the fenced block; keep the surrounding Step 3 rules (ticket link, screenshots, HEREDOC, draft + `@me`).
+Fallback when the target repo has no `.github/PULL_REQUEST_TEMPLATE.md` and
+recently merged PRs show no clear house style. Step 3 in SKILL.md.
 
-```
-[fix|feat|chore] Short title (under 70 chars)
+Keep it lean. `templates/pr-guidelines.md` governs brevity + voice. Copy
+the fenced block + keep the surrounding Step 3 rules.
 
-## Summary
-- 1–3 bullets on what changed and why
+## Step 3: Create draft PR (only if no existing)
 
-## What changed
+```markdown
+[Bugfix|Feature|Chore]: Short title (< 70 chars)
+
+Why this change, in 1–2 sentences.
+
+**Changed:**
+
 - Substantive change 1 (file or area)
 - Substantive change 2
-
-## Test plan
-- [ ] Manual repro / verification step
-- [ ] Edge case 1
-- [ ] Automated test coverage notes
-
-## Notes for reviewer
-- Anything non-obvious in the diff
-- Any known issues consciously deferred (with reason)
-- Any architectural decisions worth a second pair of eyes
 ```
+
+Add an `## Additional notes` section when the diff hides something
+non-obvious.
