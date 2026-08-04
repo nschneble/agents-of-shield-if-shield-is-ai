@@ -59,7 +59,7 @@ jq -rn --arg index "$INDEX" '
     "  \($n) records · format-scope class \($class | length) · would-have-caught \($viol | length) · branches \($branches | length)",
     "",
     "format-scope class records (recurring correction, memory-only baseline):",
-    ($class[] | "  \(.cite)  [\(.repo)/\(.branch) w\(.wave)]  \((.summary // .verdict // "")[0:66])"),
+    ($class[] | "  \(.cite)  [\(.repo)/\(.branch) w\(.wave // "?")]  \((.summary // .verdict // "")[0:66])"),
     "",
     "  distinct branches: \($branches | join(", "))",
     "",
