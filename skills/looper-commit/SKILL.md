@@ -90,7 +90,7 @@ Three cases:
 
 Template precedence, first that applies:
 
-1. Target repo has a `.github/PULL_REQUEST_TEMPLATE.md` → that is the house template; honor it.
+1. Target repo has a PR template (`.github/PULL_REQUEST_TEMPLATE.md`, the lowercase `.github/pull_request_template.md`, a root `PULL_REQUEST_TEMPLATE.md`, or a file under `.github/PULL_REQUEST_TEMPLATE/`) → READ the file and author the body INTO its structure. Fill its sections verbatim by name (e.g. `**Added:** / **Changed:** / **Fixed:**`), keep its section order, honor its inline comment guidance (e.g. "skip empty sections", "link to issues"), and do NOT substitute your own `##`/`###` headings for its shape. GitHub prefills a new PR from this template; a body that ignores it forces the maintainer to rewrite it to house shape. "Honor it" means fill it, not merely be aware of it.
 2. Recent merged PRs show a clear house style → emulate it:
    ```
    gh pr list --limit 5 --state merged
