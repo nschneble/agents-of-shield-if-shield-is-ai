@@ -18,7 +18,7 @@
 # @dirty -> 1 (style issues), else -> 0 (clean); --version -> 0 (the gate's
 # pre-flight availability probe). The gate's logic — not prettier's
 # formatting — is under test, so a controlled verdict per file is the right
-# oracle. A real-prettier end-to-end pass is proven at build time, not here.
+# oracle. A real-prettier end-to-end pass is proven at build, not here.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -61,7 +61,7 @@ out=$(PRETTIER="$stub" "$gate" --dir "$ra" --changed "$ra/changed.txt" a.css); r
 [ "$rc" -eq 1 ] && r=0 || r=1; check "RED-A: unclean touched file fails (exit 1)" "$r"
 printf '%s\n' "$out" | grep -q 'VIOLATION A .*not prettier-clean: a.css'; check "RED-A: cites the unclean touched file" $?
 
-# --- RED-B: an out-of-scope file was reformatted (clean, not declared). ---
+# --- RED-B: out-of-scope file reformatted (clean, not declared). ---
 rb="$temp_dir/redb"; mkdir -p "$rb"
 printf '.a { color: red; }\n' > "$rb/a.css"       # touched, clean
 printf 'const x = 1;\n'       > "$rb/vendor.js"   # changed, NOT touched, clean

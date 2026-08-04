@@ -23,7 +23,7 @@ check() { # desc, condition-already-evaluated ($?)
   else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
 }
 
-# mk_entry REGDIR ID EXITCODE [ENABLED] — a stub entry whose gate just exits.
+# mk_entry REGDIR ID EXITCODE [ENABLED] — stub entry; gate just exits.
 mk_entry() {
   local d="$1/$2"; mkdir -p "$d"
   {
@@ -38,7 +38,7 @@ mk_entry() {
   chmod +x "$d/gate.sh"
 }
 
-# --- GREEN: two passing entries -> exit 0, both ran (proves multi-entry). ---
+# --- GREEN: two passing entries -> exit 0, both ran (multi-entry). ---
 reg="$temp_dir/green"
 mk_entry "$reg" alpha 0
 mk_entry "$reg" beta  0
@@ -73,7 +73,7 @@ printf '%s\n' "$out" | grep -q 'SKIP  off (disabled)'; check "SKIP: reports the 
 
 # --- CONTEXT: the wave-context contract (CG_*) reaches the exec. A gate
 # that greps CG_TOUCHED_FILE for a sentinel passes only when the runner
-# actually threaded the value through; absent, it fails. Both directions. ---
+# actually threaded the value through; absent it fails. Both ways. ---
 reg="$temp_dir/ctx"; d="$reg/ctx"; mkdir -p "$d"
 {
   echo '---'; echo 'id: ctx'; echo 'enabled: true'

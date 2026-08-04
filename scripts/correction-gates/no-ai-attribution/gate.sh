@@ -15,7 +15,7 @@
 # These are the exact tells the correction bans; a full list of variants is
 # in ./spec.md.
 #
-# Position note: this is a COMMIT/PR-surface gate — it reads git history and
+# Position: this is a COMMIT/PR-surface gate — it reads git history and
 # a staged body, so it runs at commit/PR time (looper-commit), not the
 # working-tree pre-commit slot format-scope uses. That the two entries sit
 # at different points is the "compare-ref must be a parameter, not baked

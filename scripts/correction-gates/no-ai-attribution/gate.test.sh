@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gate.test.sh — both-directions test for the no-ai-attribution gate.
 #
-# Standing rule: RED (fires on a marker) AND green (a clean surface passes).
+# Standing rule: RED (fires on a marker) AND green (clean surface passes).
 # Covers every scanned surface — commit-message trailer, a commit range,
 # and a PR-body file — in both footer forms (with and without the emoji),
 # so the gate proves it catches the tells the correction bans and does not
