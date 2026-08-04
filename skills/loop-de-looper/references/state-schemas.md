@@ -50,7 +50,7 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
     "wave_retries": 0
   },
   "last_crew_wave": 0,
-  "pr": { "number": 214, "url": "...", "state": "draft" },
+  "pr": { "number": 214, "url": "...", "state": "draft", "body_sha": "9f2a3c7e" },
   "usage": {
     "paused": false,
     "window_reset": 1784258400,
@@ -59,5 +59,7 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
   }
 }
 ```
+
+`pr.body_sha` hashes the PR body as the LOOP last wrote it (wave-1 creation, then the terminal recap refresh) — the baseline Step 4's user-edit guard compares the live body against to tell its own text from the owner's. Without a persisted baseline that guard has nothing to diff and cannot fire correctly, and `editor.login` can't substitute: the loop authenticates as `@me`, so its edits and the owner's carry the same login. Absent on a run predating the field or one whose PR the loop didn't create — the guard reads absent as "assume user-edited" and takes the augment path, which is the safe direction.
 
 `usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
