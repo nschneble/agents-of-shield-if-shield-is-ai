@@ -16,3 +16,5 @@ jobs:
         run: ./scripts/custodian-guardrails.test.sh
       - name: Skill spec lint (both directions)
         run: ./scripts/custodian-skill-lint.test.sh
+      - name: Format-scope gate (both directions)
+        run: ./scripts/format-scope-gate.test.sh
