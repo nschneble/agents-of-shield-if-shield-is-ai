@@ -6,17 +6,52 @@
 #
 # Decisions are "deny" (not "ask"): an unattended loop must not be able to
 # approve these. Run such a command yourself with `!<command>` if intended.
+#
+# The rules match a SCAN STRING, not the raw command. The scan string drops
+# text that is data rather than execution — heredoc bodies and quoted prose
+# — because matching those denied commit messages and PR bodies that merely
+# NAMED a blocked verb, and blocked grepping for the phrase at all.
+# Stripping is skipped wherever the shell would still execute that text, so
+# the evasion cases below stay blocked. See ## Scan string.
 
 input=$(cat)
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
 
+# --- Scan string --------------------------------------------------------
+# Anything that EXECUTES a string or heredoc argument. When one of these is
+# present the text is code, not data, so nothing is stripped and the raw
+# command is matched exactly as it always was. Command substitution counts:
+# $(...) and backticks run their contents.
+interp='(^|[;&|(]| )(sudo +)?(bash|sh|zsh|dash|fish|ksh|eval|exec|source|xargs|ssh|python3?|node|perl|ruby|php|awk)\b'
+subst='\$\(|`'
+
+scan=$cmd
+
+# Heredoc bodies are stdin data (git commit -F -, gh pr create --body
+# "$(cat <<EOF)") — except when fed straight to an interpreter, where the
+# body IS the script.
+if ! printf '%s' "$cmd" | grep -Eq '(bash|sh|zsh|dash|fish|ksh|python3?|node|perl|ruby|php) *<<'; then
+  scan=$(printf '%s' "$scan" | perl -0777 -pe 's/<<-?[ \t]*(["'\'']?)(\w+)\1.*?^[ \t]*\2[ \t]*$//gms')
+fi
+
 # Collapse whitespace so flags split across spacing still match.
-norm=$(printf '%s' "$cmd" | tr -s '[:space:]' ' ')
+scan=$(printf '%s' "$scan" | tr -s '[:space:]' ' ')
+
+# Quoted arguments, only when no interpreter or substitution is in play.
+# A single-word quoted token is UNQUOTED rather than dropped, so
+# `git push "--force"` and `git "push" -f` still match. A quoted segment
+# containing whitespace is prose and is removed.
+if ! printf '%s' "$scan" | grep -Eq "$interp" && ! printf '%s' "$scan" | grep -Eq "$subst"; then
+  scan=$(printf '%s' "$scan" | perl -pe "s/'([^'[:space:]]*)'/\$1/g; s/\"([^\"[:space:]]*)\"/\$1/g")
+  scan=$(printf '%s' "$scan" | perl -pe "s/'[^']*'//g; s/\"[^\"]*\"//g")
+fi
 
 # Normalize `git -C <path>` / `--git-dir=` / `--work-tree=` to plain `git`,
 # so the verb-based rules below also catch the directory-targeted form
 # (e.g. `git -C /repo push --force`).
-norm=$(printf '%s' "$norm" | sed -E 's/git +-C +[^ ]+ +/git /g; s/git +--git-dir[= ][^ ]+ +/git /g; s/git +--work-tree[= ][^ ]+ +/git /g')
+scan=$(printf '%s' "$scan" | sed -E 's/git +-C +[^ ]+ +/git /g; s/git +--git-dir[= ][^ ]+ +/git /g; s/git +--work-tree[= ][^ ]+ +/git /g')
+
+norm=$scan
 
 deny() {
   jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
