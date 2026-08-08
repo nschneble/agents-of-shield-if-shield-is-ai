@@ -11,7 +11,13 @@ orients the reviewer. It does not re-narrate changes. Lean is best.
 - Link the ticket (Jira, GitHub issue, etc) at the top
 - Test plan is checkboxes, not prose
 - No empty sections
-- Drop `## Additional notes` unless something is genuinely non-obvious
+- `## Additional notes` is off by default. Add it only for a fact the reviewer
+  needs and cannot get from the diff, the tests, or CI
+  - Qualifies: an approach tried and rejected for a reason the diff can't show,
+    a manual step the merge requires, a constraint outside the repo
+  - Never: test counts, verification or lint/build status, deferred work,
+    rationale the summary carries, restating the bullets
+  - Budget: 4 sentences. Longer means it belongs in the code or a doc
 
 ## Budgets
 

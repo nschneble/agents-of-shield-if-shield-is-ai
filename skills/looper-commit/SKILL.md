@@ -90,7 +90,7 @@ Three cases:
 
 Template precedence, first that applies:
 
-1. Target repo has a PR template → READ the file and author the body INTO its structure. GitHub honors either casing (`PULL_REQUEST_TEMPLATE.md` / `pull_request_template.md`) in three locations: `.github/`, the repo root, and `docs/` — check all three, not just `.github/`. Fill its sections verbatim by name (e.g. `**Added:** / **Changed:** / **Fixed:**`), keep its section order, and honor its inline comment guidance ("skip empty sections", "link to issues"). That guidance OUTRANKS this rule wherever they differ — including when it invites a heading of your own (this repo's template asks for an `## Additional notes` section when the diff hides something non-obvious, and `## Structured recap` is likewise required below). What's forbidden is REPLACING the template's shape with your own headings, not adding what it asks for. A body that ignores the template forces the maintainer to rewrite it to house shape; "honor it" means fill it, not merely be aware of it.
+1. Target repo has a PR template → READ the file and author the body INTO its structure. GitHub honors either casing (`PULL_REQUEST_TEMPLATE.md` / `pull_request_template.md`) in three locations: `.github/`, the repo root, and `docs/` — check all three, not just `.github/`. Fill its sections verbatim by name (e.g. `**Added:** / **Changed:** / **Fixed:**`), keep its section order, and honor its inline comment guidance ("skip empty sections", "link to issues"). That guidance OUTRANKS this rule wherever they differ. What's forbidden is REPLACING the template's shape with your own headings; an OPTIONAL section the template describes conditionally (`## Additional notes`) is off by default and stays out unless its stated condition is genuinely met — `templates/pr-guidelines.md` sets that bar. A body that ignores the template forces the maintainer to rewrite it to house shape; "honor it" means fill it, not merely be aware of it.
    **A `PULL_REQUEST_TEMPLATE/` DIRECTORY is different** — that form holds multiple templates and GitHub does NOT auto-apply any of them (one is chosen with a `?template=<name>.md` query param), so pick the closest match by name and fill it deliberately. Either way `gh pr create --body` bypasses prefill entirely: never assume the form arrives pre-populated.
 2. Recent merged PRs show a clear house style → emulate it:
    ```
@@ -103,7 +103,8 @@ Keep the body lean whichever wins. `templates/pr-guidelines.md` governs brevity,
 - Link any ticket (Jira, Linear, GitHub issue) at top of body
 - Attach screenshots for UI changes when available (refer to verify's browser run) — and add the structured recap's UI before/after block (see `## Structured recap (PR-body section)`)
 - Include before/after for visual changes — the ASCII wireframe in `## Structured recap (PR-body section)` is the dependency-free default
-- Document deferred work explicit; don't hide
+- Document deferred work where the loop tracks it — the run recap, an issue, or
+  the backlog. Never hide it, and never park it in the PR body
 
 > **Recap timing.** In an orchestrated multi-wave run the structured recap is emitted by the TERMINAL PR-body refresh (`loop-de-looper` Step 4), NOT at wave-1 creation — so a wave-1 executor does NOT build it here from a partial diff. A standalone single-commit PR (no orchestrator, whole diff already present) can include it directly.
 
