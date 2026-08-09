@@ -45,9 +45,15 @@ REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="${INDEX:-$CUSTODIAN_HOME/history-index.jsonl}"
 
+# a value-taking flag given no value must not fall through to `$2` unbound:
+# under `set -u` that aborts with status 1, which the header reserves for
+# "violations found". Usage errors exit 2 here and in
+# custodian-phase-order.sh.
+needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    --index) INDEX="$2"; shift 2;;
+    --index) needs_value --index "$#"; INDEX="$2"; shift 2;;
     -h|--help)
       echo "usage: $0 [--index PATH]" >&2
       echo "  replays G1/G2/G3 guardrail predicates over the history index" >&2
@@ -59,7 +65,10 @@ done
 
 [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
 
-report=$(jq -rn --arg index "$INDEX" '
+# One object out, not rendered text: the verdict below reads `.total`
+# from this JSON, so a newline inside an indexed field cannot inject a
+# counterfeit total.
+analysis=$(jq -n --arg index "$INDEX" '
   # --- era gate: a line predates the schema iff it has no verified_by key ---
   def legacy: (has("verified_by") | not);
 
@@ -115,7 +124,7 @@ report=$(jq -rn --arg index "$INDEX" '
   | ($g1viol | length) as $v1 | ($g2viol | length) as $v2 | ($g3viol | length) as $v3
   | ($v1 + $v2 + $v3) as $total
 
-  | "custodian-guardrails — replay over \($index)",
+  | [ "custodian-guardrails — replay over \($index)",
     "  \($n) records · \($modern) modern (checked-era) · \($legacyn) legacy (exempt-era)",
     "",
     "G1  no verdict without a run",
@@ -133,10 +142,14 @@ report=$(jq -rn --arg index "$INDEX" '
     "    waves: checked \($g3checked | length) · legacy-exempt \($g3exempt) · violations \($v3)",
     ($g3viol[] | "    VIOLATION  \(.[0].repo)/\(.[0].branch) wave \(.[0].wave)\n      cites: \([.[].cite] | join(", "))"),
     "",
-    "TOTAL VIOLATIONS: \($total)  (G1 \($v1) lines · G2 \($v2) lines · G3 \($v3) waves)"
+    "TOTAL VIOLATIONS: \($total)  (G1 \($v1) lines · G2 \($v2) lines · G3 \($v3) waves)" ] as $report
+
+  | { total: $total, report: $report }
 ' "$INDEX")
 
-printf '%s\n' "$report"
+printf '%s\n' "$analysis" | jq -r '.report[]'
 
-count=$(printf '%s\n' "$report" | grep '^TOTAL VIOLATIONS:' | grep -oE '[0-9]+' | head -1)
-[ "${count:-0}" -gt 0 ] && exit 1 || exit 0
+# verdict off the computed field, never off the rendered report — the
+# shape scripts/custodian-skill-lint.sh:429-430 already uses.
+violations=$(printf '%s\n' "$analysis" | jq -r '.total')
+[ "$violations" -eq 0 ]

@@ -196,18 +196,35 @@ LangChain, Ambiance, wakamoleguy, Hobday, Elliot Smith, capn-hook):
 
 Refined 2026-07-20 from the bg-wait-ceiling incident:
 
-15. **Phase E gets ceiling headroom, and a ceiling-kill is resumable, not
-    silently dropped.** The 2026-07-20 run backgrounded Phase E's `deep-research`
-    and then hit the harness `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default
-    (600s) while the fan-out was still running (~644s in, not yet done). The
+15. **Phase E's ceiling is an unmeasured margin, and a ceiling-kill is
+    resumable, not silently dropped.** The 2026-07-20 run backgrounded Phase
+    E's `deep-research` and then hit the harness
+    `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default while the fan-out was still
+    running. That run's `cron.log` line 2 is the whole of what is on disk
+    about it: `Background tasks still running after 600s; terminating. Set
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.` The
     harness terminated the workflow — but a ceiling-kill still exits 0, so the
     wrapper counted it a clean success: no `Custodian report` issue was ever
     opened and ~1.4M tokens of already-completed research were thrown away with
     no trace but a drained session limit. Sibling failure mode to decision 13's
     silent-on-failure wrapper — a half-done run that *looks* done is as bad as a
     dead one that looks alive. Three fixes: (a) the wrapper raises the ceiling to
-    30 min so a normal Phase E finishes within the end-of-turn wait and Phase F
-    runs; (b) a ceiling-kill is detected (the harness'
+    30 min, to give a normal Phase E room to finish within the end-of-turn wait
+    so Phase F runs — **how much room that is was never measured**, and the
+    original wording (`3ce7156`: "30 min clears an observed ~11 min
+    deep-research fan-out with headroom") read the 30 min as proven. Two
+    things are wrong with that. The sourced figure is the 600s above — the
+    point at which the harness KILLED a fan-out that had not finished, so it
+    is a **lower bound** on that fan-out's duration and nothing at all is
+    known about the rest of it. And the `~11 min` itself has no source: it
+    entered with `3ce7156`, and searching that run's artifacts for `11 min` —
+    or for the `644` seconds it would imply — returns nothing. Take that as
+    stated rather than reproduced: `local/custodian/` is gitignored, so neither
+    search runs from a clone, and the only figure that run produced for the
+    kill is the 600s in the `cron.log` line quoted above. 30
+    min is therefore an unmeasured margin over a lower bound, not a headroom
+    figure, and it stands unchanged until a live Monday measures a fan-out
+    that actually completes; (b) a ceiling-kill is detected (the harness'
     `Background tasks still running after …` marker in the run log), turned into
     a loud resumable state — a `resume.json` breadcrumb + a
     `Custodian INCOMPLETE <date>` issue — and **never retried** (a retry re-runs
@@ -225,8 +242,10 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     Phase E is the run's one large token sink (~1.4M tokens) and the custodian
     had NO usage-window guard at all — unlike `loop-de-looper`, whose guard reads
     the real `anthropic-ratelimit-unified-*` window and pauses at a wave boundary.
-    The custodian has no wave loop, but the C → A → B → E order is itself a
-    checkpoint and E is the dispatch worth gating. So E now runs
+    The custodian has no wave loop, so the C → A → B → E order stands in for
+    one and E is the dispatch worth gating — a substitution that holds only
+    while the order is executed serially, since a phase boundary is a
+    checkpoint only when it is a quiet moment (decision 24). So E now runs
     `scripts/usage-window-probe.sh` before invoking `deep-research`: at ≥95%
     utilization or a `rejected` status on the 5-hour or weekly window it DEFERS E
     — logs `deferred (usage-window)`, writes the `resume.json` breadcrumb, and
@@ -479,7 +498,8 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       saved 2026-08-03 — the front door was clear at 36%. Its case is the
       different one: a cron tick that never had room. Claiming otherwise
       would have made the incident look closed while the mechanism that
-      caused it stayed live.
+      caused it stayed live — and that mechanism turned out to have a
+      second half, found later in the same log and recorded as decision 24.
     - **Fan-out bound.** The candidate count IS the fan-out width, because
       every candidate draws a verifier panel, and it is the only dial
       custodian holds — `deep-research` is invoked as a skill, and its
@@ -491,11 +511,17 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       and 3 below 0.30, standing track only at either. Twelve is not a
       modelled rate — the one measurement is 25 candidates collapsing at
       0.64 headroom, and 12 is under half of a fan-out that demonstrably
-      did not fit. A second probe after E returns logs the real
-      `utilization` delta, so the cap is replaced by measurement rather
-      than left as a guess. `read_ok:false` keeps the standing cap
-      unshrunk: unguarded means unsized, and treating an unread window as
-      thin is the same fabrication as treating it as empty.
+      did not fit. Read that 0.64 for what it is, though: it was logged
+      ahead of Phase B's 484-file fan-out rather than after it, so it is
+      not shown to describe the quiet window a tier is meant to measure
+      (decision 24). What did not fit still did not fit, so the cap
+      stands — but it is anchored to a reading logged in an order the
+      one-at-a-time rule now forbids. A second probe after E returns
+      logs the real `utilization` delta, so the cap is replaced by
+      measurement rather than left as a guess. `read_ok:false` keeps the
+      standing cap unshrunk: unguarded means unsized, and treating an
+      unread window as thin is the same fabrication as treating it as
+      empty.
     - **A zero is never reported bare.** The failure that hurt most was not
       the collapse, it was that the collapse was invisible — a digest
       reading like a quiet week. Phase E now distinguishes three zeros and
@@ -513,3 +539,179 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     without a live cron run: nothing here can be exercised by CI (the
     wrapper is unattended shell against a real rate-limit window), so the
     first real Monday is the test.
+
+24. **Phases run one at a time — a phase is done when its subagents have
+    RETURNED, not when they were dispatched.** The same 2026-08-03 log that
+    produced decision 23 also records the order that run LOGGED, and it is not
+    the order the spec asserted. Its lines, in sequence: Phase B's
+    skill-spec lint; then the pre-E usage-window probe, reading `five_hour
+    util 0.36 allowed, weekly util 0.11 allowed`; then `deep-research
+    dispatched (window healthy)`; and only THEN Phase B's `memory audit
+    fan-out dispatched (8 Read-only subagents)` over `files_total=484`, which
+    logs full coverage afterwards. So the 36% that selected E's fan-out tier
+    was read with an 8-subagent, 484-file fan-out still ahead of it. The order
+    decision 16 leaned on as a substitute for a wave boundary was being
+    satisfied at dispatch, not at return — and the log places no phase-B
+    return ahead of that 36% reading. What that overlap cost in tokens is not
+    knowable and is not claimed here: there is no per-phase accounting, and
+    inventing one would be the fabricated gauge this design refuses everywhere
+    else. The claim is the narrow one the log proves on its own — the
+    asserted order is not the order that run logged, and the reading that
+    sized E was logged ahead of Phase B's fan-out rather than after it.
+    - **The rule.** Phases execute one at a time; no phase's fan-out may
+      still be in flight when the next phase begins, and Phase E is probed
+      and dispatched only after Phase B has fully returned. The order was
+      always meant as a sequence to execute, not a sequence to start; it now
+      says so. It binds the resume path too, and there it is a **correction,
+      not a precaution**: the same 2026-08-03 run's resume tail did it again.
+      That tail logs `E "usage-window re-probe (resume gate)"` and
+      `E "E synthesized from killed run's reachable findings (no re-fan)"`
+      before `B "staleness resolved against live tree (resume)"`. A tail
+      holding both B and E runs B to completion before the pre-E probe. The
+      tail looking small is why it happens, not a reason to write the clause
+      as hypothetical.
+    - **The alternative is unimplementable, not merely worse.** The other
+      way to close this is to keep the interleave and have E's sizing
+      subtract the cost of work still in flight. Be exact about what is
+      missing, because this design already owns a per-phase instrument:
+      decision 23's re-probe after `deep-research` returns logs
+      `utilization` before → after, and bracketing a phase that way yields
+      an OBSERVED cost for it. What has no observable is the **not-yet-spent
+      concurrent cost at probe time**. The fan-out width is fixed in the
+      research brief before `deep-research` is invoked, and its internal
+      execution cannot be batched, throttled, or interrupted mid-flight, so
+      there is no later moment at which a measurement could still change the
+      ask — the sizing decision has to be made before the cost it would
+      subtract exists. That number could only be invented, which is exactly
+      the fake gauge `loop-de-looper`'s `## Budget governor` bans, and the
+      mirror image of what Phase E's own `read_ok:false` rule already
+      refuses in the other direction: treating an unread window as thin is
+      the same fabrication as treating it as empty. So the concurrency is
+      removed rather than estimated — the only one of the two that can be
+      done honestly.
+    - **A headroom tier is a reading of something specific.** The tiers in
+      decision 23 describe the window as it stands with C/A/B complete and
+      nothing else in flight. That is the whole of what a tier means, and it
+      is why the digest's stated tier is only as true as this rule was kept.
+    - **The archive says this is the run's shape, not a one-off drift.** The
+      check flags 2026-07-27 and 2026-08-03, and none of the five logs before
+      them. Per-log counts are deliberately not restated in this decision:
+      they move with the check, and
+      `scripts/custodian-phase-order.sh --date <date>` prints them for any log
+      in `local/custodian/` on the machine that produced it — that dir is
+      gitignored, so anywhere else the command exits 2 with `empty or missing
+      log` rather than a count. What prose owes is the shapes, since the check
+      prints line numbers rather than a diagnosis. 2026-08-03 is the
+      interleave twice over — once in its first segment,
+      `E "usage-window probe (pre-E gate)"` and
+      `E "deep-research dispatched (window healthy)"` ahead of
+      `B "memory audit fan-out dispatched (8 Read-only subagents)"`, and again
+      in its second segment, after the resume marker — the lines quoted higher
+      up in this entry. 2026-07-27's first segment is the starkest case in
+      the archive: an `E` probe, an `E` dispatch, and then a resume marker
+      whose own line reads `session-limit kill at 09:29 left B unlogged + E
+      digest lost` — E dispatched, B never logged at all. Its second segment
+      then does it again on the resume: `B "memory audit dispatched"`, then
+      `E "deep-research re-dispatched from main session (run wf_6ef308bc-0c1)"`,
+      and only then `B "audit complete — full coverage 36/36, 7 proposals"` —
+      E dispatched while B was outstanding, dispatch read as done. Two
+      consecutive runs is not a run that drifted once; it is the shape the run
+      had settled into, and the rule is written against that.
+    - **What the check asserts, and what it cannot reach.** It reads B and E
+      lines inside a segment and applies two predicates. **P1**: no phase-E
+      line ahead of a phase-B line. **P2**: no segment carrying phase-E lines
+      with no phase-B line logged at or before it. A segment with no phase-E
+      line has genuinely nothing to order and is reported `NOT EVALUABLE`
+      without counting, and a no-B segment that DOES have a phase-B line
+      earlier is reported `RESUME TAIL` and likewise never counted — the
+      class the discriminator below produces, named here so that token,
+      grepped out of a printed report, lands on the decision that authorizes
+      it. A log yielding zero parseable phase records reports
+      `NOTHING CHECKED` and exits 2 — an unusable input, never a clean run.
+    - **P2's discriminator is the earlier phase-B line, and it is decidable
+      rather than heuristic.** P2 first read every no-B segment as a
+      violation, which flagged 2026-07-27's fourth segment — a resume that
+      legitimately had only E left, B having returned in segment 2. That was
+      not an accepted cost, it was a defect: an E-only tail is the resume
+      verb's *definition* (`## Two modes` — a resume "replays only the
+      unlogged tail (Phase E → report issue), reusing the C/A/B already in
+      `custodian-log.jsonl`"), and the rule above is conditional on the tail,
+      binding only *if* the unlogged tail contains both B and E. So the
+      unconditional predicate flagged every conforming resume, against the
+      rule it cites. The check now asks whether a phase-B line exists earlier
+      in the log. A no-B segment holds zero phase-B lines by construction, so
+      every phase-B line in the log lies either before its first line or
+      after its last, and "a phase-B line with a lower line number" names
+      exactly the phase-B lines in a PRIOR segment. Segment 1 has no prior
+      segment, so 2026-07-27's first — an E probe, an E dispatch, then a
+      resume marker reading `session-limit kill at 09:29 left B unlogged + E
+      digest lost` — can never match it and stays flagged. Measured over the
+      seven archived logs, the discriminator reclassifies exactly one
+      segment — 2026-07-27's fourth, from violation to `RESUME TAIL` — while
+      keeping 2026-07-27 segment 1 flagged and leaving every other segment's
+      verdict untouched, 2026-08-03's included.
+    - **What the discriminator does NOT buy, stated plainly.** Three limits.
+      It is a claim about log order and nothing more, the same cap P1 carries.
+      An earlier phase-B line proves phase B was logged once in this run, not
+      that the tail had no fresh phase-B obligation — a resume that needed B
+      again and never logged it goes quiet here, which is a real blind spot,
+      bounded only by the fact that such a run is not the "B never logged at
+      all" shape P2's modal subject is. That bound is narrow, and the archive
+      holds the live precedent rather than a hypothetical: 2026-08-03's own
+      resume tail logged a FRESH phase-B obligation,
+      `B "staleness resolved against live tree (resume)"`, after two phase-E
+      lines. Had that run died between them, the tail would report
+      `RESUME TAIL` and exit 0 on a genuine E-before-B-then-dead shape. The
+      only discriminator would be reading the action text, which this design
+      refuses everywhere else, so the blind spot is accepted — named, not
+      closed. And it cannot show the earlier phase B RETURNED before the
+      tail's phase E was probed, only that its line precedes. What P2 buys is
+      that the modal failure — E logged, B never logged, run then dead —
+      cannot pass silently.
+    - **The check runs at Phase F, which is past where both incidents died.**
+      2026-08-03 hit the session limit at 09:49 before Phase F; 2026-07-27's
+      log records a `session-limit kill at 09:29 left B unlogged + E digest
+      lost`. A run killed before F produces no verdict at all — the check's
+      own output is one of the things the kill takes with it — and gets one
+      only once a resume carries it to F. Both of these did reach F
+      eventually, but on the far side of a resume: 2026-07-27's took a
+      one-shot launchd job installed by hand, firing at 19:10 that evening.
+      Be precise about who does the resuming, because the two kill shapes
+      differ. The wrapper AUTO-resumes a session-limit kill — it waits out
+      the window's reset and relaunches the resume path headless — while a
+      ceiling-kill only breadcrumbs and waits for a human. So the window in
+      which a broken Monday is invisible is "until the run is resumed",
+      which on the ceiling path means until someone does it by hand, and a
+      run nobody resumes is never checked. Named here for the reason decision
+      23 names its own gap: an incident must not look closed while the
+      mechanism that produced it stays live. The
+      obvious place a partial-log check COULD run is the cron wrapper's
+      INCOMPLETE path, which already renders `phases_summary()` over exactly
+      that partial log before opening the issue. Considered and deferred, not
+      overlooked: it is a change to the wrapper's alert path, and this
+      decision is scoped to the ordering rule and its log check.
+
+    Tradeoff taken: wall clock, and it is a real cost rather than a
+    bookkeeping one. Phase E's `deep-research` runs as a harness-backgrounded
+    workflow the CLI blocks for at end-of-turn, capped by
+    `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`. Dispatching E early overlaps its
+    runtime with Phase B's work, so less of it is left to wait out when the
+    turn ends — very likely what the 2026-08-03 run was buying. Serializing
+    gives that overlap up and pushes more of E's runtime inside the
+    end-of-turn wait, which makes a ceiling-kill likelier. Accepted on one
+    ground: a ceiling-kill is a detected, resumable state (decision 15),
+    while a window reading that was already wrong when it was used leaves
+    nothing to detect. Same caveat as decision 23, and for the same reason:
+    nothing here can be exercised by CI, because what is being fixed is the
+    runtime ordering of an unattended session against a real rate-limit
+    window, so the first real Monday is the test. A check over
+    `custodian-log.jsonl` asserting its phase lines land in order is worth
+    having, and now exists — `scripts/custodian-phase-order.sh`, run by
+    Phase F over the run's own log. But it tests the log, not the runtime. A
+    run that dispatched out of order and logged in order would pass it, so a
+    clean result is evidence of a well-ordered log and of nothing else. What
+    it buys is timing — a broken Monday becomes visible that week rather
+    than whenever someone next reads a log by hand. That is how both the
+    2026-07-27 and the 2026-08-03 orderings sat unread until this decision
+    was written: not one incident missed, but two consecutive weekly runs
+    logging the same shape in plain text with nobody reading it.

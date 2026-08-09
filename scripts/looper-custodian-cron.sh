@@ -28,7 +28,9 @@
 # ceiling-kill still exits 0, the wrapper counted it a clean success — so the
 # report issue was never opened and ~1.4M tokens of research were silently
 # thrown away. Two guards now:
-#   1. The ceiling is raised so a normal Phase E finishes and Phase F runs.
+#   1. The ceiling is raised to give a normal Phase E room to finish
+#      so Phase F runs. How much room that buys is unmeasured — see
+#      the comment on the export below, and decision 15.
 #   2. A ceiling-kill is DETECTED (marker in the run log), never retried
 #      (a retry re-runs C/A/B and re-hits the ceiling), and turned into a
 #      loud, RESUMABLE state: a resume.json breadcrumb + a "Custodian
@@ -69,10 +71,12 @@ set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# Give a backgrounded Phase E room to finish before end-of-turn tears it down.
-# 30 min clears an observed ~11 min deep-research fan-out with headroom while
-# still bounding a genuinely hung task. A ceiling-kill past this is handled
-# below (resume), not retried.
+# Give a backgrounded Phase E room before end-of-turn tears it down.
+# The one sourced figure is the 2026-07-20 cron.log's "still running
+# after 600s; terminating" — where a fan-out was KILLED, not how long
+# one takes — so the margin is unmeasured (decision 15). Left alone
+# until a live Monday measures it. A ceiling-kill is handled below
+# (resume), not retried.
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=1800000
 
 REPO="$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai"
