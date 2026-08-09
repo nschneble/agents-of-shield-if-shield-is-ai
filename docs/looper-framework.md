@@ -11,6 +11,11 @@ Per-wave flow inside `the-looper`:
 
 - `research → plan → build → verify → review → learn → commit`
 
+Each of those steps is checkpointed to a per-wave journal under
+`local/loops/<branch>/` as it completes, so a dispatch killed mid-wave
+resumes at its next unfinished step rather than repeating the wave. The
+contract lives with the executor, in `agents/the-looper.md`.
+
 Cross-wave flow inside Loop de Looper:
 
 - `nonbeliever → scope → wave loop × N → final crew → recap → terminate`

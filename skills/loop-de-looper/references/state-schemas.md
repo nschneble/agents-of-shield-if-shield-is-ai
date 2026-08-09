@@ -1,6 +1,6 @@
 # State schemas
 
-Field shapes + provenance lint for the loop's on-disk gate records. The governing rules live in SKILL.md `## Gate artifacts` and `## State tracking` — consult this file only when writing or validating an artifact.
+Field shapes + provenance lint for the loop's on-disk records. The governing rules live elsewhere — SKILL.md `## Gate artifacts` and `## State tracking` for the two orchestrator-owned files, `agents/the-looper.md` `## Step journal` for the executor-owned per-wave journal. Consult this file only when writing or validating an artifact.
 
 ## gates.jsonl line shape
 
@@ -63,3 +63,43 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
 `pr.body_sha` hashes the PR body as the LOOP last wrote it (wave-1 creation, then the terminal recap refresh) — the baseline Step 4's user-edit guard compares the live body against to tell its own text from the owner's. Without a persisted baseline that guard has nothing to diff and cannot fire correctly, and `editor.login` can't substitute: the loop authenticates as `@me`, so its edits and the owner's carry the same login. Absent on a run predating the field or one whose PR the loop didn't create — the guard reads absent as "assume user-edited" and takes the augment path, which is the safe direction.
 
 `usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
+
+## wave-N.jsonl line shapes
+
+The per-wave step journal — one file per wave in the same branch-keyed dir, named for its wave (`wave-3.jsonl`), appended by `the-looper`, never by the orchestrator. Two line kinds.
+
+Declaration, written BEFORE step one runs:
+
+```json
+{
+  "step": "_declared",
+  "wave": 3,
+  "dispatch": 1, // 1 on the first dispatch, +1 per RETRY — never per resume
+  "reason": "initial", // "initial" | "retry"
+  "steps": ["research", "plan", "build", "verify", "review", "learn", "commit"]
+}
+```
+
+Completion, appended AFTER each step finishes:
+
+```json
+{
+  "step": "plan",
+  "status": "done", // "done" | "skipped" | "escalated" | "stopped"
+  "artifact": "wave-3-plan.md" // a filename in this dir | "working-tree" | null
+}
+```
+
+| `status`    | Means                                                            | To a re-dispatch                                                           |
+| ----------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `done`      | ran to completion                                                | do not re-run — subject to the step's oracle                               |
+| `skipped`   | deliberately not run (plan, when the brief carried gate outputs) | do not run; there is no artifact to reload                                 |
+| `escalated` | ran and handed back `gate needed pre-build`                      | the brief decides: `gate outputs` present ⇒ do not re-run, resume at build |
+| `stopped`   | a stop condition fired at this step                              | resumed dispatch re-runs it; a retry opens a new segment instead           |
+
+Reader rules:
+
+- **Segments.** Only the lines after the LAST `_declared` describe the live attempt. A retry appends a new declaration; a resume appends none and continues the current segment. Everything above the last declaration is audit trail, never an input to a skip.
+- **An unparseable line is discarded — that line, wherever it sits, never the file.** A kill mid-append leaves a truncated line, not a corrupt file, and it need not be the last one: a dispatch that appends onto an unterminated fragment fuses its line to the wreckage and leaves the mess mid-file. Read a discarded line's step as not-done. Discarding errs in exactly one direction and it is the safe one — a line is written only after its step completes, so the worst case is re-running a step that had already finished, which its oracle then confirms. Never repair or rewrite a line, and never void the whole journal over one: the good checkpoints around it are still good, and the oracles, not the parse, are what stop a bad line from authorizing a skip.
+- **Blank lines are noise.** Skip them. Emptiness is not evidence of anything.
+- **Absent file** = first dispatch. **Absent line for a declared step** = that step is not known to have run — which is also what a kill mid-step leaves.
