@@ -43,6 +43,17 @@
 # die identically, so it's detected like a ceiling-kill, breadcrumbed, and the
 # wrapper sleeps until the window's real reset epoch (usage-window-probe.sh)
 # before running the resume path once. Only if that also fails does it alert.
+#
+# Those three all react AFTER a session was spent. The run-start gate below
+# fires first: the skill's usage-window probe guards only Phase E, so a
+# weekly tick landing in an already-hot window burns C/A/B before anything
+# looks. This wrapper therefore probes BEFORE launching claude at all,
+# against the same 95% default the Phase E gate uses. Hot => wait out the
+# reset and launch once; still hot after that => defer the whole run and
+# say so as loudly as a failure (notification + "Custodian INCOMPLETE"
+# issue), because the original sin these alert paths exist for is a Monday
+# that quietly did nothing. Unread window => launch unguarded and log it;
+# unread is not 0%.
 set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -66,6 +77,11 @@ LOG="$LOGDIR/cron.log"
 
 MAX_ATTEMPTS=3
 BACKOFFS=(60 900)  # zsh arrays are 1-indexed: wait before attempt 2, attempt 3
+
+# Usage-window threshold for the run-start gate. Deliberately the SAME
+# default as the Phase E gate in skills/looper-custodian/SKILL.md — one
+# rule checked at two points, not two policies. Move both or they drift.
+WINDOW_THRESHOLD=0.95
 
 # The harness prints this when it terminates background tasks at the ceiling.
 # Matched as a substring so it holds regardless of the "<n>s" in the message.
@@ -110,6 +126,56 @@ EOF
     >>"$LOG" 2>&1 || true
 }
 
+# Run-start defer: the window was over threshold at launch AND still over
+# it after waiting out the reset, so NO phase ran. Nothing is logged and
+# there is no tail to replay, which is why the breadcrumb names a fresh run
+# rather than `resume`. Kept as loud as a hard failure on purpose — a
+# weekly job that quietly does nothing is the 2026-07 silent Monday again.
+alert_deferred() {
+  local state="$1"
+  cat > "$LOGDIR/resume.json" <<EOF
+{"date":"$DATE","reason":"usage-window","partial":false,"started":false,"window":"$state","resume_cmd":"/looper-custodian"}
+EOF
+  osascript -e "display notification \"Usage window still over threshold ($state) — run deferred. Retry: /looper-custodian\" with title \"looper-custodian INCOMPLETE\"" >>"$LOG" 2>&1 || true
+  gh issue create \
+    --title "Custodian INCOMPLETE $DATE" \
+    --body "$(printf 'The weekly run never started. The usage window was at or over the %s threshold at launch and still over it after waiting for the reset (observed: `%s`). No phase ran, so nothing is logged and there is no tail to replay.\n\n**Run it:** `/looper-custodian` — a fresh run, not `resume`.\n' "$WINDOW_THRESHOLD" "$state")" \
+    >>"$LOG" 2>&1 || true
+}
+
+# Read the real rate-limit window and classify it against WINDOW_THRESHOLD.
+# Echoes exactly one of:
+#   hot <window> <why>   over threshold, or the server said "rejected"
+#   ok                   under threshold on both windows
+#   unread <reason>      probe could not read the window
+# <why> names which signal fired, not just a number: a "rejected" status is
+# a hard stop at ANY utilization, so reporting its (possibly tiny) pct
+# alone would read like a threshold trip that never happened.
+# An unread window is UNREAD, not 0% — the caller launches and says so, the
+# same contract usage-window-probe.sh documents for read_ok:false.
+window_state() {
+  "$REPO/scripts/usage-window-probe.sh" 2>/dev/null \
+    | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
+import json, os, sys
+try:
+    p = json.load(sys.stdin)
+except Exception:
+    print("unread parse_failed"); sys.exit(0)
+if not p.get("read_ok"):
+    print("unread %s" % p.get("reason", "unknown")); sys.exit(0)
+t = float(os.environ["THRESHOLD"])
+for name in ("five_hour", "weekly"):
+    w = p.get(name) or {}
+    u = w.get("utilization")
+    pct = "%.0f%%" % (u * 100) if u is not None else "unread"
+    if w.get("status") == "rejected":
+        print("hot %s rejected@%s" % (name, pct)); sys.exit(0)
+    if u is not None and u >= t:
+        print("hot %s %s" % (name, pct)); sys.exit(0)
+print("ok")
+'
+}
+
 # Sleep until the 5h usage window resets. Reads the real reset epoch from the
 # ratelimit-header probe; a bounded fallback covers an unreadable probe. Capped
 # at 6h so a bad epoch can't park the job forever.
@@ -129,6 +195,40 @@ except Exception: pass' 2>/dev/null)
   echo "=== waiting ${wait}s for the usage window to reset ($(date)) ===" >> "$LOG"
   sleep "$wait"
 }
+
+# Run-start gate. The Phase E probe guards only the run's biggest dispatch;
+# C/A/B run before it and are not free, so a cron firing into an already
+# hot window has spent what's left by the time E looks. Probe before
+# spending a headless session at all: hot => wait the reset and launch once;
+# still hot after => defer the whole run, loudly. Unread => launch, say so.
+gate_state="$(window_state)"
+case "$gate_state" in
+  'hot weekly'*)
+    # A 7-day window does not roll inside wait_for_window_reset's 6h cap,
+    # and that helper reads the 5h reset epoch anyway — so waiting one out
+    # would burn the morning and defer regardless. Defer now, loudly.
+    echo "=== run-start gate: usage window $gate_state — weekly window will not reset inside the wait cap, deferring the run ===" >> "$LOG"
+    alert_deferred "$gate_state"
+    exit 5
+    ;;
+  'hot '*)
+    echo "=== run-start gate: usage window $gate_state (threshold $WINDOW_THRESHOLD) — waiting for reset before launching ($(date)) ===" >> "$LOG"
+    wait_for_window_reset
+    gate_state="$(window_state)"
+    if [[ "$gate_state" == 'hot '* ]]; then
+      echo "=== run-start gate: window still $gate_state after the wait — deferring the run ===" >> "$LOG"
+      alert_deferred "$gate_state"
+      exit 5
+    fi
+    echo "=== run-start gate: window cleared ($gate_state) — launching ($(date)) ===" >> "$LOG"
+    ;;
+  'unread '*)
+    echo "=== run-start gate: usage window $gate_state — launching unguarded ($(date)) ===" >> "$LOG"
+    ;;
+  *)
+    echo "=== run-start gate: usage window ok — launching ($(date)) ===" >> "$LOG"
+    ;;
+esac
 
 attempt=1
 while true; do
