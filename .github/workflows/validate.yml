@@ -18,6 +18,8 @@ jobs:
         run: ./scripts/custodian-guardrails.test.sh
       - name: Skill spec lint (both directions)
         run: ./scripts/custodian-skill-lint.test.sh
+      - name: Custodian phase-order log check (both directions)
+        run: ./scripts/custodian-phase-order.test.sh
       - name: Doc-bloat detector (both directions)
         run: ./scripts/doc-bloat-scan.test.sh
       - name: Correction-gates runner (both directions)

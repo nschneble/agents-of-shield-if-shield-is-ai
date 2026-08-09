@@ -576,6 +576,11 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     nothing here can be exercised by CI, because what is being fixed is the
     runtime ordering of an unattended session against a real rate-limit
     window, so the first real Monday is the test. A check over
-    `custodian-log.jsonl` could assert its phase lines land in order, and
-    that is worth having — but it would test the log, not the runtime. A run
-    that dispatched out of order and logged in order would pass it.
+    `custodian-log.jsonl` asserting its phase lines land in order is worth
+    having, and now exists — `scripts/custodian-phase-order.sh`, run by
+    Phase F over the run's own log. But it tests the log, not the runtime. A
+    run that dispatched out of order and logged in order would pass it, so a
+    clean result is evidence of a well-ordered log and of nothing else. What
+    it buys is timing — a broken Monday becomes visible that week rather
+    than whenever someone next reads a log by hand, which is how the
+    2026-08-03 ordering sat unread until this decision was written.
