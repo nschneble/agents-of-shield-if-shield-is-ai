@@ -17,6 +17,13 @@
 #
 # Run from anywhere; resolves the repo root itself. Wire into CI (see
 # .github/workflows/validate.yml) and run locally before committing spec edits.
+#
+# Deliberately over the ~100-line refactor bar, same waiver
+# scripts/temp-dir-guard.test.sh carries. The three checks share one
+# `errors` verdict and one repo-root resolution, and the wiring check has
+# already been wrong in both directions — splitting it into a file that
+# cannot see the frontmatter walk's file list is how a fourth spelling
+# gets missed. Trim its prose before reaching for its code.
 
 set -uo pipefail
 

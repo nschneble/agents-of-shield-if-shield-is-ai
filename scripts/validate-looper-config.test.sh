@@ -17,6 +17,11 @@
 # of the validator, which resolves its repo root from its own path. No git,
 # no network. Needs a writable temp dir, so it must run sandbox-off
 # locally; it aborts rather than degrade when it cannot get one.
+#
+# The verdict is derived from a results LOG, and an expected assertion
+# count is asserted alongside it. Both because this file is now what
+# guarantees every other suite reaches CI, and a guarantor that can
+# false-green through its own accountant guarantees nothing.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -37,10 +42,20 @@ temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
 [ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
-fails=0
+# Both the verdict and the assertion count are DERIVED from a log this
+# function appends to, never from a shell counter it increments. The
+# counter form had a one-token false-green: deleting `fails=$((fails+1))`
+# left the suite printing five FAIL lines and exiting 0 under
+# `all validate-looper-config tests passed`. It also had no floor, so
+# deleting a whole fixture block was zero FAILs and zero noise. This
+# file is the one that guarantees every OTHER suite is wired into CI, so
+# it is the one that must not be able to lie. Deleting the FAIL append
+# now shortens the log and trips the count instead.
+results="$temp_dir/results.log"
+: > "$results" || die_temp "cannot open the results log at $results"
 check() { # desc, condition-already-evaluated ($?)
-  if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"
-  else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
+  if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"; printf 'ok\n' >> "$results"
+  else printf 'FAIL  %s\n' "$1"; printf 'FAIL\n' >> "$results"; fi
 }
 
 fix="$temp_dir/fixture"
@@ -63,16 +78,20 @@ run_fixture() { # sets $out and $rc — not a subshell, so both survive
 # still exit 0 for other reasons, so the absence of THAT error is the
 # assertion). `unwired` = it must complain, by name, and exit nonzero.
 wiring() { # label, wired|unwired  — workflow body arrives on stdin
+  local r saw want
   cat > "$wf"
   run_fixture
-  if [ "$2" = wired ]; then
-    [ "$rc" -eq 0 ] \
-      && ! printf '%s\n' "$out" | grep -q 'alpha.test.sh is not invoked'
-  else
-    [ "$rc" -ne 0 ] \
-      && printf '%s\n' "$out" | grep -q 'alpha.test.sh is not invoked'
-  fi
-  check "$1 ($2, exit $rc)" $?
+  # both sides of the label, not just the want: a FAIL reading only
+  # `(unwired, exit 1)` names the expectation and leaves the reader
+  # guessing which half of it missed
+  printf '%s\n' "$out" | grep -q 'alpha.test.sh is not invoked' \
+    && saw=complained || saw=silent
+  if [ "$2" = wired ]; then want='exit 0 + silent'
+    [ "$rc" -eq 0 ] && [ "$saw" = silent ]
+  else want='nonzero + complained'
+    [ "$rc" -ne 0 ] && [ "$saw" = complained ]
+  fi; r=$?
+  check "$1 ($2: exit $rc + $saw, want $want)" "$r"
 }
 
 # --- WIRED: the three spellings CI actually executes. ---
@@ -239,6 +258,18 @@ run_fixture
 [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'does not exist'
 check "resolving reference does not warn (exit $rc)" $?
 
+# --- the tally, derived from the log rather than from a counter ---------
+# EXPECTED_CHECKS is the floor. Add or remove a fixture block and this
+# number moves with it — that is the point: a block deleted on its own
+# reads as silence, and silence is what this file exists to stop.
+EXPECTED_CHECKS=17
+ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
-if [ "$fails" -eq 0 ]; then echo "all validate-looper-config tests passed"; exit 0
-else echo "$fails validate-looper-config test(s) FAILED"; exit 1; fi
+[ "$ran" -eq "$EXPECTED_CHECKS" ] \
+  || echo "FAIL  assertion count ($ran, want $EXPECTED_CHECKS) — a block was dropped, or added without moving EXPECTED_CHECKS"
+# both conditions in ONE verdict, so there is no accumulator to delete
+if [ "$fails" -eq 0 ] && [ "$ran" -eq "$EXPECTED_CHECKS" ]; then
+  echo "all $ran validate-looper-config tests passed"; exit 0
+  # never "0 FAILED" beside a non-zero exit: on a count trip the failure
+  # IS the missing assertions, so the line has to say so
+else echo "validate-looper-config FAILED: $fails failing, $ran of $EXPECTED_CHECKS assertions ran"; exit 1; fi

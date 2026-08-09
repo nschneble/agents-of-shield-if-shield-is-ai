@@ -60,10 +60,22 @@ to the owner rather than licensing a self-correction.
 ## Config validation
 
 The agent + skill specs are themselves checked. `scripts/validate-looper-config.sh`
-asserts every `agents/*.md` and `skills/*/SKILL.md` has the frontmatter the
-harness resolves on (`name`, `description`) and that the declared name matches
-its path — a malformed name silently breaks resolution. It also warns on
-backtick'd repo-relative path references that don't resolve (doc rot), while
-leaving `[[memory-links]]` alone (a dangling one is a valid forward-reference).
+carries three responsibilities, split across two severities.
+
+Two ERROR. It asserts every `agents/*.md` and `skills/*/SKILL.md` has the
+frontmatter the harness resolves on (`name`, `description`) and that the declared
+name matches its path — a malformed name silently breaks resolution. And it
+asserts every `*.test.sh` in the tree is actually invoked by
+`.github/workflows/validate.yml`, reading only the command text CI executes
+rather than any mention of the path: a suite CI never runs is a red nobody sees,
+which `doc-bloat-scan.test.sh` demonstrated by sitting out of the workflow for a
+week while failing. That check is why `scripts/validate-looper-config.test.sh`
+exists — the wiring match has been wrong in both directions, and both were
+silent.
+
+One WARNS. Backtick'd repo-relative path references that don't resolve are doc
+rot, reported without blocking a merge, while `[[memory-links]]` are left alone
+(a dangling one is a valid forward-reference).
+
 The `.github/workflows/validate.yml` CI job runs it on every push and PR, so a
 broken spec can't land; run it locally before committing spec edits.

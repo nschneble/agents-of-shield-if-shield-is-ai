@@ -466,14 +466,15 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       reset (reusing the `wait_for_window_reset` the session-limit path
       already had) — except on a hot *weekly* window, which cannot roll
       inside that helper's 6h cap and so defers immediately rather than
-      burning the morning first. A window still over threshold after the
-      wait defers the whole run through the loud path — notification plus
-      a `Custodian INCOMPLETE <date>` issue — because a job that quietly
-      does nothing is exactly the 2026-07-06 / 2026-07-13 failure the alert
-      paths were built for. Invoked by hand, the run defers at step 0 with
-      a breadcrumb and no issue. The breadcrumb names a fresh
-      `/looper-custodian`, never `resume`: no phase logged means no tail to
-      replay.
+      burning the morning first. **Every unattended defer takes the loud
+      path — notification plus a `Custodian INCOMPLETE <date>` issue —
+      whether it came after the wait or straight away**, because a job
+      that quietly does nothing is exactly the 2026-07-06 / 2026-07-13
+      failure the alert paths were built for. The two differ only in what
+      the issue body says happened. Invoked by hand, the run defers at
+      step 0 with a breadcrumb and no issue, because a person is already
+      watching. The breadcrumb names a fresh `/looper-custodian`, never
+      `resume`: no phase logged means no tail to replay.
     - **Honest about what this gate does not cover.** It would NOT have
       saved 2026-08-03 — the front door was clear at 36%. Its case is the
       different one: a cron tick that never had room. Claiming otherwise

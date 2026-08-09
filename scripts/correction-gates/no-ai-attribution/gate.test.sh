@@ -80,7 +80,12 @@ out=$("$gate" --dir "$repo" --range HEAD --body "$temp_dir/genwith.txt"); rc=$?
 
 # --- RED: a Co-Authored-By: Claude trailer in the tip commit fires. ---
 printf 'feat: a change\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n' > "$temp_dir/msg"
-( cd "$repo" && echo two > f.txt && git add -A && git commit -q -F "$temp_dir/msg" ) >/dev/null 2>&1
+# silenced like its sibling above, so it needs the same `||`: the `cd &&`
+# chain short-circuits rather than committing into the caller's repo, but
+# a failure here leaves the tainted commit unmade and reports the GATE as
+# broken for missing a marker that was never written
+( cd "$repo" && echo two > f.txt && git add -A && git commit -q -F "$temp_dir/msg" ) >/dev/null 2>&1 \
+  || die_temp "tainted-commit fixture setup failed in $repo"
 out=$("$gate" --dir "$repo" --range HEAD); rc=$?
 [ "$rc" -eq 1 ] && r=0 || r=1; check "RED: Co-Authored-By Claude trailer fails (exit 1)" "$r"
 printf '%s\n' "$out" | grep -qi 'co-authored-by'; check "RED: cites the trailer line" $?

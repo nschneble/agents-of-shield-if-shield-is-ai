@@ -29,11 +29,13 @@
 # The roster is DERIVED, never hand-listed: every `*.test.sh` in the repo
 # that mentions mktemp, minus this file. A hardcoded list covers the
 # suites someone remembered; the seventh suite would be covered by
-# nothing and fail nothing. Derivation has its own two failure modes, both
-# of which used to pass: narrowing it to a subset (pinned by a second
-# count spelled with find rather than a recursive grep) and emptying it
+# nothing and fail nothing. Derivation has its own three failure modes,
+# all of which used to pass: narrowing it to a subset (pinned by a second
+# count spelled with find rather than a recursive grep); emptying it
 # altogether (pinned by running a copy of this suite alone in a bare tree,
-# because an empty array under `set -u` is legal on the bash CI runs).
+# because an empty array under `set -u` is legal on the bash CI runs); and
+# WIDENING it back over `local/` (pinned by a planted scratch suite that
+# must be neither counted nor executed).
 #
 # scripts/custodian-history.sh is checked by name at the end. It carries
 # the same guard but is not a suite, so no derivation over `*.test.sh` can
@@ -54,7 +56,14 @@ repo_root=$(cd "$here/.." && pwd)
 # TMPDIR on BSD and allocates under /var/folders.
 # one arm per shape: mktemp's own stderr explains a nonzero exit, but the
 # empty-yet-successful shape prints nothing, so "failed" would be a lie
-die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+# fd 3 is this suite's own stderr, saved before any fixture runs, so a
+# refusal spoken from inside the silenced victim subshell below still
+# reaches an operator. Forced with a failing victim `git init`, this file
+# printed 238 lines, no FATAL, 104 ok and 62 FAIL, and told a CI reader
+# their repo had been clobbered — quoting the operator's real global git
+# identity as the drift — by a suite that never ran.
+exec 3>&2
+die_temp() { echo "FATAL: $1; refusing to run" >&3; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
   || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] \
@@ -77,7 +86,8 @@ check() { # desc, condition-already-evaluated ($?)
 # below already carried — planting `local/scratch/fake.test.sh` did two
 # things, and the miscount was the lesser: this loop EXECUTED that
 # unreviewed file three times, with a poisoned PATH, from inside the
-# victim repo.
+# victim repo. Both halves are now pinned by the planted-scratch fixture
+# near the end of this file.
 suites=()
 while IFS= read -r suite; do
   case "$suite" in "$here/temp-dir-guard.test.sh") continue ;; esac
@@ -135,15 +145,30 @@ chmod +x "$shim_fail/mktemp" "$shim_empty/mktemp" "$shim_notdir/mktemp"
 # file a stray `git add -A` would sweep in
 victim="$temp_dir/victim"
 mkdir -p "$victim" || die_temp "cannot create $victim"
+# chained with `&&`, because a subshell reports only its LAST command:
+# with a failing `git init` the trailing `echo` still succeeded, so an
+# `||` on the group alone never fired. `set -e` inside does NOT fix that
+# — errexit is suppressed in a subshell that is the left operand of an
+# AND-OR list, which is exactly the position this one is in, so the
+# chain is the only spelling that reports.
 (
-  cd "$victim" || die_temp "cannot cd into $victim"
-  git init -q -b main
-  git config user.email victim@caller.test
-  git config user.name  victim
-  echo seed > seed.txt && git add seed.txt && git commit -q -m seed
-  echo wip > uncommitted.txt
-) >/dev/null 2>&1
-head0=$(cd "$victim" && git rev-parse HEAD)
+  cd "$victim" \
+    && git init -q -b main \
+    && git config user.email victim@caller.test \
+    && git config user.name  victim \
+    && echo seed > seed.txt && git add seed.txt && git commit -q -m seed \
+    && echo wip > uncommitted.txt \
+    || die_temp "victim fixture setup failed in $victim"
+# the refusal is spoken from INSIDE the silence, over fd 3, and the exit
+# out here carries no second message: one fault, one line. `exit` in a
+# subshell ends only the subshell, so the parent still needs this arm or
+# every assertion below runs against a fixture that was never built.
+) >/dev/null 2>&1 || exit 2
+head0=$(cd "$victim" && git rev-parse HEAD 2>/dev/null)
+# a baseline the fixture never produced is not a passing assertion: with
+# head0 empty every drift() HEAD comparison matched empty against empty
+# and printed `no commit landed in the caller repo (HEAD , want )`
+[ -n "$head0" ] || die_temp "victim fixture produced no HEAD baseline in $victim"
 
 # both the observed AND the baseline value go in the label: `trap rm -rf`
 # deletes the victim on exit, so a FAIL line naming only what was seen
@@ -204,21 +229,66 @@ for suite in "${suites[@]}"; do
   drift "GREEN $name"
 done
 
+# --- fixtures that run a COPY of this suite ------------------------------
+# Both sections below stand this file up in a synthetic tree and run it.
+# A copy that discovers a suite reaches these sections itself and stands
+# up another tree, so the nesting is bounded by an env marker rather than
+# by luck: today the planted copy bails at the roster guard before it
+# gets here, but that is the very property one of them is testing, and
+# the failing direction is unbounded recursion.
+nested_run() { # tree-root — run a copy of this suite from another tree
+  mkdir -p "$1/scripts" || die_temp "cannot create $1/scripts"
+  cp "$here/temp-dir-guard.test.sh" "$1/scripts/" \
+    || die_temp "cannot copy this suite into $1/scripts"
+  chmod +x "$1/scripts/temp-dir-guard.test.sh"
+  LOOPER_SUITE_NESTED=1 "$1/scripts/temp-dir-guard.test.sh" 2>&1
+}
+
+if [ -n "${LOOPER_SUITE_NESTED:-}" ]; then
+  echo "(nested run: skipping the copy-of-this-suite fixtures)"
+else
+
 # --- the empty-roster bail-out has to be reachable -----------------------
 # a copy of this suite alone in a bare tree discovers nothing but itself,
 # which it skips. On bash >= 4.4 — CI is ubuntu-latest — `"${arr[@]}"` on
 # an empty array is legal under `set -u`, so without the bail-out the loop
 # above sails through asserting nothing and exits 0. Only bash 3.2 dies
 # loudly on it, which is the environment CI does not have.
-solo="$temp_dir/solo/scripts"
-mkdir -p "$solo" || die_temp "cannot create $solo"
-cp "$here/temp-dir-guard.test.sh" "$solo/" \
-  || die_temp "cannot copy this suite into $solo"
-chmod +x "$solo/temp-dir-guard.test.sh"
-out=$("$solo/temp-dir-guard.test.sh" 2>&1); rc=$?
+out=$(nested_run "$temp_dir/solo"); rc=$?
 [ "$rc" -eq 1 ] \
   && printf '%s\n' "$out" | grep -q 'discovery found no suite'
 check "empty roster bails out loudly (exit $rc, want 1)" $?
+
+# --- the `local/` exclusion has to survive a revert ----------------------
+# The roster's `--exclude-dir` and the `expected` cross-check's
+# `-not -path './local/*'` are a copy-paste pair, so reverting both
+# widens them in lockstep and the cross-check cannot see it. With no
+# scratch file present the revert is silent, and when it does fire the
+# red reads "your scratch file lacks a temp-dir guard" — which invites
+# guarding the scratch file rather than restoring the exclusion, after
+# the unreviewed file has already been EXECUTED with a poisoned PATH
+# from inside the victim repo. So the fixture pins both halves: not
+# counted, and not run.
+planted="$temp_dir/planted"
+mkdir -p "$planted/local/scratch" || die_temp "cannot create $planted/local/scratch"
+marker="$planted/local/scratch/EXECUTED"
+# mentions mktemp so a widened roster WILL discover it, and leaves proof
+# on disk if anything ever runs it
+printf '#!/usr/bin/env bash\ntouch "%s"\n: mktemp\nexit 0\n' "$marker" \
+  > "$planted/local/scratch/fake.test.sh"
+chmod +x "$planted/local/scratch/fake.test.sh"
+out=$(nested_run "$planted"); rc=$?
+[ "$rc" -eq 1 ] \
+  && printf '%s\n' "$out" | grep -q 'discovery found no suite'
+check "planted local/ suite is not counted (exit $rc, want 1)" $?
+# the observation is resolved into a variable first: a `$(…)` spliced
+# into the label runs before the `$?` beside it expands, and would hand
+# check() the substitution's own status
+[ -e "$marker" ] && seen=present || seen=absent
+[ "$seen" = absent ]
+check "planted local/ suite is never executed (marker $seen, want absent)" $?
+
+fi   # end of the copy-of-this-suite fixtures
 
 # --- the production script carrying the same guard -----------------------
 # custodian-history.sh is not a suite, so the derived roster structurally

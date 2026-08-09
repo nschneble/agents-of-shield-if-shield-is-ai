@@ -9,7 +9,9 @@
 # braced one-liners (a `{/*` read as an unconditional block opener would
 # swallow the code between them into a phantom block), a `// TODO:`
 # marker, a braced token inside a string, a `https://` URL (the `//` must
-# not read as a comment), and a ≤75-char comment.
+# not read as a comment), and a comment of exactly 75 chars — the boundary
+# itself, paired with an exactly-76 line on the red side so the comparison
+# is pinned from both directions rather than somewhere in the middle.
 # Three more green shapes carry the block bookkeeping: a block with NO
 # content line at all, in both the bare and the `*`-only spelling, so that
 # miscounting an empty body emits a candidate quoting nothing; the braced
@@ -72,6 +74,9 @@ export const e = 5
    and one more body line follows
 */
 export const j = 6
+
+// a comment running exactly one character past the seventy-five column wrap
+export const k = 7
 EOF
 
 # ── RED fixture: the JSX braced spelling of the same shapes ────────────────────
@@ -125,6 +130,9 @@ export const k = 6
 { /*
   a block scope, not a comment: the brace has to abut the slash
 */ }
+
+// a comment measured to stop exactly at the seventy-fifth column, no wider
+export const l = 7
 EOF
 
 cat > "$temp_dir/clean.tsx" <<'EOF'
@@ -164,6 +172,16 @@ check "stacked-slashes fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"over-75"'
 check "over-75 fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# the boundary itself, both sides of it. `len > 75` had nothing pinning
+# the comparison: `>= 75`, `> 74` and `> 76` all survived. bloat.ts:27 is
+# exactly 76 chars and must fire (kills `> 76`); the clean fixture's
+# exactly-75 line must not (kills `>= 75` and `> 74`).
+echo "$out" | grep -q '"file":"[^"]*bloat.ts","line":27,"kind":"over-75"'
+check "a 76-char comment fires over-75" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q 'clean\.ts".*"kind":"over-75"'
+check "a 75-char comment does not fire over-75" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"capitalized-slash"'
 check "capitalized-slash fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
@@ -215,7 +233,7 @@ check "clean.tsx produces no candidate" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 # dropped the last 20 lines including the Usage block, and reddened
 # nothing. Four assertions, because each catches a different regression —
 # a non-zero exit, an empty body, stderr noise leaking into a help screen
-# piped to a pager, and the truncation itself.
+# piped to a pager, and truncation at EITHER end.
 help_out=$("$scanner" --help 2>"$temp_dir/help.err"); help_rc=$?
 [ "$help_rc" -eq 0 ]
 check "--help exits 0 (got $help_rc)" $?
@@ -226,6 +244,16 @@ check "--help writes nothing to stderr" $?
 # the LAST line of the header, so a range that stops short cannot pass
 printf '%s\n' "$help_out" | grep -q -- '-h | --help'
 check "--help reaches the end of the header (no truncation)" $?
+# and the FIRST, because only the tail was pinned: moving the range start
+# to `sed -n '30,/^set -/p'` dropped 28 of 61 help lines and stayed green
+printf '%s\n' "$help_out" | grep -q 'doc-bloat-scan — self-contained comment-bloat detector'
+check "--help starts at the top of the header (no head truncation)" $?
+
+# the header documents `-h | --help`, so the alias is part of the contract:
+# narrowing the case to `--help)` silently turned `-h` into a scan of `.`
+h_out=$("$scanner" -h 2>"$temp_dir/h.err"); h_rc=$?
+[ "$h_rc" -eq 0 ] && [ "$h_out" = "$help_out" ] && [ ! -s "$temp_dir/h.err" ]
+check "-h is the same answer as --help (exit $h_rc)" $?
 
 printf '\n%d failure(s)\n' "$fails"
 [ "$fails" -eq 0 ]

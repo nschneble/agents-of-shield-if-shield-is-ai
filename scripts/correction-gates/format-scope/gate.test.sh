@@ -63,7 +63,10 @@ STUB
 chmod +x "$stub"
 
 # --- GREEN: only the touched file changed and it is prettier-clean. ---
-g="$temp_dir/green"; mkdir -p "$g"
+# every fixture dir is guarded: an unmade dir sends the writes below to
+# paths that do not exist, and a gate handed an empty tree reports clean
+# — which is what several of these assertions are checking FOR
+g="$temp_dir/green"; mkdir -p "$g" || die_temp "cannot create $g"
 printf '.a { color: red; }\n' > "$g/a.css"
 printf 'a.css\n' > "$g/changed.txt"
 out=$(PRETTIER="$stub" "$gate" --dir "$g" --changed "$g/changed.txt" a.css); rc=$?
@@ -71,7 +74,7 @@ out=$(PRETTIER="$stub" "$gate" --dir "$g" --changed "$g/changed.txt" a.css); rc=
 printf '%s\n' "$out" | grep -q 'format-scope-gate: clean'; check "GREEN: reports clean" $?
 
 # --- RED-A: a declared touched file is not prettier-clean. ---
-ra="$temp_dir/reda"; mkdir -p "$ra"
+ra="$temp_dir/reda"; mkdir -p "$ra" || die_temp "cannot create $ra"
 printf '.a{color:red} @dirty\n' > "$ra/a.css"
 printf 'a.css\n' > "$ra/changed.txt"
 out=$(PRETTIER="$stub" "$gate" --dir "$ra" --changed "$ra/changed.txt" a.css); rc=$?
@@ -79,7 +82,7 @@ out=$(PRETTIER="$stub" "$gate" --dir "$ra" --changed "$ra/changed.txt" a.css); r
 printf '%s\n' "$out" | grep -q 'VIOLATION A .*not prettier-clean: a.css'; check "RED-A: cites the unclean touched file" $?
 
 # --- RED-B: out-of-scope file reformatted (clean, not declared). ---
-rb="$temp_dir/redb"; mkdir -p "$rb"
+rb="$temp_dir/redb"; mkdir -p "$rb" || die_temp "cannot create $rb"
 printf '.a { color: red; }\n' > "$rb/a.css"       # touched, clean
 printf 'const x = 1;\n'       > "$rb/vendor.js"   # changed, NOT touched, clean
 printf 'a.css\nvendor.js\n'   > "$rb/changed.txt"
@@ -92,7 +95,7 @@ printf '%s\n' "$out" | grep -q 'full-tree drift OR an undeclared edit'; check "R
 # logo.png is touched but prettier-unsupported -> note not violation
 # (out-of-glob carve-out). notes.txt changed out-of-scope but UNCLEAN ->
 # not format drift.
-c="$temp_dir/control"; mkdir -p "$c"
+c="$temp_dir/control"; mkdir -p "$c" || die_temp "cannot create $c"
 printf '.a { color: red; }\n'  > "$c/a.css"
 printf 'PNGDATA @unsupported\n' > "$c/logo.png"
 printf 'raw @dirty\n'           > "$c/notes.txt"

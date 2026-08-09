@@ -189,7 +189,8 @@ EOF
 # Echoes exactly one of:
 #   hot <window> <why>   over threshold, or the server said "rejected"
 #   ok                   under threshold on both windows
-#   unread <reason>      probe could not read the window
+#   unread <reason>      probe could not read the window, or WINDOW_THRESHOLD
+#                        was not a number to compare it against
 # <why> names which signal fired, not just a number: a "rejected" status is
 # a hard stop at ANY utilization, so reporting its (possibly tiny) pct
 # alone would read like a threshold trip that never happened.
@@ -210,7 +211,15 @@ except Exception:
     print("unread parse_failed"); sys.exit(0)
 if not p.get("read_ok"):
     print("unread %s" % p.get("reason", "unknown")); sys.exit(0)
-t = float(os.environ["THRESHOLD"])
+# a non-numeric WINDOW_THRESHOLD raised here, which printed nothing, and
+# the caller read an empty state as "unrecognized probe output: ''" and
+# launched with both windows possibly at 99%. Fail-open stays the
+# contract; naming the threshold is what makes it fixable, since the env
+# override is the only way to reach this at all.
+try:
+    t = float(os.environ["THRESHOLD"])
+except ValueError:
+    print("unread bad_threshold=%r" % os.environ["THRESHOLD"]); sys.exit(0)
 # weekly first, both passes. Returning on the first hit of a
 # ("five_hour", "weekly") scan let a hot 5-hour window MASK a hot weekly
 # one: the caller then took the wait arm, slept up to 6h, re-probed and
