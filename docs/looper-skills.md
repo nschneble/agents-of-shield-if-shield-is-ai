@@ -230,9 +230,14 @@ Added in framework v1.3.
 Scheduled cross-run, cross-repo housekeeping. The only looper step that
 runs across runs and repos on a cadence.
 
-The scheduled run is five phases, executed **C → A → B → E → F**, one at a
-time — a phase is done when its subagents have returned, not when they were
-dispatched:
+The scheduled run is five phases, and the spec requires them executed
+**C → A → B → E → F**, one at a time — a phase is done when its subagents
+have returned, not when they were dispatched. Stated as a requirement, not a
+description: the two most recent archived runs did not LOG that order, and
+nothing enforces the runtime. What exists is `scripts/custodian-phase-order.sh`,
+which Phase F runs over the run's own log and which asserts the order the run
+LOGGED — never that the runtime was serialized (decision 24,
+`docs/looper-custodian.md`):
 
 - **C** mines wave history across repos into a cited index
 - **A** GCs merged-branch artifacts under `local/loops/`

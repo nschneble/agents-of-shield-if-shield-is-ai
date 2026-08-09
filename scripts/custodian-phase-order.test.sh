@@ -5,11 +5,11 @@
 # Standing rule: a new invariant is tested RED (goes off on a violating
 # fixture) AND green (clean fixture passes). Proves P1 flags an out-of-order
 # phase-E line citing both offending lines verbatim, P2 flags a segment whose
-# phase-E lines have no phase-B line to be ordered against, the exit code
-# tracks both, and the two report-only classes — malformed lines and segments
-# with no phase-E line — stay out of the violation set.
+# phase-E lines have no phase-B line logged at or before them, the exit code
+# tracks both, and the three report-only classes — malformed lines, segments
+# with no phase-E line, and resume tails — stay out of the violation set.
 #
-# Four further properties the check's honesty depends on:
+# Five further properties the check's honesty depends on:
 #   - SEGMENTATION is load-bearing: deleting the `resume` marker from the
 #     GREEN fixture, and changing nothing else, must turn it RED. Without
 #     that arm a check that ignored segments entirely would still pass GREEN,
@@ -23,10 +23,17 @@
 #   - NOTHING CHECKED is not clean: a log the check cannot read asserts
 #     nothing, so it must be distinguishable from a verified run at BOTH the
 #     headline and the exit code, or schema drift greens the gate forever.
-#   - CLAIM DISCIPLINE, in both directions. The report must say it asserts log
-#     order only (decision 24 caps what this check may claim), and it must NOT
-#     say anything more — a present disclaimer does not stop an overclaim from
-#     being added beside it, so the negative arm greps for one.
+#   - The P2 DISCRIMINATOR reads the earlier phase-B line, not the segment
+#     number. One fixture pair carries both directions: a textbook E-only
+#     resume tail exits 0, and the same fixture with its phase-B lines
+#     deleted exits 1. Without the pair, a check that flagged every no-B
+#     segment and a check that flagged none would each pass some single arm.
+#   - CLAIM DISCIPLINE, in both directions, INCLUDING on the disclaimer's own
+#     line. The report must say it asserts log order only (decision 24 caps
+#     what this check may claim), and it must NOT say anything more. The
+#     negative arm strips the pinned SUBSTRING rather than the line it sits
+#     on: dropping the line hid every overclaim welded onto it, which is the
+#     one place a future edit is actually likely to put one.
 #
 # Fixtures are written by this file — never read from gitignored `local/`.
 # Pure bash + jq, self-contained.
@@ -83,11 +90,17 @@ agree() { # desc — reads $out and $rc from the case just run
   check "AGREE: $1 exit code $rc matches its printed total (want $want)" $?
 }
 
-# the check may say it asserts log order; it may never say more than that
-no_overclaim() { # desc
-  ! printf '%s\n' "$out" \
-    | grep -v 'ASSERTS LOG ORDER ONLY, never runtime serialization' \
+# the check may say it asserts log order; it may never say more than that.
+# Strips the pinned SUBSTRING, never the line: `grep -v` dropped the whole
+# line, so an overclaim WELDED onto the disclaimer's own line was unreachable
+# — and that line is exactly where a future edit lands. The `s|…||` leaves the
+# rest of the line behind for the grep to find.
+overclaims() { # reads the report on stdin; 0 = an overclaim is present
+  sed 's|ASSERTS LOG ORDER ONLY, never runtime serialization||g' \
     | grep -Eq 'serializ|at runtime|proves the phase'
+}
+no_overclaim() { # desc
+  ! printf '%s\n' "$out" | overclaims
   check "CLAIM: $1 report carries no runtime claim beyond the pinned line" $?
 }
 
@@ -133,10 +146,10 @@ out=$("$runner" --log "$red"); rc=$?
 
 [ "$rc" -eq 1 ] && result=0 || result=1; check "RED: exit code is 1" "$result"
 agree "RED:"
-printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 3  (P1 2 phase-E lines · P2 1 segments)'
-check "RED: total is 3 (two pre-B phase-E lines + one unordered segment)" $?
-printf '%s\n' "$out" | grep -q 'segments: checked 2 · unordered 1 · not evaluable 1 · violations 3'
-check "RED: segment counts split checked/unordered/not-evaluable" $?
+printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 2  (P1 2 phase-E lines · P2 0 segments)'
+check "RED: total is 2 (the two pre-B phase-E lines)" $?
+printf '%s\n' "$out" | grep -q 'segments: checked 2 · unordered 0 · resume tail 1 · not evaluable 1 · violations 2'
+check "RED: segment counts split checked/unordered/resume-tail/not-evaluable" $?
 # both offending lines are cited verbatim, subject AND the B line it precedes
 printf '%s\n' "$out" | grep 'VIOLATION P1' | grep -q 'usage-window probe (pre-E gate)'
 check "RED: pre-E probe cited verbatim as a P1 violation" $?
@@ -158,11 +171,25 @@ check "RED: malformed counted separately from violations" $?
 # the blank/whitespace tail lines must not inflate that 2
 printf '%s\n' "$out" | grep -q '17 phase records · 2 malformed'
 check "RED: blank and whitespace-only lines are neither records nor malformed" $?
-printf '%s\n' "$out" | grep -q 'VIOLATION P2  segment 3: 1 phase-E line(s), no phase-B line'
-check "RED: phase-E-only segment is a P2 violation, not a free pass" $?
+printf '%s\n' "$out" | grep -q 'RESUME TAIL  segment 3: 1 phase-E line(s), no phase-B line, but 4 phase-B line(s) logged earlier'
+check "RED: phase-E-only segment with earlier phase-B lines is a resume tail" $?
+! printf '%s\n' "$out" | grep -q 'VIOLATION P2'
+check "RED: and that resume tail is NOT counted as a P2 violation" $?
 printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  segment 4: 1 phase-B line(s), 0 phase-E line(s)'
 check "RED: segment with no phase-E line is report-only, never a violation" $?
 no_overclaim "RED:"
+
+# --- The claim-discipline arm has to catch an overclaim WELDED ONTO the
+#     disclaimer's own line, because that is where a future edit lands. It
+#     could not: the helper ran `grep -v` on the pinned wording, dropping the
+#     whole line and everything appended to it. This is that exact mutant's
+#     text, run through the same predicate the arms above use. ---
+welded=$(printf '%s\n' "$out" | sed \
+  's|never runtime serialization: a run that dispatched|never runtime serialization, and it also proves the phase order held at runtime: a run that dispatched|')
+printf '%s\n' "$welded" | grep -q 'serialization, and it also proves the phase order held at runtime'
+check "CLAIM: the welded-overclaim mutant is actually constructed" $?
+printf '%s\n' "$welded" | overclaims
+check "CLAIM: an overclaim welded onto the disclaimer's own line is caught" $?
 
 # --- GREEN fixture: C → A → B → E, then an ordered resume tail. ---
 green="$temp_dir/green.jsonl"
@@ -184,7 +211,7 @@ out=$("$runner" --log "$green"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1; check "GREEN: exit code is 0" "$result"
 agree "GREEN:"
 printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0'; check "GREEN: total is 0" $?
-printf '%s\n' "$out" | grep -q 'segments: checked 2 · unordered 0 · not evaluable 0 · violations 0'
+printf '%s\n' "$out" | grep -q 'segments: checked 2 · unordered 0 · resume tail 0 · not evaluable 0 · violations 0'
 check "GREEN: both segments evaluated, neither violated" $?
 
 # --- SEGMENTATION is load-bearing. Delete ONLY the `resume` marker from the
@@ -208,6 +235,54 @@ out=$("$runner" --log "$green"); rc=$?
 printf '%s\n' "$out" | grep -q 'ASSERTS LOG ORDER ONLY, never runtime serialization'
 check "CLAIM: the disclaimer is printed on a clean run too" $?
 no_overclaim "GREEN:"
+
+# --- The P2 DISCRIMINATOR, both directions on ONE fixture pair. An E-only
+#     resume tail is the resume verb's definition (`## Two modes`: "replays
+#     only the unlogged tail (Phase E → report issue), reusing the C/A/B
+#     already in custodian-log.jsonl"), and decision 24's clause is
+#     conditional on the tail — "if the unlogged tail contains BOTH B and E".
+#     So a conforming run must exit 0. Delete the two phase-B lines and
+#     nothing else, and the same tail must redden: with no phase-B line
+#     anywhere earlier it is the 2026-07-27 segment-1 shape. The pair is what
+#     proves the discriminator reads the earlier B rather than the segment
+#     number. ---
+conform="$temp_dir/conform.jsonl"
+{
+  echo '{"phase":"C","action":"ingest incremental"}'
+  echo '{"phase":"A","action":"reaped 2 merged dirs"}'
+  echo '{"phase":"B","action":"memory audit fan-out dispatched"}'
+  echo '{"phase":"B","action":"memory audit FULL COVERAGE 484/484"}'
+  echo '{"phase":"E","action":"usage-window probe (pre-E gate)"}'
+  echo '{"phase":"E","action":"deep-research dispatched (window healthy)"}'
+  echo '{"phase":"resume","action":"resume dispatched (session-limit tail)"}'
+  echo '{"phase":"E","action":"E synthesized from reachable findings"}'
+  echo '{"phase":"F","action":"report issue opened"}'
+} > "$conform"
+out=$("$runner" --log "$conform"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1
+check "CONFORM: a textbook E-only resume tail exits 0" "$result"
+agree "CONFORM:"
+printf '%s\n' "$out" | grep -q 'RESUME TAIL  segment 2: 1 phase-E line(s), no phase-B line, but 2 phase-B line(s) logged earlier'
+check "CONFORM: the tail is reported as a resume tail, citing the earlier count" $?
+# `VIOLATION P` on purpose: a bare `VIOLATION` also matches the clean run's
+# own `TOTAL VIOLATIONS: 0` line, which would make this arm unfailable
+! printf '%s\n' "$out" | grep -q 'VIOLATION P'
+check "CONFORM: nothing in a conforming run is a violation" $?
+no_overclaim "CONFORM:"
+
+# same fixture, its two phase-B lines deleted and NOTHING else changed
+nob="$temp_dir/nob.jsonl"
+grep -v '"phase":"B"' "$conform" > "$nob"
+out=$("$runner" --log "$nob"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1
+check "CONFORM-MINUS-B: the same tail with no earlier phase-B line exits 1" "$result"
+agree "CONFORM-MINUS-B:"
+printf '%s\n' "$out" | grep -q 'VIOLATION P2  segment 2'
+check "CONFORM-MINUS-B: the tail itself becomes the P2, on the earlier-B test" $?
+printf '%s\n' "$out" | grep -q 'VIOLATION P2  segment 1'
+check "CONFORM-MINUS-B: segment 1 reddens too, having no prior segment at all" $?
+! printf '%s\n' "$out" | grep -q 'RESUME TAIL'
+check "CONFORM-MINUS-B: no segment is excused as a resume tail" $?
 
 # --- P2: the MODAL violation shape. E dispatched, the run died, B never
 #     logged — 2026-07-27 segment 1. Read as "nothing to order" this exits 0
@@ -271,8 +346,11 @@ out=$("$runner" --log "$unreadable"); rc=$?
 [ "$rc" -eq 2 ] && result=0 || result=1
 check "NOTHING: an unreadable log exits 2, not 0" "$result"
 agree "NOTHING:"
-printf '%s\n' "$out" | grep -q 'NOTHING CHECKED'
-check "NOTHING: the headline says nothing was checked" $?
+# anchored to the HEADLINE line, not to the string anywhere: the closing
+# total line also reads "NOTHING CHECKED", so an unanchored grep stayed green
+# with the headline block deleted — the arm's own subject going missing
+printf '%s\n' "$out" | grep -q '^NOTHING CHECKED  this log carries no parseable phase record'
+check "NOTHING: the headline block itself says nothing was checked" $?
 ! printf '%s\n' "$out" | grep -q '^TOTAL VIOLATIONS: 0'
 check "NOTHING: does not print a clean total" $?
 # schema drift: well-formed JSON whose `phase` key was renamed
@@ -302,6 +380,19 @@ out=$("$runner" --log "$dapply"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1
 check "D-APPLY: a D-apply line between two B lines is not a phase-E line" "$result"
 agree "D-APPLY:"
+
+# --- only B and E lines are ordered. Widening that selection to "everything
+#     but a resume marker" left all other arms green while giving a C/A/F-only
+#     segment a spurious NOT EVALUABLE row, so the exclusion was unpinned. ---
+cafonly="$temp_dir/caf-only.jsonl"
+printf '%s\n' '{"phase":"C","action":"ingest incremental"}' \
+               '{"phase":"A","action":"reaped 2 merged dirs"}' \
+               '{"phase":"F","action":"report issue opened"}' > "$cafonly"
+out=$("$runner" --log "$cafonly"); rc=$?
+printf '%s\n' "$out" | grep -q 'checked 0 · unordered 0 · resume tail 0 · not evaluable 0'
+check "NON-BE: a C/A/F-only log yields no segment at all, not a not-evaluable one" $?
+! printf '%s\n' "$out" | grep -q 'NOT EVALUABLE'
+check "NON-BE: and prints no NOT EVALUABLE row for it" $?
 
 # --- usage/env arms exit 2, distinct from a violation's 1. ---
 "$runner" --log "$temp_dir/absent.jsonl" >/dev/null 2>&1
@@ -368,6 +459,6 @@ echo
 # "all tests passed" off a zero failure counter, so the count is verified too.
 # Pegged at the exact number of arms, not a round number under it — slack here
 # is arms that can be deleted in silence.
-[ "$checks" -eq 61 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 61\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 76 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 76\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all phase-order tests passed ($checks assertions)"; exit 0
 else echo "$fails phase-order test(s) FAILED"; exit 1; fi

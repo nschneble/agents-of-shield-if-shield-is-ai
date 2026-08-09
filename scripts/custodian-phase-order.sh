@@ -22,14 +22,37 @@
 # human-triggered invocation rather than part of the run.
 #
 # P1  no phase-E line before a phase-B line inside one run segment
-# P2  no segment carrying phase-E lines and NO phase-B line at all
+# P2  no segment carrying phase-E lines and NO phase-B line logged anywhere
+#     at or before it
 #     P2 exists because P1 alone cannot see the MODAL failure. "E logged, B
 #     never logged" is what a run looks like when the order broke and the run
-#     then died (2026-07-27 segment 1). Such a segment cannot be shown
-#     ordered: its phase B either returned in an earlier segment or was never
-#     logged at all, and the log does not say which. Treating that as
-#     "nothing to order" made the check structurally incapable of reporting
-#     its own most likely subject.
+#     then died (2026-07-27 segment 1). That segment cannot be shown ordered
+#     against anything, because no phase B was ever logged for the run to
+#     order it against.
+#
+# The "at or before it" is the whole discriminator, and it is decidable from
+# the log rather than inferred. A no-B segment holds ZERO phase-B lines by
+# construction, so every phase-B line in the log lies either before its first
+# line or after its last — "a phase-B line with a lower lineno" therefore
+# names exactly the phase-B lines in a PRIOR segment. Segment 1 has no prior
+# segment, so the modal shape can never match it. When a prior phase-B line
+# DOES exist, the segment is the documented resume shape rather than a
+# violation: skills/looper-custodian/SKILL.md `## Two modes` defines a resume
+# as replaying "only the unlogged tail (Phase E → report issue), reusing the
+# C/A/B already in custodian-log.jsonl", and decision 24's clause is
+# conditional on the tail — "IF the unlogged tail contains both B and E, B
+# runs to completion before the resume's pre-E probe". An E-only tail breaks
+# no obligation, so it is reported as RESUME TAIL and never counted.
+# 2026-07-27 segment 4 is exactly that shape and 2026-07-27 segment 1 is
+# exactly the other; the archive holds both.
+#
+# THREE LIMITS, stated rather than papered over. (1) Log order only, the same
+# cap P1 carries. (2) A prior phase-B line proves B was logged once in this
+# run, NOT that the tail had no fresh phase-B obligation — a resume that
+# needed B again and never logged it goes quiet here. Bounded, because such a
+# run is not the "B never logged at all" shape P2's modal subject is.
+# (3) It cannot show the prior phase B RETURNED before the tail's phase E was
+# probed, only that its line precedes.
 #
 # A segment with NO phase-E line is different and stays report-only: there is
 # genuinely nothing to order (archived 2026-06-29 and 2026-07-13 are real
@@ -115,13 +138,30 @@ analysis=$(jq -Rn --arg log "$LOG" '
               bs: map(select(.phase == "B")),
               es: map(select(.phase == "E")) }) )                       as $s
   | ($s | map(select((.es | length) > 0 and (.bs | length) > 0)))       as $checked
-  | ($s | map(select((.es | length) > 0 and (.bs | length) == 0)))      as $unord
   | ($s | map(select((.es | length) == 0)))                             as $skipped
+
+  # Split the no-B segments by whether a phase-B line exists EARLIER in the
+  # log. A no-B segment holds zero B lines by construction, so every B line
+  # in the log is either before its first line or after its last — and
+  # `lineno < firstE.lineno` therefore selects exactly the B lines in a PRIOR
+  # segment. Segment 1 has no prior segment and so can never match, which is
+  # what keeps the modal shape flagged.
+  | ($tagged | map(select(.phase == "B")))                              as $allbs
+  | ($s | map(select((.es | length) > 0 and (.bs | length) == 0))
+        | map(. as $g
+              | . + { priorb: ($allbs
+                               | map(select(.lineno < $g.es[0].lineno))
+                               | length) }))                            as $nob
+  | ($nob | map(select(.priorb == 0)))                                  as $unord
+  | ($nob | map(select(.priorb > 0)))                                   as $tail
 
   # one P1 violation per E line that some LATER B line in its segment follows.
   # `first` is the NEAREST following B only because $g.bs ascends by lineno,
   # which holds because to_entries, map(select) and group_by all preserve input
-  # order. That is the one assumption this check takes on faith.
+  # order. That is the one assumption this check takes on faith, and the P2
+  # discriminator above leans on the same one: `.es[0]` is the EARLIEST
+  # phase-E line in its segment only under it.
+  # (No apostrophes in here — this program is a single-quoted shell string.)
   | [ $checked[] as $g
       | $g.es[] as $e
       | (first($g.bs[] | select(.lineno > $e.lineno))) as $b
@@ -142,13 +182,15 @@ analysis=$(jq -Rn --arg log "$LOG" '
             "" ]
          else [] end)
       + [ "P1  no phase-E line before a phase-B line inside one run segment",
-          "P2  no segment carrying phase-E lines and no phase-B line at all",
+          "P2  no segment carrying phase-E lines with no phase-B line logged at or before it",
+          "    (a no-B segment with an EARLIER phase-B line is a resume tail, reported not counted)",
           "    (skills/looper-custodian/SKILL.md ## Maintenance run · decision 24, docs/looper-custodian.md)",
           "    ASSERTS LOG ORDER ONLY, never runtime serialization: a run that dispatched",
           "    out of order and logged in order passes this check (decision 24).",
-          "    segments: checked \($checked | length) · unordered \($p2) · not evaluable \($skipped | length) · violations \($p1 + $p2)" ]
+          "    segments: checked \($checked | length) · unordered \($p2) · resume tail \($tail | length) · not evaluable \($skipped | length) · violations \($p1 + $p2)" ]
       + [ ($viol[] | "    VIOLATION P1  segment \(.seg) line \(.e.lineno) phase E \"\(.e.action)\"\n                  precedes line \(.b.lineno) phase B \"\(.b.action)\"") ]
-      + [ ($unord[] | "    VIOLATION P2  segment \(.seg): \(.es | length) phase-E line(s), no phase-B line — cannot be shown ordered\n                  first at line \(.es[0].lineno) phase E \"\(.es[0].action)\"") ]
+      + [ ($unord[] | "    VIOLATION P2  segment \(.seg): \(.es | length) phase-E line(s), no phase-B line anywhere at or before it — cannot be shown ordered\n                  first at line \(.es[0].lineno) phase E \"\(.es[0].action)\"") ]
+      + [ ($tail[] | "    RESUME TAIL  segment \(.seg): \(.es | length) phase-E line(s), no phase-B line, but \(.priorb) phase-B line(s) logged earlier — the documented resume shape, not a violation") ]
       + [ ($skipped[] | "    NOT EVALUABLE  segment \(.seg): \(.bs | length) phase-B line(s), 0 phase-E line(s) — nothing to order") ]
       + [ ($bad[] | "    MALFORMED  line \(.lineno): no parseable phase key — reported, not a violation") ]
       + [ "" ]

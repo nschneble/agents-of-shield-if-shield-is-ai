@@ -196,10 +196,12 @@ LangChain, Ambiance, wakamoleguy, Hobday, Elliot Smith, capn-hook):
 
 Refined 2026-07-20 from the bg-wait-ceiling incident:
 
-15. **Phase E gets ceiling headroom, and a ceiling-kill is resumable, not
-    silently dropped.** The 2026-07-20 run backgrounded Phase E's `deep-research`
-    and then hit the harness `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default
-    (600s) while the fan-out was still running (~644s in, not yet done). The
+15. **Phase E's ceiling is an unmeasured margin, and a ceiling-kill is
+    resumable, not silently dropped.** The 2026-07-20 run backgrounded Phase
+    E's `deep-research` and then hit the harness
+    `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default while the fan-out was still
+    running. That run's `cron.log` line 2 is the whole of what is on disk
+    about it: `Background tasks still running after 600s; terminating.` The
     harness terminated the workflow — but a ceiling-kill still exits 0, so the
     wrapper counted it a clean success: no `Custodian report` issue was ever
     opened and ~1.4M tokens of already-completed research were thrown away with
@@ -208,14 +210,17 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     dead one that looks alive. Three fixes: (a) the wrapper raises the ceiling to
     30 min, to give a normal Phase E room to finish within the end-of-turn wait
     so Phase F runs — **how much room that is was never measured**, and the
-    original wording ("clears an observed ~11 min fan-out with headroom") read
-    the 30 min as proven. The ~11 min is this incident's own `~644s in, not yet
-    done`: the point at which the harness KILLED a fan-out that had not
-    finished, so it is a lower bound on that fan-out's duration and nothing is
-    known about the rest of it. 30 min is therefore an unmeasured margin over a
-    lower bound, not a headroom figure, and it stands unchanged until a live
-    Monday measures a fan-out that actually completes; (b) a ceiling-kill is
-    detected (the harness'
+    original wording (`3ce7156`: "30 min clears an observed ~11 min
+    deep-research fan-out with headroom") read the 30 min as proven. Two
+    things are wrong with that. The sourced figure is the 600s above — the
+    point at which the harness KILLED a fan-out that had not finished, so it
+    is a **lower bound** on that fan-out's duration and nothing at all is
+    known about the rest of it. And the `~11 min` itself has no source: it
+    entered with `3ce7156` and `grep -rn 644 local/custodian/2026-07-20/` is
+    empty, so the only durable figure for that kill is 600s, or 10 min. 30
+    min is therefore an unmeasured margin over a lower bound, not a headroom
+    figure, and it stands unchanged until a live Monday measures a fan-out
+    that actually completes; (b) a ceiling-kill is detected (the harness'
     `Background tasks still running after …` marker in the run log), turned into
     a loud resumable state — a `resume.json` breadcrumb + a
     `Custodian INCOMPLETE <date>` issue — and **never retried** (a retry re-runs
@@ -603,19 +608,41 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     - **What the check asserts, and what it cannot reach.** It reads B and E
       lines inside a segment and applies two predicates. **P1**: no phase-E
       line ahead of a phase-B line. **P2**: no segment carrying phase-E lines
-      and no phase-B line at all — a segment like 2026-07-27's first cannot be
-      shown ordered, because its Phase B either returned in an earlier segment
-      or was never logged, and the log does not say which. A segment with no
-      phase-E line has genuinely nothing to order and is reported without
-      counting. A log yielding zero parseable phase records reports
-      `NOTHING CHECKED` and exits 2 — an unusable input, never a clean run.
-      P2 costs a known false positive and it was taken deliberately:
-      2026-07-27's fourth segment is a resume that legitimately had only E
-      left to run, B having returned in segment 2, and it is flagged anyway.
-      A heuristic that looked for the earlier B would have gone quiet on the
-      first segment too, and silence on that shape is the false assurance the
-      check exists to remove. Noise that names its own segment is cheaper
-      than a check that cannot fail on its subject.
+      with no phase-B line logged at or before it. A segment with no phase-E
+      line has genuinely nothing to order and is reported without counting. A
+      log yielding zero parseable phase records reports `NOTHING CHECKED` and
+      exits 2 — an unusable input, never a clean run.
+    - **P2's discriminator is the earlier phase-B line, and it is decidable
+      rather than heuristic.** P2 first read every no-B segment as a
+      violation, which flagged 2026-07-27's fourth segment — a resume that
+      legitimately had only E left, B having returned in segment 2. That was
+      not an accepted cost, it was a defect: an E-only tail is the resume
+      verb's *definition* (`## Two modes` — a resume "replays only the
+      unlogged tail (Phase E → report issue), reusing the C/A/B already in
+      `custodian-log.jsonl`"), and the rule above is conditional on the tail,
+      binding only *if* the unlogged tail contains both B and E. So the
+      unconditional predicate flagged every conforming resume, against the
+      rule it cites. The check now asks whether a phase-B line exists earlier
+      in the log. A no-B segment holds zero phase-B lines by construction, so
+      every phase-B line in the log lies either before its first line or
+      after its last, and "a phase-B line with a lower line number" names
+      exactly the phase-B lines in a PRIOR segment. Segment 1 has no prior
+      segment, so 2026-07-27's first — an E probe, an E dispatch, then a
+      resume marker reading `session-limit kill at 09:29 left B unlogged + E
+      digest lost` — can never match it and stays flagged. Measured over the
+      seven archived logs, the discriminator keeps that segment flagged,
+      silences 2026-07-27 segment 4, and changes no other verdict: 2026-08-03
+      stays at its four P1 violations and the five clean logs stay clean.
+    - **What the discriminator does NOT buy, stated plainly.** Three limits.
+      It is a claim about log order and nothing more, the same cap P1 carries.
+      An earlier phase-B line proves phase B was logged once in this run, not
+      that the tail had no fresh phase-B obligation — a resume that needed B
+      again and never logged it goes quiet here, which is a real blind spot,
+      bounded only by the fact that such a run is not the "B never logged at
+      all" shape P2's modal subject is. And it cannot show the earlier phase B
+      RETURNED before the tail's phase E was probed, only that its line
+      precedes. What P2 buys is that the modal failure — E logged, B never
+      logged, run then dead — cannot pass silently.
     - **The check runs at Phase F, which is past where both incidents died.**
       2026-08-03 hit the session limit at 09:49 before Phase F; 2026-07-27's
       log records a `session-limit kill at 09:29 left B unlogged + E digest
@@ -624,8 +651,12 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       only once a resume carries it to F. Both of these did reach F
       eventually, but on the far side of a resume: 2026-07-27's took a
       one-shot launchd job installed by hand, firing at 19:10 that evening.
-      So the window in which a broken Monday is invisible is not "until
-      someone reads the log", it is "until someone resumes the run", and a
+      Be precise about who does the resuming, because the two kill shapes
+      differ. The wrapper AUTO-resumes a session-limit kill — it waits out
+      the window's reset and relaunches the resume path headless — while a
+      ceiling-kill only breadcrumbs and waits for a human. So the window in
+      which a broken Monday is invisible is "until the run is resumed",
+      which on the ceiling path means until someone does it by hand, and a
       run nobody resumes is never checked. Named here for the reason decision
       23 names its own gap: an incident must not look closed while the
       mechanism that produced it stays live. The
