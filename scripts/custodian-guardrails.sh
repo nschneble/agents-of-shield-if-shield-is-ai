@@ -47,7 +47,8 @@ INDEX="${INDEX:-$CUSTODIAN_HOME/history-index.jsonl}"
 
 # a value-taking flag given no value must not fall through to `$2` unbound:
 # under `set -u` that aborts with status 1, which the header reserves for
-# "violations found". Usage errors exit 2 here and in custodian-phase-order.sh.
+# "violations found". Usage errors exit 2 here and in
+# custodian-phase-order.sh.
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -64,8 +65,9 @@ done
 
 [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
 
-# One object out, not rendered text: the verdict below reads `.total` from this
-# JSON, so a newline inside an indexed field cannot inject a counterfeit total.
+# One object out, not rendered text: the verdict below reads `.total`
+# from this JSON, so a newline inside an indexed field cannot inject a
+# counterfeit total.
 analysis=$(jq -n --arg index "$INDEX" '
   # --- era gate: a line predates the schema iff it has no verified_by key ---
   def legacy: (has("verified_by") | not);
@@ -147,7 +149,7 @@ analysis=$(jq -n --arg index "$INDEX" '
 
 printf '%s\n' "$analysis" | jq -r '.report[]'
 
-# verdict off the computed field, never off the rendered report — the shape
-# scripts/custodian-skill-lint.sh:429-430 already uses.
+# verdict off the computed field, never off the rendered report — the
+# shape scripts/custodian-skill-lint.sh:429-430 already uses.
 violations=$(printf '%s\n' "$analysis" | jq -r '.total')
 [ "$violations" -eq 0 ]

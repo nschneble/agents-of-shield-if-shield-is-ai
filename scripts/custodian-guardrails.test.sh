@@ -89,9 +89,10 @@ out=$("$runner" --index "$green"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1; check "GREEN: exit code is 0" "$result"
 printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0'; check "GREEN: total is 0" $?
 
-# --- The exit code is COMPUTED, never scraped back out of the rendered report.
-#     This record's `cite` is echoed verbatim onto the G1 violation line and
-#     carries a newline plus a counterfeit clean total, so a verdict that
+# --- The exit code is COMPUTED, never scraped back out of the rendered
+#     report. This record's `cite` is echoed verbatim onto the G1
+#     violation line and carries a newline plus a counterfeit clean
+#     total, so a verdict that
 #     re-read its own prose and took the first match would exit 0 on a real
 #     violation. Same shape, same fixture idea, as
 #     scripts/custodian-phase-order.test.sh's INJECT arm. ---
@@ -180,8 +181,9 @@ runner_hits=$("$runner" --index "$syncfix" \
 [ "$lint_hits" = "$runner_hits" ] && result=0 || result=1
 check "SYNC: G2 selects same lines as state-schemas.md ## Provenance lint (lint=$lint_hits vs g2=$runner_hits)" "$result"
 
-# --- a value-taking flag with no value must not abort on `$2` unbound: under
-#     `set -u` that exits 1, and 1 is reserved for "violations found". ---
+# --- a value-taking flag with no value must not abort on `$2` unbound:
+#     under `set -u` that exits 1, and 1 is reserved for "violations
+#     found". ---
 "$runner" --index >/dev/null 2>&1
 [ "$?" -eq 2 ] && result=0 || result=1
 check "ENV: --index with no value exits 2, not 1" "$result"
