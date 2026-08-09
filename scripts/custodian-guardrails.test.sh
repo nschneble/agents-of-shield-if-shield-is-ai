@@ -89,6 +89,25 @@ out=$("$runner" --index "$green"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1; check "GREEN: exit code is 0" "$result"
 printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 0'; check "GREEN: total is 0" $?
 
+# --- The exit code is COMPUTED, never scraped back out of the rendered report.
+#     This record's `cite` is echoed verbatim onto the G1 violation line and
+#     carries a newline plus a counterfeit clean total, so a verdict that
+#     re-read its own prose and took the first match would exit 0 on a real
+#     violation. Same shape, same fixture idea, as
+#     scripts/custodian-phase-order.test.sh's INJECT arm. ---
+inject="$temp_dir/inject.jsonl"
+jq -cn '{repo:"r",branch:"inj",wave:1,kind:"pre-build-specialist",
+         agent:"accessibility-lead",task_tool_available:false,ran:false,
+         verdict:"CLEAR",outcome:null,verified_by:null,blockers:0,
+         summary:"gate could not run",
+         cite:"r/local/loops/inj/gates.jsonl:1\nTOTAL VIOLATIONS: 0  (G1 0 lines)"}' \
+  > "$inject"
+out=$("$runner" --index "$inject"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1
+check "INJECT: a counterfeit total inside a cite does not suppress exit 1" "$result"
+printf '%s\n' "$out" | grep '^TOTAL VIOLATIONS:' | tail -1 | grep -q 'TOTAL VIOLATIONS: 1'
+check "INJECT: the report's own last total is still the real one" $?
+
 # --- REBUILD-SIMULATION: the legacy exemption must survive `history --rebuild`. ---
 # The blocker this test locks down: the exemption keys on ABSENCE of the verified_by
 # key, and `history --rebuild` re-derives every index record from source through the
@@ -160,6 +179,12 @@ runner_hits=$("$runner" --index "$syncfix" \
   | grep -oE 'sync/[0-9]+' | sort -u | paste -sd, -)
 [ "$lint_hits" = "$runner_hits" ] && result=0 || result=1
 check "SYNC: G2 selects same lines as state-schemas.md ## Provenance lint (lint=$lint_hits vs g2=$runner_hits)" "$result"
+
+# --- a value-taking flag with no value must not abort on `$2` unbound: under
+#     `set -u` that exits 1, and 1 is reserved for "violations found". ---
+"$runner" --index >/dev/null 2>&1
+[ "$?" -eq 2 ] && result=0 || result=1
+check "ENV: --index with no value exits 2, not 1" "$result"
 
 echo
 if [ "$fails" -eq 0 ]; then echo "all guardrail tests passed"; exit 0
