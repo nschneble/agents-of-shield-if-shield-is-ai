@@ -48,10 +48,10 @@ Run the detector over the target tree. It ships in the looper definitions repo a
 ~/.claude/scripts/doc-bloat-scan.sh [<path> ...]
 ```
 
-It emits one JSONL candidate per hit — `{file, line, kind, text}` — across five kinds (v1, C-style `//` and `/* */`, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
+It emits one JSONL candidate per hit — `{file, line, kind, text}` — across five kinds (v1, C-style `//` and `/* */` plus JSX's braced `{/* … */}` spelling of the latter, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
 
-- `block-overexplained` — a bare `/* … */` block spanning multiple lines (at least one content line between opener and closer), `*`-prefixed or free-form prose alike. The primary quarry: a multi-line block wedged mid-execution. A free-form block whose lines don't start with `*` used to be invisible — the worst offender slipped the net; it no longer does.
-- `jsdoc-block` — the same shape but a `/**` opener, i.e. a doc header. Kept by default; snipped only when it is NOT actually a header.
+- `block-overexplained` — a bare `/* … */` or `{/* … */}` block spanning multiple lines (at least one content line between opener and closer), `*`-prefixed or free-form prose alike. The primary quarry: a multi-line block wedged mid-execution. A free-form block whose lines don't start with `*` used to be invisible — the worst offender slipped the net; it no longer does.
+- `jsdoc-block` — the same shape but a `/**` (or `{/**`) opener, i.e. a doc header. Kept by default; snipped only when it is NOT actually a header.
 - `stacked-slashes` — two or more consecutive `//` lines
 - `over-75` — a comment line longer than 75 chars (break belongs at column 76)
 - `capitalized-slash` — a single-line `//` whose first word is Capitalized
@@ -104,7 +104,7 @@ The heart of the skill. Each kind maps to an existing rule; declutter applies th
 
 | Kind                  | Owner rule (source of truth)                                                                                                                             |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `block-overexplained` | the primary quarry — a free-form `/* … */` block mid-execution. Collapse to ONE `// WHY` line or delete (`the-chronicler` `## Comment Style Rules`: no multi-line blocks mid-execution). Explains a known primitive / restates code → `the-improver` deletes it; glosses a design-token/color/style that IS the answer → `the-chronicler` `## Do NOT document`. |
+| `block-overexplained` | the primary quarry — a free-form `/* … */` or `{/* … */}` block mid-execution. Collapse to ONE `// WHY` line or delete (`the-chronicler` `## Comment Style Rules`: no multi-line blocks mid-execution). Explains a known primitive / restates code → `the-improver` deletes it; glosses a design-token/color/style that IS the answer → `the-chronicler` `## Do NOT document`. |
 | `jsdoc-block`         | a `/**` doc header — KEEP-LEANING (declaration-position context; `the-chronicler`: longer context lives in the overview). Snip only when it is not a genuine header: a self-evident per-field block, one echoing the type, or a `/**` stranded mid-execution — then treat as `block-overexplained`. |
 | `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line, or delete if it only narrates the code                                                             |
 | `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                                                                       |

@@ -9,14 +9,16 @@
 # exit is always 0.
 #
 # ── What it flags (JSONL, one candidate per line) ───────────────────────────────
-#   block-overexplained : a bare `/* … */` block spanning multiple lines — at
-#                         least one content line between opener and closer,
-#                         `*`-prefixed OR free-form prose alike, so an un-starred
-#                         inline essay is not invisible. The primary quarry: a
-#                         multi-line block wedged mid-execution.
-#   jsdoc-block         : the same shape, but a `/**` opener — a doc header,
-#                         kept by default (top-of-file/symbol context). The skill
-#                         snips it only when it is NOT actually a header.
+#   block-overexplained : a bare `/* … */` or `{/* … */}` block spanning
+#                         multiple lines — at least one content line between
+#                         opener and closer, `*`-prefixed OR free-form prose
+#                         alike, so an un-starred inline essay is not invisible.
+#                         The primary quarry: a multi-line block wedged
+#                         mid-execution.
+#   jsdoc-block         : the same shape, but a `/**` (or `{/**`) opener — a
+#                         doc header, kept by default (top-of-file/symbol
+#                         context). The skill snips it only when it is NOT
+#                         actually a header.
 #   stacked-slashes     : two or more consecutive full-line `//` comments (a wall
 #                         of `//` that wants collapsing to a single WHY line).
 #   over-75             : a comment line whose length exceeds 75 chars (content
@@ -27,11 +29,17 @@
 #
 # ── Scope (v1) ──────────────────────────────────────────────────────────────────
 # C-style `//` and `/* */` only, and only FULL-LINE comments (the trimmed line
-# starts with the comment token). Trailing end-of-line comments (`code(); // x`)
-# and `#`-comment languages are out of scope — deliberately, so a `//` inside a
-# string or a `https://` URL is never mis-read as a comment. A candidate is a
-# suggestion, not a verdict: the skill's human-disposes gate is where false
-# positives die. Extending to `#`-languages / trailing comments is future scope.
+# starts with the comment token). JSX's braced form IS that same token: `{/*`
+# and `{/**` open the same blocks, `*/}` closes them — braced is the only way
+# to comment in JSX children position, so a `.tsx` tree would otherwise scan as
+# comment-free. The brace must abut the slash (`{ /*` is an object literal or
+# an open block). Capitalization is judged on single-line `//` only; a one-line
+# `/* … */` or `{/* … */}` is length-checked, not case-checked.
+# Trailing end-of-line comments (`code(); // x`) and `#`-comment languages are
+# out of scope — deliberately, so a `//` inside a string or a `https://` URL is
+# never mis-read as a comment. A candidate is a suggestion, not a verdict: the
+# skill's human-disposes gate is where false positives die. Extending to
+# `#`-languages / trailing comments is future scope.
 #
 # Mirrors scripts/custodian-skill-lint.sh conventions: env-override paths, usage
 # on stderr, bash 3.2 safe (no mapfile / associative arrays). Grep/awk that may
@@ -46,7 +54,9 @@
 #   doc-bloat-scan.sh -h | --help
 set -uo pipefail
 
-usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; }
+# ranged to `set -`, not a line number, so editing the header can't truncate
+# help mid-sentence or drop the Usage block off the end
+usage() { sed -n '2,/^set -/p' "$0" | sed '$d;s/^# \{0,1\}//'; }
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
 # Source extensions carrying C-style comments.
@@ -106,17 +116,18 @@ FNR == 1 { flush_slashes(); reset() }
     next
   }
 
-  # block opener?
-  if (t ~ /^\/\*/) {
+  # block opener? `{/*` is the JSX braced form of the same token, so it takes
+  # the same path. The brace must abut: `{ /*` is a block or object literal.
+  if (t ~ /^\{?\/\*/) {
     flush_slashes()
     if (len > 75) emit(FILENAME, FNR, "over-75", t)
-    # single-line `/* … */` is not a block
-    if (index(t, "*/") > 1 || t ~ /\*\/$/) { next }
+    # a `/* … */` or `{/* … */}` that closes on its own line is not a block
+    if (index(t, "*/") > 1) { next }
     in_block = 1; block_body = 0; block_first = ""
     block_line = FNR; block_file = FILENAME
     # `/**` is a doc header (keep-leaning); a bare `/*` mid-code is the quarry
-    block_kind = (t ~ /^\/\*\*/) ? "jsdoc-block" : "block-overexplained"
-    block_open = (t ~ /^\/\*\*/) ? "/**" : "/*"
+    block_kind = (t ~ /^\{?\/\*\*/) ? "jsdoc-block" : "block-overexplained"
+    block_open = ((t ~ /^\{/) ? "{" : "") ((block_kind == "jsdoc-block") ? "/**" : "/*")
     next
   }
 
