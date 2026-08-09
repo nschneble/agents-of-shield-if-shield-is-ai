@@ -47,10 +47,12 @@
 # skill's human-disposes gate is where false positives die. Extending to
 # `#`-languages / trailing comments is future scope.
 #
-# Mirrors scripts/custodian-skill-lint.sh conventions: env-override paths, usage
-# on stderr, bash 3.2 safe (no mapfile / associative arrays). Grep/awk that may
-# legitimately return non-zero (no match) are guarded so a clean scan never
-# turns fatal.
+# Shares scripts/custodian-skill-lint.sh's portability rules: bash 3.2
+# safe (no mapfile / associative arrays), and grep/awk that may
+# legitimately return non-zero (no match) are guarded so a clean scan
+# never turns fatal. Not its I/O conventions — this script has no
+# env-override paths (paths are arguments) and prints usage on stdout,
+# `--help` being an answer rather than an error.
 #
 # Usage:
 #   doc-bloat-scan.sh [<path> ...]     paths default to `.`; dirs are walked,

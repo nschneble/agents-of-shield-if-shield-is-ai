@@ -57,14 +57,18 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
 ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
-  # set -e already aborts on a non-zero mktemp, but an empty-yet-successful
-  # result slides through into a `>> ""` redirect with no stated cause.
-  # The explicit template is what makes TMPDIR the input the message names:
-  # a bare `mktemp` ignores TMPDIR on BSD and allocates under /var/folders.
-  cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX")
-  new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX")
+  # `|| cand=""` so set -e cannot abort ahead of the check below: it did,
+  # and the terminal got mktemp's own line with no script name, no refusal
+  # word, and rc=1 where the empty shape gives 2 for the same failure.
+  # Both shapes land here because "no temp file" is true of both, and a
+  # nonzero mktemp explains itself on stderr. The explicit template is what
+  # makes TMPDIR the input the message names: a bare `mktemp` ignores
+  # TMPDIR on BSD and allocates under /var/folders.
+  cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
+  new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
   [ -n "$cand" ] && [ -n "$new" ] || {
-    echo "FATAL: mktemp failed (TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
+    echo "FATAL: custodian-history: mktemp gave no temp file" \
+         "(TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
     exit 2
   }
   for repo in "${REPOS[@]}"; do

@@ -8,6 +8,12 @@
 # as an unconditional block opener would swallow the code between them into a
 # phantom block), a `// TODO:` marker, a braced token inside a string, a
 # `https://` URL (the `//` must not read as a comment), and a ≤75-char comment.
+# Three more green shapes carry the block bookkeeping: a block with NO
+# content line at all, in both the bare and the `*`-only spelling, so that
+# miscounting an empty body emits a candidate quoting nothing; the braced
+# zero-content form, whose `*/}` closer has to strip to empty like a plain
+# `*/` does; and a `{ /*` block scope, which is not a comment opener
+# because the brace does not abut — the one rule the scanner states twice.
 # Exit is always 0 — the scanner reports, it never gates. Pure bash, jq-free.
 set -uo pipefail
 
@@ -20,11 +26,14 @@ scanner="$here/doc-bloat-scan.sh"
 # `mktemp -d` ignores TMPDIR on BSD and allocates under /var/folders.
 # GOTCHA: a TMPDIR inside a git work tree reds this suite: the walk takes
 # its `git ls-files` branch and lists no untracked fixture.
+# one arm per shape: mktemp's own stderr explains a nonzero exit, but the
+# empty-yet-successful shape prints nothing, so "failed" would be a lie
+die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
-  && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
-  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
-  exit 2
-}
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
@@ -100,6 +109,19 @@ export const h = 3
 
 const url = "https://example.com/a//b"
 export const i = 4
+
+/*
+*/
+export const j = 5
+
+/*
+ *
+ */
+export const k = 6
+
+{ /*
+  a block scope, not a comment: the brace has to abut the slash
+*/ }
 EOF
 
 cat > "$temp_dir/clean.tsx" <<'EOF'
@@ -111,6 +133,8 @@ export const Ok = () => (
     <span>b</span>
     {/** a braced doc one-liner */}
     <span>c</span>
+    {/*
+    */}
     <span>{"{/* not a comment, just a string */}"}</span>
   </div>
 )
@@ -126,8 +150,11 @@ check "exit 0" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"block-overexplained"'
 check "block-overexplained fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"jsdoc-block"'
-check "jsdoc-block fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+# pinned through to the text: a bare `/**` opener has no prose of its own,
+# and the quote is the only part of a jsdoc candidate that can silently
+# empty out while the kind and the line number stay right
+echo "$out" | grep -q '"file":"[^"]*bloat.ts","line":1,"kind":"jsdoc-block","text":"/\*\* \.\.\. this block over-narrates"'
+check "jsdoc-block fires, quoting the elided body line" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"stacked-slashes"'
 check "stacked-slashes fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
@@ -142,7 +169,7 @@ check "capitalized-slash fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":3,"kind":"block-overexplained"'
 check "braced multi-line block fires block-overexplained" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":8,"kind":"jsdoc-block"'
+echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":8,"kind":"jsdoc-block","text":"{/\*\* a braced doc opener"'
 check "braced multi-line doc block fires jsdoc-block" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":12,"kind":"over-75"'

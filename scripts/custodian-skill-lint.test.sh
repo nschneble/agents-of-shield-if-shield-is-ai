@@ -16,11 +16,14 @@ linter="$here/custodian-skill-lint.sh"
 # loudly rather than half-run against paths nobody intended. The explicit
 # template is what makes TMPDIR the input the message names: a bare
 # `mktemp -d` ignores TMPDIR on BSD and allocates under /var/folders.
+# one arm per shape: mktemp's own stderr explains a nonzero exit, but the
+# empty-yet-successful shape prints nothing, so "failed" would be a lie
+die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
-  && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
-  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
-  exit 2
-}
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0

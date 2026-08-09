@@ -6,12 +6,14 @@
 #
 # Frontmatter problems are ERRORS (exit 1) — a malformed name/description can
 # silently break agent/skill resolution. An unwired test suite is an ERROR
-# too: the match is an exact path token, so nothing false-positives, and a
-# suite CI never runs is a red nobody sees (doc-bloat-scan.test.sh sat out
-# of the workflow for a week while failing). Dangling path references are
-# WARNINGS (printed, non-fatal) — they catch doc rot without blocking on a
-# clever false-positive. `[[memory-links]]` are intentionally NOT checked:
-# a dangling one is a valid forward-reference per the memory convention.
+# too: a suite CI never runs is a red nobody sees (doc-bloat-scan.test.sh
+# sat out of the workflow for a week while failing). The wiring match reads
+# the whole workflow body, so it errs toward calling a suite wired — the
+# harmless direction for a check that blocks a merge. Dangling path
+# references are WARNINGS (printed, non-fatal) — they catch doc rot
+# without blocking on a clever false-positive. `[[memory-links]]` are
+# intentionally NOT checked: a dangling one is a valid forward-reference
+# per the memory convention.
 #
 # Run from anywhere; resolves the repo root itself. Wire into CI (see
 # .github/workflows/validate.yml) and run locally before committing spec edits.
@@ -127,11 +129,16 @@ workflow=".github/workflows/validate.yml"
 if [ ! -e "$workflow" ]; then
   err "$workflow is missing, so no test suite runs in CI"
 else
-  run_steps=$(grep -E '^[[:space:]]*run:' "$workflow" 2>/dev/null)
+  # The whole body, not just `run:` lines: a suite invoked inside a
+  # `run: |` block scalar sits on a continuation line a `run:` grep never
+  # sees, and erroring on a suite CI genuinely runs blocks a merge over
+  # nothing. Full-line YAML comments are dropped so a suite named only in
+  # a comment still reads as unwired.
+  run_steps=$(grep -v '^[[:space:]]*#' "$workflow" 2>/dev/null)
   while IFS= read -r suite; do
     case "$run_steps" in
       *"./$suite"*) : ;;
-      *) err "$suite has no \`run:\` step in $workflow" ;;
+      *) err "$suite is not invoked anywhere in $workflow" ;;
     esac
   done < <(find . -name '*.test.sh' -not -path './.git/*' -not -path './local/*' \
              | sed 's|^\./||' | sort)
