@@ -230,13 +230,20 @@ Added in framework v1.3.
 Scheduled cross-run, cross-repo housekeeping. The only looper step that
 runs across runs and repos on a cadence.
 
-There are five phases:
+The scheduled run is five phases, executed **C → A → B → E → F**, one at a
+time — a phase is done when its subagents have returned, not when they were
+dispatched:
 
-1. GCs merged-branch artifacts under `local/loops/`
-2. Audits memory for duplicates / contradictions / staleness
-3. Mines wave history across repos
-4. Researches external advances
-5. Opens a GitHub report with proposals
+- **C** mines wave history across repos into a cited index
+- **A** GCs merged-branch artifacts under `local/loops/`
+- **B** audits memory for duplicates / contradictions / staleness
+- **E** researches external advances
+- **F** checks the run's own log order and opens the GitHub report
+
+C runs before A on purpose: A may not reap a `gates.jsonl` C has not indexed
+(decision 13 — the reverse order destroyed 11 unindexed files). A sixth
+phase, **D**, applies approved proposals; it is human-triggered and never on
+the cron.
 
 Governing rail: custodian proposes, human disposes. Read-only/regenerable
 work auto-applies. Anything that writes a memory or an agent lands as a

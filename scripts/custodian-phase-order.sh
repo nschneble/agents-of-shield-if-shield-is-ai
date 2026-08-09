@@ -45,8 +45,19 @@
 # wrong file), so it reports NOTHING CHECKED and exits 2, the same class as the
 # empty-file guard below rather than a fabricated clean.
 #
+# WHERE THIS CANNOT REACH: Phase F runs it, so a run killed before F makes
+# no verdict at all until a resume carries it to F. That is the shape of
+# both runs it was written for — 2026-08-03 hit the session limit at
+# 09:49 and 2026-07-27 logged a kill at 09:29, each before F. Both got
+# there eventually, but only on the far side of a resume, and a run nobody
+# resumes is never checked. The cron wrapper's INCOMPLETE path already
+# renders phases_summary() over the partial log and is where a partial-log
+# check could run; considered and deferred, named here so the incident does
+# not look closed (decision 23's standard, applied to this check).
+#
 # Pure bash + jq, no third-party tool, no external store.
-# Exit 0 clean · 1 any violation · 2 usage/env error.
+# Exit 0 clean · 1 any violation (P1 or P2) · 2 usage/env error, an
+# unreadable log, or NOTHING CHECKED.
 #
 # Usage: custodian-phase-order.sh [--log PATH] [--date YYYY-MM-DD]
 set -euo pipefail

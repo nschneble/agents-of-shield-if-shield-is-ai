@@ -69,14 +69,11 @@ set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# Give a backgrounded Phase E room to finish before end-of-turn tears it down.
-# The ~11 min deep-research fan-out this 30 min was sized against was observed
-# under the INTERLEAVE — E dispatched while Phase B was still running, so part
-# of E's runtime elapsed beside B's rather than inside this wait. Phases now
-# run one at a time (decision 24, docs/looper-custodian.md), which moves more
-# of E's runtime into the wait: the margin here is thinner than 11-vs-30 reads.
-# The value is left alone until a live Monday measures it under the serial
-# shape. A ceiling-kill past this is handled below (resume), not retried.
+# Give a backgrounded Phase E room before end-of-turn tears it down. The
+# ~11 min this was sized against is where a fan-out was KILLED, not how
+# long one takes, so the margin is unmeasured (decision 15). Left alone
+# until a live Monday measures it. A ceiling-kill is handled below
+# (resume), not retried.
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=1800000
 
 REPO="$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai"
