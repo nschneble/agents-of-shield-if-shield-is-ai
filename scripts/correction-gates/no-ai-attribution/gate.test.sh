@@ -8,13 +8,21 @@
 # flag clean commits/bodies.
 #
 # Self-contained: builds a throwaway git repo in a temp dir, so the test
-# needs no network and runs in CI (git only). Runs sandbox-off locally
-# (mktemp), clean in CI.
+# needs no network and runs in CI (git only). Needs a writable temp dir, so
+# it must run sandbox-off locally; it aborts rather than degrade when it
+# cannot get one.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 gate="$here/gate.sh"
-temp_dir=$(mktemp -d)
+# a failing mktemp returns empty, which makes every derived path absolute
+# (/repo). The mkdir and cd below then fail while silenced, leaving the git
+# fixture commands running in the CALLER's repo, where they commit its
+# working tree and overwrite its user.email. Refuse to run instead.
+temp_dir=$(mktemp -d) && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
+  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
+  exit 2
+}
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
@@ -23,9 +31,10 @@ check() { # desc, condition-already-evaluated ($?)
   else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
 }
 
-repo="$temp_dir/repo"; mkdir -p "$repo"
+repo="$temp_dir/repo"; mkdir -p "$repo" || exit 2
 (
-  cd "$repo"
+  # never let the git fixture run in whatever the caller's CWD happens to be
+  cd "$repo" || exit 2
   git init -q -b main
   git config user.email t@example.com
   git config user.name  t

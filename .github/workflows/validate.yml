@@ -26,3 +26,5 @@ jobs:
         run: ./scripts/correction-gates/no-ai-attribution/gate.test.sh
       - name: Destructive-git guard hook (both directions)
         run: ./hooks/guard-destructive-git.test.sh
+      - name: Temp-dir guard across suites (both directions)
+        run: ./scripts/temp-dir-guard.test.sh

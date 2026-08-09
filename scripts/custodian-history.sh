@@ -57,7 +57,13 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
 ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
+  # set -e already aborts on a non-zero mktemp, but an empty-yet-successful
+  # result slides through into a `>> ""` redirect with no stated cause
   cand=$(mktemp); new=$(mktemp)
+  [ -n "$cand" ] && [ -n "$new" ] || {
+    echo "FATAL: mktemp failed (TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
+    exit 2
+  }
   for repo in "${REPOS[@]}"; do
     rr="$REPOS_ROOT/$repo"
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }

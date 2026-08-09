@@ -20,7 +20,13 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 runner="$here/custodian-guardrails.sh"
-temp_dir=$(mktemp -d)
+# a failing mktemp returns empty, which makes every derived fixture path
+# absolute (/simroot) and scatters the run outside the temp tree. Abort
+# loudly rather than half-run against paths nobody intended.
+temp_dir=$(mktemp -d) && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
+  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
+  exit 2
+}
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0

@@ -23,7 +23,14 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 gate="$here/gate.sh"
-temp_dir=$(mktemp -d)
+# a failing mktemp returns empty, which makes every derived path absolute
+# (/gitderived). The mkdir and cd below then fail while silenced, leaving
+# the GIT-DERIVED fixture commands running in the CALLER's repo, where they
+# commit its working tree and overwrite its user.email. Refuse to run.
+temp_dir=$(mktemp -d) && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
+  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
+  exit 2
+}
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
@@ -86,9 +93,10 @@ printf '%s\n' "$out" | grep -q 'note .*unsupported/parse.*logo.png'; check "CONT
 ! printf '%s\n' "$out" | grep -q 'notes.txt'; check "CONTROL: unclean out-of-scope file is NOT flagged as drift" $?
 
 # --- GIT-DERIVED: the real-wave path (no --changed; gate reads git). ---
-gd="$temp_dir/gitderived"; mkdir -p "$gd"
+gd="$temp_dir/gitderived"; mkdir -p "$gd" || exit 2
 (
-  cd "$gd"
+  # never let the git fixture run in whatever the caller's CWD happens to be
+  cd "$gd" || exit 2
   git init -q -b main
   git config user.email test@example.com
   git config user.name  test

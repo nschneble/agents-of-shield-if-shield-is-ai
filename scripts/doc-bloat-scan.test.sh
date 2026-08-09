@@ -13,7 +13,15 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 scanner="$here/doc-bloat-scan.sh"
-temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/doc-bloat-scan.XXXXXX")
+# the explicit template makes this the one site an unwritable or absent
+# TMPDIR actually breaks (a bare `mktemp -d` ignores TMPDIR on BSD). A
+# failure returns empty, making every derived fixture path absolute
+# (/bloat.ts). Abort loudly rather than half-run outside the temp tree.
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/doc-bloat-scan.XXXXXX") \
+  && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
+  echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
+  exit 2
+}
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
