@@ -511,12 +511,12 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       and 3 below 0.30, standing track only at either. Twelve is not a
       modelled rate — the one measurement is 25 candidates collapsing at
       0.64 headroom, and 12 is under half of a fan-out that demonstrably
-      did not fit. Read that 0.64 for what it is, though: it was taken
-      before Phase B's 484-file fan-out ran, so it describes a window
-      other work re-entered rather than the quiet one a tier is meant to
-      measure (decision 24). What did not fit still did not fit, so the
-      cap stands — but it is anchored to a reading taken under conditions
-      the one-at-a-time rule now forbids. A second probe after E returns
+      did not fit. Read that 0.64 for what it is, though: it was logged
+      ahead of Phase B's 484-file fan-out rather than after it, so it is
+      not shown to describe the quiet window a tier is meant to measure
+      (decision 24). What did not fit still did not fit, so the cap
+      stands — but it is anchored to a reading logged in an order the
+      one-at-a-time rule now forbids. A second probe after E returns
       logs the real `utilization` delta, so the cap is replaced by
       measurement rather than left as a guess. `read_ok:false` keeps the
       standing cap unshrunk: unguarded means unsized, and treating an
@@ -551,13 +551,13 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     logs full coverage afterwards. So the 36% that selected E's fan-out tier
     was read with an 8-subagent, 484-file fan-out still ahead of it. The order
     decision 16 leaned on as a substitute for a wave boundary was being
-    satisfied at dispatch, not at return — a boundary nothing had crossed.
-    What that overlap cost in tokens is not knowable and is not claimed here:
-    there is no per-phase accounting, and inventing one would be the fabricated
-    gauge this design refuses everywhere else. The claim is the narrow one the
-    log proves on its own — the asserted order is not the order that run
-    logged, and the reading that sized E was logged ahead of Phase B's fan-out
-    rather than after it.
+    satisfied at dispatch, not at return — and the log places no phase-B
+    return ahead of that 36% reading. What that overlap cost in tokens is not
+    knowable and is not claimed here: there is no per-phase accounting, and
+    inventing one would be the fabricated gauge this design refuses everywhere
+    else. The claim is the narrow one the log proves on its own — the
+    asserted order is not the order that run logged, and the reading that
+    sized E was logged ahead of Phase B's fan-out rather than after it.
     - **The rule.** Phases execute one at a time; no phase's fan-out may
       still be in flight when the next phase begins, and Phase E is probed
       and dispatched only after Phase B has fully returned. The order was
@@ -594,21 +594,24 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       nothing else in flight. That is the whole of what a tier means, and it
       is why the digest's stated tier is only as true as this rule was kept.
     - **The archive says this is the run's shape, not a one-off drift.** The
-      check flags the two most recent of the seven logs on disk and none of
-      the five before them. Per-log counts are deliberately not restated in
-      this decision: they move with the check, and
-      `scripts/custodian-phase-order.sh --date <date>` prints them for any
-      log. What prose owes is the shapes, since the check prints line numbers
-      rather than a diagnosis. 2026-08-03 is the interleave twice over — once
-      in its first segment, `E "usage-window probe (pre-E gate)"` and
+      check flags 2026-07-27 and 2026-08-03, and none of the five logs before
+      them. Per-log counts are deliberately not restated in this decision:
+      they move with the check, and
+      `scripts/custodian-phase-order.sh --date <date>` prints them for any log
+      in `local/custodian/` on the machine that produced it — that dir is
+      gitignored, so anywhere else the command exits 2 with `empty or missing
+      log` rather than a count. What prose owes is the shapes, since the check
+      prints line numbers rather than a diagnosis. 2026-08-03 is the
+      interleave twice over — once in its first segment,
+      `E "usage-window probe (pre-E gate)"` and
       `E "deep-research dispatched (window healthy)"` ahead of
       `B "memory audit fan-out dispatched (8 Read-only subagents)"`, and again
-      in the resume tail quoted higher up in this entry. 2026-07-27's first
-      segment is the starkest case in the archive: an `E` probe, an `E`
-      dispatch, and then a resume marker whose own line reads
-      `session-limit kill at 09:29 left B unlogged + E digest lost` — E
-      dispatched, B never logged at all. Its second segment then does it
-      again on the resume: `B "memory audit dispatched"`, then
+      in its second segment, after the resume marker — the lines quoted higher
+      up in this entry. 2026-07-27's first segment is the starkest case in
+      the archive: an `E` probe, an `E` dispatch, and then a resume marker
+      whose own line reads `session-limit kill at 09:29 left B unlogged + E
+      digest lost` — E dispatched, B never logged at all. Its second segment
+      then does it again on the resume: `B "memory audit dispatched"`, then
       `E "deep-research re-dispatched from main session (run wf_6ef308bc-0c1)"`,
       and only then `B "audit complete — full coverage 36/36, 7 proposals"` —
       E dispatched while B was outstanding, dispatch read as done. Two
@@ -618,13 +621,13 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       lines inside a segment and applies two predicates. **P1**: no phase-E
       line ahead of a phase-B line. **P2**: no segment carrying phase-E lines
       with no phase-B line logged at or before it. A segment with no phase-E
-      line has genuinely nothing to order and is reported without counting,
-      and a no-B segment that DOES have a phase-B line earlier is reported
-      `RESUME TAIL` and likewise never counted — the class the discriminator
-      below produces, named here so that token, grepped out of a printed
-      report, lands on the decision that authorizes it. A log yielding zero
-      parseable phase records reports `NOTHING CHECKED` and exits 2 — an
-      unusable input, never a clean run.
+      line has genuinely nothing to order and is reported `NOT EVALUABLE`
+      without counting, and a no-B segment that DOES have a phase-B line
+      earlier is reported `RESUME TAIL` and likewise never counted — the
+      class the discriminator below produces, named here so that token,
+      grepped out of a printed report, lands on the decision that authorizes
+      it. A log yielding zero parseable phase records reports
+      `NOTHING CHECKED` and exits 2 — an unusable input, never a clean run.
     - **P2's discriminator is the earlier phase-B line, and it is decidable
       rather than heuristic.** P2 first read every no-B segment as a
       violation, which flagged 2026-07-27's fourth segment — a resume that
