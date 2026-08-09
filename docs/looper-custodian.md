@@ -225,8 +225,10 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     Phase E is the run's one large token sink (~1.4M tokens) and the custodian
     had NO usage-window guard at all — unlike `loop-de-looper`, whose guard reads
     the real `anthropic-ratelimit-unified-*` window and pauses at a wave boundary.
-    The custodian has no wave loop, but the C → A → B → E order is itself a
-    checkpoint and E is the dispatch worth gating. So E now runs
+    The custodian has no wave loop, so the C → A → B → E order stands in for
+    one and E is the dispatch worth gating — a substitution that holds only
+    while the order is executed serially, since a phase boundary is a
+    checkpoint only when it is a quiet moment (decision 24). So E now runs
     `scripts/usage-window-probe.sh` before invoking `deep-research`: at ≥95%
     utilization or a `rejected` status on the 5-hour or weekly window it DEFERS E
     — logs `deferred (usage-window)`, writes the `resume.json` breadcrumb, and
@@ -479,7 +481,8 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       saved 2026-08-03 — the front door was clear at 36%. Its case is the
       different one: a cron tick that never had room. Claiming otherwise
       would have made the incident look closed while the mechanism that
-      caused it stayed live.
+      caused it stayed live — and that mechanism turned out to have a
+      second half, found later in the same log and recorded as decision 24.
     - **Fan-out bound.** The candidate count IS the fan-out width, because
       every candidate draws a verifier panel, and it is the only dial
       custodian holds — `deep-research` is invoked as a skill, and its
@@ -491,11 +494,17 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       and 3 below 0.30, standing track only at either. Twelve is not a
       modelled rate — the one measurement is 25 candidates collapsing at
       0.64 headroom, and 12 is under half of a fan-out that demonstrably
-      did not fit. A second probe after E returns logs the real
-      `utilization` delta, so the cap is replaced by measurement rather
-      than left as a guess. `read_ok:false` keeps the standing cap
-      unshrunk: unguarded means unsized, and treating an unread window as
-      thin is the same fabrication as treating it as empty.
+      did not fit. Read that 0.64 for what it is, though: it was taken
+      before Phase B's 484-file fan-out ran, so it describes a window
+      other work re-entered rather than the quiet one a tier is meant to
+      measure (decision 24). What did not fit still did not fit, so the
+      cap stands — but it is anchored to a reading taken under conditions
+      the one-at-a-time rule now forbids. A second probe after E returns
+      logs the real `utilization` delta, so the cap is replaced by
+      measurement rather than left as a guess. `read_ok:false` keeps the
+      standing cap unshrunk: unguarded means unsized, and treating an
+      unread window as thin is the same fabrication as treating it as
+      empty.
     - **A zero is never reported bare.** The failure that hurt most was not
       the collapse, it was that the collapse was invisible — a digest
       reading like a quiet week. Phase E now distinguishes three zeros and
@@ -513,3 +522,60 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     without a live cron run: nothing here can be exercised by CI (the
     wrapper is unattended shell against a real rate-limit window), so the
     first real Monday is the test.
+
+24. **Phases run one at a time — a phase is done when its subagents have
+    RETURNED, not when they were dispatched.** The same 2026-08-03 log that
+    produced decision 23 also records the order the run actually took, and it
+    is not the order the spec asserted. Its lines, in sequence: Phase B's
+    skill-spec lint; then the pre-E usage-window probe, reading `five_hour
+    util 0.36 allowed, weekly util 0.11 allowed`; then `deep-research
+    dispatched (window healthy)`; and only THEN Phase B's `memory audit
+    fan-out dispatched (8 Read-only subagents)` over `files_total=484`, which
+    logs full coverage afterwards. So the 36% that selected E's fan-out tier
+    was read with an 8-subagent, 484-file fan-out still ahead of it. The order
+    decision 16 leaned on as a substitute for a wave boundary was being
+    satisfied at dispatch, not at return — a boundary nothing had crossed.
+    What that overlap cost in tokens is not knowable and is not claimed here:
+    there is no per-phase accounting, and inventing one would be the fabricated
+    gauge this design refuses everywhere else. The claim is the narrow one the
+    log proves on its own — the asserted order is not the order that ran, and
+    the reading that sized E excluded work that ran alongside it.
+    - **The rule.** Phases execute one at a time; no phase's fan-out may
+      still be in flight when the next phase begins, and Phase E is probed
+      and dispatched only after Phase B has fully returned. The order was
+      always meant as a sequence to execute, not a sequence to start; it now
+      says so. It binds the resume path too, where the temptation is
+      strongest because the unlogged tail looks small — a tail holding both
+      B and E runs B to completion before the pre-E probe.
+    - **The alternative is unimplementable, not merely worse.** The other
+      way to close this is to keep the interleave and have E's sizing
+      subtract the cost of work still in flight. There is no observable to
+      subtract. That number could only be invented, which is exactly the
+      fake gauge `loop-de-looper`'s `## Budget governor` bans, and the
+      mirror image of what Phase E's own `read_ok:false` rule already
+      refuses in the other direction: treating an unread window as thin is
+      the same fabrication as treating it as empty. So the concurrency is
+      removed rather than estimated — the only one of the two that can be
+      done honestly.
+    - **A headroom tier is a reading of something specific.** The tiers in
+      decision 23 describe the window as it stands with C/A/B complete and
+      nothing else in flight. That is the whole of what a tier means, and it
+      is why the digest's stated tier is only as true as this rule was kept.
+
+    Tradeoff taken: wall clock, and it is a real cost rather than a
+    bookkeeping one. Phase E's `deep-research` runs as a harness-backgrounded
+    workflow the CLI blocks for at end-of-turn, capped by
+    `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`. Dispatching E early overlaps its
+    runtime with Phase B's work, so less of it is left to wait out when the
+    turn ends — very likely what the 2026-08-03 run was buying. Serializing
+    gives that overlap up and pushes more of E's runtime inside the
+    end-of-turn wait, which makes a ceiling-kill likelier. Accepted on one
+    ground: a ceiling-kill is a detected, resumable state (decision 15),
+    while a window reading that was already wrong when it was used leaves
+    nothing to detect. Same caveat as decision 23, and for the same reason:
+    nothing here can be exercised by CI, because what is being fixed is the
+    runtime ordering of an unattended session against a real rate-limit
+    window, so the first real Monday is the test. A check over
+    `custodian-log.jsonl` could assert its phase lines land in order, and
+    that is worth having — but it would test the log, not the runtime. A run
+    that dispatched out of order and logged in order would pass it.
