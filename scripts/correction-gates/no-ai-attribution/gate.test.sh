@@ -19,7 +19,10 @@ gate="$here/gate.sh"
 # (/repo). The mkdir and cd below then fail while silenced, leaving the git
 # fixture commands running in the CALLER's repo, where they commit its
 # working tree and overwrite its user.email. Refuse to run instead.
-temp_dir=$(mktemp -d) && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
+# The explicit template is what makes TMPDIR the input the message names:
+# a bare `mktemp -d` ignores TMPDIR on BSD, allocating under /var/folders.
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
+  && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
   echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
   exit 2
 }

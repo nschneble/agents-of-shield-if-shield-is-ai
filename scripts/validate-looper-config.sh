@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Validates the looper config surface: every agent and skill spec has the
-# frontmatter the harness needs, the declared name matches its path, and
-# backtick'd repo-relative path references resolve to real files.
+# frontmatter the harness needs, the declared name matches its path,
+# backtick'd repo-relative path references resolve to real files, and every
+# test suite in the repo is wired into the CI workflow.
 #
 # Frontmatter problems are ERRORS (exit 1) — a malformed name/description can
-# silently break agent/skill resolution. Dangling path references are WARNINGS
-# (printed, non-fatal) — they catch doc rot without blocking on a clever
-# false-positive. `[[memory-links]]` are intentionally NOT checked: a dangling
-# one is a valid forward-reference per the memory convention.
+# silently break agent/skill resolution. An unwired test suite is an ERROR
+# too: the match is an exact path token, so nothing false-positives, and a
+# suite CI never runs is a red nobody sees (doc-bloat-scan.test.sh sat out
+# of the workflow for a week while failing). Dangling path references are
+# WARNINGS (printed, non-fatal) — they catch doc rot without blocking on a
+# clever false-positive. `[[memory-links]]` are intentionally NOT checked:
+# a dangling one is a valid forward-reference per the memory convention.
 #
 # Run from anywhere; resolves the repo root itself. Wire into CI (see
 # .github/workflows/validate.yml) and run locally before committing spec edits.
@@ -114,6 +118,24 @@ for d in skills/*/; do
   fi
   validate_spec "$f" "$skill"
 done
+
+# --- CI wiring: every *.test.sh needs a step in the validate workflow ---
+# Derived from the tree, never a hand-kept roster: a roster is what rotted.
+# `local/` is gitignored scratch, not CI's business. Process substitution
+# (not a pipeline) so err's counter survives the loop.
+workflow=".github/workflows/validate.yml"
+if [ ! -e "$workflow" ]; then
+  err "$workflow is missing, so no test suite runs in CI"
+else
+  run_steps=$(grep -E '^[[:space:]]*run:' "$workflow" 2>/dev/null)
+  while IFS= read -r suite; do
+    case "$run_steps" in
+      *"./$suite"*) : ;;
+      *) err "$suite has no \`run:\` step in $workflow" ;;
+    esac
+  done < <(find . -name '*.test.sh' -not -path './.git/*' -not -path './local/*' \
+             | sed 's|^\./||' | sort)
+fi
 
 printf '\n%d error(s), %d warning(s)\n' "$errors" "$warnings" >&2
 [ "$errors" -eq 0 ]

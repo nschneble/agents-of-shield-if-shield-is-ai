@@ -18,7 +18,8 @@
 #   jsdoc-block         : the same shape, but a `/**` (or `{/**`) opener — a
 #                         doc header, kept by default (top-of-file/symbol
 #                         context). The skill snips it only when it is NOT
-#                         actually a header.
+#                         actually a header, which a braced `{/**` never
+#                         is: it parses only in JSX children position.
 #   stacked-slashes     : two or more consecutive full-line `//` comments (a wall
 #                         of `//` that wants collapsing to a single WHY line).
 #   over-75             : a comment line whose length exceeds 75 chars (content
@@ -26,6 +27,11 @@
 #   capitalized-slash   : a single-line `//` whose first word is Capitalized
 #                         (`// Returns…` → `// returns…`). Conventional ALL-CAPS
 #                         markers (TODO, FIXME, GOTCHA, NOTE…) are exempt.
+#
+# `text` quotes the line the candidate CITES. For a block that is the
+# opener line verbatim when it carries prose, and `/* ... <first body>`
+# when the opener is bare — the elision mark says the words come from
+# the next line, so the quote is never read as the opener's own.
 #
 # ── Scope (v1) ──────────────────────────────────────────────────────────────────
 # C-style `//` and `/* */` only, and only FULL-LINE comments (the trimmed line
@@ -86,7 +92,7 @@ function flush_slashes() {
 }
 function reset() {           # per-file state
   in_block = 0; block_body = 0; block_line = 0; block_file = ""
-  block_first = ""; block_kind = ""; block_open = ""
+  block_first = ""; block_kind = ""; block_open = ""; block_head = ""
   slash_run = 0; slash_line = 0; slash_text = ""; slash_file = ""
 }
 FNR == 1 { flush_slashes(); reset() }
@@ -110,8 +116,9 @@ FNR == 1 { flush_slashes(); reset() }
       # >= 1 content line means a genuine multi-line block (opener, content,
       # closer) — the-chronicler bans any multi-line block mid-execution
       if (block_body >= 1)
-        emit(block_file, block_line, block_kind, block_open " " block_first)
-      in_block = 0; block_body = 0; block_first = ""
+        emit(block_file, block_line, block_kind,
+             (block_head != "") ? block_head : block_open " ... " block_first)
+      in_block = 0; block_body = 0; block_first = ""; block_head = ""
     }
     next
   }
@@ -128,6 +135,11 @@ FNR == 1 { flush_slashes(); reset() }
     # `/**` is a doc header (keep-leaning); a bare `/*` mid-code is the quarry
     block_kind = (t ~ /^\{?\/\*\*/) ? "jsdoc-block" : "block-overexplained"
     block_open = ((t ~ /^\{/) ? "{" : "") ((block_kind == "jsdoc-block") ? "/**" : "/*")
+    # the emitted text has to quote the line it CITES. When the opener
+    # carries prose, that trimmed line is the quote; splicing the next
+    # line's words onto this line number misleads whoever ticks it
+    open_rest = t; sub(/^\{?\/\*+[ \t]*/, "", open_rest)
+    block_head = (open_rest != "") ? t : ""
     next
   }
 

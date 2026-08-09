@@ -58,8 +58,11 @@ ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
   # set -e already aborts on a non-zero mktemp, but an empty-yet-successful
-  # result slides through into a `>> ""` redirect with no stated cause
-  cand=$(mktemp); new=$(mktemp)
+  # result slides through into a `>> ""` redirect with no stated cause.
+  # The explicit template is what makes TMPDIR the input the message names:
+  # a bare `mktemp` ignores TMPDIR on BSD and allocates under /var/folders.
+  cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX")
+  new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX")
   [ -n "$cand" ] && [ -n "$new" ] || {
     echo "FATAL: mktemp failed (TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
     exit 2

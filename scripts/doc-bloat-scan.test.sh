@@ -13,11 +13,14 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 scanner="$here/doc-bloat-scan.sh"
-# the explicit template makes this the one site an unwritable or absent
-# TMPDIR actually breaks (a bare `mktemp -d` ignores TMPDIR on BSD). A
-# failure returns empty, making every derived fixture path absolute
-# (/bloat.ts). Abort loudly rather than half-run outside the temp tree.
-temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/doc-bloat-scan.XXXXXX") \
+# a failing mktemp returns empty, which makes every derived fixture path
+# absolute (/bloat.ts) and scatters the run outside the temp tree. Abort
+# loudly rather than half-run against paths nobody intended. The explicit
+# template is what makes TMPDIR the input the message names: a bare
+# `mktemp -d` ignores TMPDIR on BSD and allocates under /var/folders.
+# GOTCHA: a TMPDIR inside a git work tree reds this suite: the walk takes
+# its `git ls-files` branch and lists no untracked fixture.
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
   && [ -n "$temp_dir" ] && [ -d "$temp_dir" ] || {
   echo "FATAL: mktemp -d failed (TMPDIR=${TMPDIR:-unset}); refusing to run" >&2
   exit 2
@@ -52,6 +55,11 @@ export const d = 4
 
 // Returns the widget
 export const e = 5
+
+/* this opener carries its own prose
+   and one more body line follows
+*/
+export const j = 6
 EOF
 
 # ── RED fixture: the JSX braced spelling of the same shapes ────────────────────
@@ -71,6 +79,10 @@ export const Panel = () => (
     <span>c</span>
     {/* short braced note */}
     <span>d</span>
+    {/* this braced opener carries prose
+      and continues on a second line
+    */}
+    <span>e</span>
   </div>
 )
 EOF
@@ -136,10 +148,28 @@ check "braced multi-line doc block fires jsdoc-block" "$([ $? -eq 0 ] && echo 0 
 echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":12,"kind":"over-75"'
 check "braced one-liner reaches the over-75 check" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-# a one-line `{/* … */}` closes itself, so exactly the two real blocks emit —
-# any extra means a braced one-liner opened a phantom block
+# a one-line `{/* … */}` closes itself, so exactly the three real blocks
+# emit — any extra means a braced one-liner opened a phantom block
 braced_blocks=$(echo "$out" | grep -c 'braced.tsx.*"kind":"\(block-overexplained\|jsdoc-block\)"')
-check "braced one-liners open no block" "$([ "$braced_blocks" -eq 2 ] && echo 0 || echo 1)"
+check "braced one-liners open no block" "$([ "$braced_blocks" -eq 3 ] && echo 0 || echo 1)"
+
+# ── the quote must belong to the line it cites ─────────────────────────────────
+# The defect: the opener's line number was emitted with the FIRST BODY
+# LINE's text, so prose on the opener line was silently dropped and the
+# report showed a quote that is not on the line it points at.
+echo "$out" | grep -q '"file":"[^"]*bloat.ts","line":22,"kind":"block-overexplained","text":"/\* this opener carries its own prose"'
+check "opener prose is the quote, not the body line" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":16,"kind":"block-overexplained","text":"{/\* this braced opener carries prose"'
+check "braced opener prose is the quote" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# a bare opener has no prose of its own, so the body line stands in behind
+# an explicit elision mark rather than posing as the opener's words
+echo "$out" | grep -q '"file":"[^"]*bloat.ts","line":7,"kind":"block-overexplained","text":"/\* \.\.\. this free-form block over-narrates too"'
+check "bare opener marks the borrowed line as elided" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":3,"kind":"block-overexplained","text":"{/\* \.\.\. this braced block over-narrates"'
+check "bare braced opener marks the borrowed line as elided" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 # green: neither clean fixture appears in any candidate
 echo "$out" | grep -q 'clean\.ts"'
