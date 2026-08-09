@@ -114,7 +114,10 @@ ingest() {
   ' > "$new"
   n=$(grep -c . "$new" || true)
   cat "$new" >> "$INDEX"
-  echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || echo 0) line(s) at $INDEX"
+  # `|| true`, never `|| echo 0`: grep -c prints its own 0 and THEN exits 1
+  # on no match, so the fallback appended a second 0 and the summary read
+  # "index now 0\n0 line(s)" — split across two lines on a first ingest
+  echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
   rm -f "$cand" "$new"
 }
 

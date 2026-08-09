@@ -23,7 +23,11 @@ gate="$here/gate.sh"
 # a bare `mktemp -d` ignores TMPDIR on BSD, allocating under /var/folders.
 # one arm per shape: mktemp's own stderr explains a nonzero exit, but the
 # empty-yet-successful shape prints nothing, so "failed" would be a lie
-die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+# fd 3 is a saved copy of the real stderr: the git fixture below runs under
+# `2>&1 >/dev/null`, so a die_temp firing inside it would otherwise be
+# swallowed and the suite would die with no line at all
+exec 3>&2
+die_temp() { echo "FATAL: $1; refusing to run" >&3; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
   || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] \
@@ -37,15 +41,18 @@ check() { # desc, condition-already-evaluated ($?)
   else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
 }
 
-repo="$temp_dir/repo"; mkdir -p "$repo" || exit 2
+repo="$temp_dir/repo"; mkdir -p "$repo" || die_temp "cannot create $repo"
 (
   # never let the git fixture run in whatever the caller's CWD happens to be
-  cd "$repo" || exit 2
+  cd "$repo" || die_temp "cannot cd into $repo"
   git init -q -b main
   git config user.email t@example.com
   git config user.name  t
   echo one > f.txt && git add -A && git commit -q -m "clean commit, no markers"
-) >/dev/null 2>&1
+# a bare `exit 2` here would end only the subshell — this file sets no -e —
+# and every assertion below would then run against a fixture that was never
+# built. Fail the parent on the subshell's status instead.
+) >/dev/null 2>&1 || die_temp "git fixture setup failed in $repo"
 c1=$( cd "$repo" && git rev-parse HEAD )
 
 # body fixtures

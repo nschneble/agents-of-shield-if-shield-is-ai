@@ -31,7 +31,11 @@ gate="$here/gate.sh"
 # a bare `mktemp -d` ignores TMPDIR on BSD, allocating under /var/folders.
 # one arm per shape: mktemp's own stderr explains a nonzero exit, but the
 # empty-yet-successful shape prints nothing, so "failed" would be a lie
-die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+# fd 3 is a saved copy of the real stderr: the GIT-DERIVED fixture below
+# runs under `2>&1 >/dev/null`, so a die_temp firing inside it would
+# otherwise be swallowed and the suite would die with no line at all
+exec 3>&2
+die_temp() { echo "FATAL: $1; refusing to run" >&3; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
   || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] \
@@ -99,17 +103,20 @@ printf '%s\n' "$out" | grep -q 'note .*unsupported/parse.*logo.png'; check "CONT
 ! printf '%s\n' "$out" | grep -q 'notes.txt'; check "CONTROL: unclean out-of-scope file is NOT flagged as drift" $?
 
 # --- GIT-DERIVED: the real-wave path (no --changed; gate reads git). ---
-gd="$temp_dir/gitderived"; mkdir -p "$gd" || exit 2
+gd="$temp_dir/gitderived"; mkdir -p "$gd" || die_temp "cannot create $gd"
 (
   # never let the git fixture run in whatever the caller's CWD happens to be
-  cd "$gd" || exit 2
+  cd "$gd" || die_temp "cannot cd into $gd"
   git init -q -b main
   git config user.email test@example.com
   git config user.name  test
   printf '.a { color: red; }\n' > a.css
   printf 'const x = 1;\n'       > vendor.js
   git add -A && git commit -q -m baseline
-) >/dev/null 2>&1
+# a bare `exit 2` here would end only the subshell — this file sets no -e —
+# and the two GIT-DERIVED cases below would run against a fixture that was
+# never built. Fail the parent on the subshell's status instead.
+) >/dev/null 2>&1 || die_temp "git fixture setup failed in $gd"
 
 # RED: an undeclared, clean, tracked change (what a full-tree format does)
 # — the gate must derive it from git and fire VIOLATION B.

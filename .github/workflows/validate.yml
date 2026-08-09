@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate agent + skill specs
         run: ./scripts/validate-looper-config.sh
+      - name: Config validator itself (both directions)
+        run: ./scripts/validate-looper-config.test.sh
       - name: Guardrail replay predicates (both directions)
         run: ./scripts/custodian-guardrails.test.sh
       - name: Skill spec lint (both directions)

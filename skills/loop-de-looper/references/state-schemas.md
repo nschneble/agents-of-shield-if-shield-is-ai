@@ -86,7 +86,7 @@ Completion, appended AFTER each step finishes:
 {
   "step": "plan",
   "status": "done", // "done" | "skipped" | "escalated" | "stopped"
-  "artifact": "wave-3-plan.md" // a filename in this dir | "working-tree" | null
+  "artifact": "wave-3-plan.md" // a filename in this dir | null — see below
 }
 ```
 
@@ -97,9 +97,12 @@ Completion, appended AFTER each step finishes:
 | `escalated` | ran and handed back `gate needed pre-build`                      | the brief decides: `gate outputs` present ⇒ do not re-run, resume at build |
 | `stopped`   | a stop condition fired at this step                              | resumed dispatch re-runs it; a retry opens a new segment instead           |
 
+`artifact` names a file in this dir or is `null` — never a sentinel. The plan is the only persisted artifact (`agents/the-looper.md` `## Step journal`), so every other step writes `null`, build included: its output lives in the working tree and git, which is what build's oracle reads. A reader waiting on a `"working-tree"` string would wait forever, because no writer built from the agent spec emits one.
+
 Reader rules:
 
 - **Segments.** Only the lines after the LAST `_declared` describe the live attempt. A retry appends a new declaration; a resume appends none and continues the current segment. Everything above the last declaration is audit trail, never an input to a skip.
-- **An unparseable line is discarded — that line, wherever it sits, never the file.** A kill mid-append leaves a truncated line, not a corrupt file, and it need not be the last one: a dispatch that appends onto an unterminated fragment fuses its line to the wreckage and leaves the mess mid-file. Read a discarded line's step as not-done. Discarding errs in exactly one direction and it is the safe one — a line is written only after its step completes, so the worst case is re-running a step that had already finished, which its oracle then confirms. Never repair or rewrite a line, and never void the whole journal over one: the good checkpoints around it are still good, and the oracles, not the parse, are what stop a bad line from authorizing a skip.
+- **An unparseable COMPLETION line is discarded — that line, wherever it sits, never the file.** A kill mid-append leaves a truncated line, not a corrupt file, and it need not be the last one: a dispatch that appends onto an unterminated fragment fuses its line to the wreckage and leaves the mess mid-file. Read a discarded line's step as not-done. Discarding errs in exactly one direction and it is the safe one — a *completion* line is written only after its step completes, so the worst case is re-running a step that had already finished, which its oracle then confirms. Never repair or rewrite a line, and never void the whole journal over one: the good checkpoints around it are still good, and the oracles, not the parse, are what stop a bad line from authorizing a skip.
+- **A `_declared` line is never discarded, and that exception is what makes the rule above safe.** The discard rule rests on "written only after the step completed", which is false of exactly one line kind: the declaration is written BEFORE step one. A retry that dies mid-declaration therefore leaves a torn line that, if discarded, hands segment-boundary duty back to the *initial* declaration — so the dead-end attempt's `done` lines read as live, and the plan oracle confirms them, because the dead end really did write a non-empty `wave-N-plan.md`. The oracles cannot arbitrate this; they confirm both attempts equally. So: **an unparseable line that cannot be typed as a completion voids skip authority for the segment below it.** Treat its position as a segment boundary of unknown intent — re-run every step from the top of the wave, ignoring the `done` lines above and below it, until a fresh `_declared` lands. Say so in the hand-back.
 - **Blank lines are noise.** Skip them. Emptiness is not evidence of anything.
 - **Absent file** = first dispatch. **Absent line for a declared step** = that step is not known to have run — which is also what a kill mid-step leaves.

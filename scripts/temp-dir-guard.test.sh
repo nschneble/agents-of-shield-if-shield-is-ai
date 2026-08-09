@@ -10,13 +10,21 @@
 # committing its working tree via `git add -A` and overwriting its
 # user.email.
 #
-# RED: mktemp is broken BOTH ways it breaks in the wild — a non-zero exit,
-# and a success that yields an empty string, which is the failure the
+# RED: mktemp is broken all THREE ways it breaks in the wild — a non-zero
+# exit; a success that yields an empty string, which is the failure the
 # guard's `-n` arm exists for and the one an exit-status-only guard
-# survives. Under each, a suite must exit 2, print its own refusal in
-# words true of THAT shape, and leave a victim repo byte-identical. GREEN:
-# with a working mktemp each suite still passes and still leaves the victim
-# untouched, so the guard costs the healthy path nothing.
+# survives; and a success handing back a real path that is a regular FILE,
+# which is what `mktemp -d` degraded to a plain `mktemp` produces and what
+# the guard's `-d` arm exists for. Under each, a suite must exit 2, print
+# its own refusal in words true of THAT shape, and leave a victim repo
+# byte-identical. GREEN: with a working mktemp each suite still passes and
+# still leaves the victim untouched, so the guard costs the healthy path
+# nothing.
+#
+# One shim per fault SHAPE, never per message. The guard grew from one arm
+# to three while this loop still iterated two shims, so the third arm was
+# decoration: deleting it from every roster suite, or corrupting its
+# wording, left this file printing "all temp-dir guard tests passed".
 #
 # The roster is DERIVED, never hand-listed: every `*.test.sh` in the repo
 # that mentions mktemp, minus this file. A hardcoded list covers the
@@ -30,6 +38,11 @@
 # scripts/custodian-history.sh is checked by name at the end. It carries
 # the same guard but is not a suite, so no derivation over `*.test.sh` can
 # ever reach it.
+#
+# Deliberately over the ~100-line refactor bar. Splitting it would put the
+# derivation, the shims and the drift oracle in separate files, and a
+# roster that cannot see its own shims is the exact failure this file was
+# written to catch. Trim its prose before reaching for its code.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -57,13 +70,21 @@ check() { # desc, condition-already-evaluated ($?)
 
 # a bare `mktemp` match, not `$(mktemp`, so a suite that reaches it by some
 # other spelling is over-covered rather than missed: a false red is loud
-# and fixable, a silent gap is what put this file here
+# and fixable, a silent gap is what put this file here.
+# `local/` and `.git/` are excluded for the same reason
+# validate-looper-config excludes them: local/ is gitignored scratch, not
+# CI's business. Without the exclusion — which the `expected` cross-check
+# below already carried — planting `local/scratch/fake.test.sh` did two
+# things, and the miscount was the lesser: this loop EXECUTED that
+# unreviewed file three times, with a poisoned PATH, from inside the
+# victim repo.
 suites=()
 while IFS= read -r suite; do
   case "$suite" in "$here/temp-dir-guard.test.sh") continue ;; esac
   suites+=( "$suite" )
 done < <(cd "$repo_root" \
-  && grep -rl --include='*.test.sh' mktemp . 2>/dev/null \
+  && grep -rl --include='*.test.sh' --exclude-dir=local --exclude-dir=.git \
+       mktemp . 2>/dev/null \
   | sed "s|^\./|$repo_root/|" | sort)
 
 # an empty roster would sail through the loop below reporting nothing
@@ -86,9 +107,9 @@ expected=$(cd "$repo_root" \
 [ "${#suites[@]}" -eq "$expected" ]
 check "roster covers every mktemp suite (${#suites[@]} of $expected)" $?
 
-# the two shapes of a broken mktemp. The empty-yet-successful one is the
-# discriminator: a guard that only checks `$?` passes the first and fails
-# the second, and empty is the shape observed live
+# the three shapes of a broken mktemp. Each defeats the guard arm before
+# it: a `$?`-only guard passes the empty shape, and an `-n`-only guard
+# passes the non-directory shape, which is a real path of the right form
 shim_fail="$temp_dir/bin-fail"
 mkdir -p "$shim_fail" || die_temp "cannot create $shim_fail"
 printf '#!/usr/bin/env bash\necho "mktemp: mkdtemp failed" >&2\nexit 1\n' \
@@ -96,7 +117,18 @@ printf '#!/usr/bin/env bash\necho "mktemp: mkdtemp failed" >&2\nexit 1\n' \
 shim_empty="$temp_dir/bin-empty"
 mkdir -p "$shim_empty" || die_temp "cannot create $shim_empty"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$shim_empty/mktemp"
-chmod +x "$shim_fail/mktemp" "$shim_empty/mktemp"
+# a `mktemp -d` that lost its -d — a stale wrapper, a busybox applet —
+# still exits 0 and still prints a path. The file lands under this run's
+# own temp dir so the EXIT trap reaps it
+shim_notdir="$temp_dir/bin-notdir"
+mkdir -p "$shim_notdir" || die_temp "cannot create $shim_notdir"
+cat > "$shim_notdir/mktemp" <<SHIM
+#!/usr/bin/env bash
+f=\$(/usr/bin/mktemp "$temp_dir/notdir.XXXXXX") || exit 1
+printf '%s\n' "\$f"
+exit 0
+SHIM
+chmod +x "$shim_fail/mktemp" "$shim_empty/mktemp" "$shim_notdir/mktemp"
 
 # the victim stands in for whatever repo the caller happens to be sitting
 # in: a commit to count, a distinct identity to clobber, and an uncommitted
@@ -113,20 +145,25 @@ mkdir -p "$victim" || die_temp "cannot create $victim"
 ) >/dev/null 2>&1
 head0=$(cd "$victim" && git rev-parse HEAD)
 
-# the observed value goes in the label: `trap rm -rf` deletes the victim on
-# exit, so a bare FAIL line is the only record left of what a suite did to
-# somebody's working tree
+# both the observed AND the baseline value go in the label: `trap rm -rf`
+# deletes the victim on exit, so a FAIL line naming only what was seen
+# leaves nobody able to say what it should have been
 drift() { # label — the victim must be byte-identical after every run
   local head email tree
   head=$(cd "$victim" && git rev-parse HEAD)
   email=$(cd "$victim" && git config user.email)
   tree=$(cd "$victim" && git status --porcelain | tr '\n' ';')
+  # an EMPTY porcelain is the maximal-damage case, not the quiet one: it
+  # means a suite committed the victim's uncommitted file away. Rendered
+  # bare it read `intact ()`, less informative than the healthy run's
+  # `intact (?? uncommitted.txt;)` — informativeness exactly inverted
+  [ -n "$tree" ] || tree='empty — uncommitted.txt was swept into a commit'
   [ "$head" = "$head0" ]
-  check "$1: no commit landed in the caller repo (HEAD $head)" $?
+  check "$1: no commit landed in the caller repo (HEAD $head, want $head0)" $?
   [ "$email" = victim@caller.test ]
-  check "$1: caller user.email intact ($email)" $?
+  check "$1: caller user.email intact ($email, want victim@caller.test)" $?
   [ "$tree" = '?? uncommitted.txt;' ]
-  check "$1: caller working tree intact ($tree)" $?
+  check "$1: caller working tree intact ($tree, want '?? uncommitted.txt;')" $?
 }
 
 for suite in "${suites[@]}"; do
@@ -137,7 +174,8 @@ for suite in "${suites[@]}"; do
   # `(fails)` first parses as the suite failing
   for broken in \
     "mktemp fails:$shim_fail:exited nonzero" \
-    "mktemp returns empty:$shim_empty:exited 0 with no path"
+    "mktemp returns empty:$shim_empty:exited 0 with no path" \
+    "mktemp returns a file:$shim_notdir:gave a non-directory"
   do
     label=${broken%%:*}; rest=${broken#*:}
     shim=${rest%%:*}; want=${rest#*:}

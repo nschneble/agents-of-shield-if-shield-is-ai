@@ -8,12 +8,12 @@
 # silently break agent/skill resolution. An unwired test suite is an ERROR
 # too: a suite CI never runs is a red nobody sees (doc-bloat-scan.test.sh
 # sat out of the workflow for a week while failing). The wiring match reads
-# the whole workflow body, so it errs toward calling a suite wired — the
-# harmless direction for a check that blocks a merge. Dangling path
-# references are WARNINGS (printed, non-fatal) — they catch doc rot
-# without blocking on a clever false-positive. `[[memory-links]]` are
-# intentionally NOT checked: a dangling one is a valid forward-reference
-# per the memory convention.
+# ONLY the command text CI executes, so it errs toward calling a suite
+# UNWIRED — the cheap direction: a false error costs a minute, a false
+# "wired" reproduces that silent week. Dangling path references are
+# WARNINGS (printed, non-fatal) — they catch doc rot without blocking on a
+# clever false-positive. `[[memory-links]]` are intentionally NOT checked:
+# a dangling one is a valid forward-reference per the memory convention.
 #
 # Run from anywhere; resolves the repo root itself. Wire into CI (see
 # .github/workflows/validate.yml) and run locally before committing spec edits.
@@ -125,18 +125,44 @@ done
 # Derived from the tree, never a hand-kept roster: a roster is what rotted.
 # `local/` is gitignored scratch, not CI's business. Process substitution
 # (not a pipeline) so err's counter survives the loop.
+
+# Emit only the shell CI actually runs: the text after an inline `run:`,
+# and the body lines of a `run: |` / `run: >` block scalar. Two shapes
+# both have to hold. Reading the whole YAML body accepts any MENTION — a
+# step `name:`, an `on: push: paths:` filter, a `# TODO re-enable
+# ./x.test.sh` comment — each of which passed while the real step was
+# deleted. Reading only lines matching `run:` misses the block scalar,
+# which is the bug that widening was meant to fix. So: strip `#` to end of
+# line (a whole-line comment collapses to whitespace and contributes
+# nothing), then track the block. A block scalar's body is indented past
+# the column of its own `run` key, which is what ends the block on the
+# next sibling key or list item.
+run_commands() {
+  awk '
+    { sub(/#.*/, "", $0) }
+    in_run {
+      if ($0 ~ /^[[:space:]]*$/) next          # blank lines stay inside
+      match($0, /^[[:space:]]*/)
+      if (RLENGTH > run_col) { print; next }
+      in_run = 0                                # dedented: block is over
+    }
+    /^[[:space:]]*(-[[:space:]]+)?run:/ {
+      run_col = index($0, "run:") - 1
+      rest = $0
+      sub(/^[[:space:]]*(-[[:space:]]+)?run:[[:space:]]*/, "", rest)
+      if (rest ~ /^[|>]/) in_run = 1
+      print rest
+    }
+  ' "$1" 2>/dev/null
+}
+
 workflow=".github/workflows/validate.yml"
 if [ ! -e "$workflow" ]; then
   err "$workflow is missing, so no test suite runs in CI"
 else
-  # The whole body, not just `run:` lines: a suite invoked inside a
-  # `run: |` block scalar sits on a continuation line a `run:` grep never
-  # sees, and erroring on a suite CI genuinely runs blocks a merge over
-  # nothing. Full-line YAML comments are dropped so a suite named only in
-  # a comment still reads as unwired.
-  run_steps=$(grep -v '^[[:space:]]*#' "$workflow" 2>/dev/null)
+  run_cmds=$(run_commands "$workflow")
   while IFS= read -r suite; do
-    case "$run_steps" in
+    case "$run_cmds" in
       *"./$suite"*) : ;;
       *) err "$suite is not invoked anywhere in $workflow" ;;
     esac
