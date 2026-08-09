@@ -23,7 +23,24 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 gate="$here/gate.sh"
-temp_dir=$(mktemp -d)
+# a failing mktemp returns empty, which makes every derived path absolute
+# (/gitderived). The mkdir and cd below then fail while silenced, leaving
+# the GIT-DERIVED fixture commands running in the CALLER's repo, where they
+# commit its working tree and overwrite its user.email. Refuse to run.
+# The explicit template is what makes TMPDIR the input the message names:
+# a bare `mktemp -d` ignores TMPDIR on BSD, allocating under /var/folders.
+# one arm per shape: mktemp's own stderr explains a nonzero exit, but the
+# empty-yet-successful shape prints nothing, so "failed" would be a lie
+# fd 3 is a saved copy of the real stderr: the GIT-DERIVED fixture below
+# runs under `2>&1 >/dev/null`, so a die_temp firing inside it would
+# otherwise be swallowed and the suite would die with no line at all
+exec 3>&2
+die_temp() { echo "FATAL: $1; refusing to run" >&3; exit 2; }
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
@@ -46,7 +63,10 @@ STUB
 chmod +x "$stub"
 
 # --- GREEN: only the touched file changed and it is prettier-clean. ---
-g="$temp_dir/green"; mkdir -p "$g"
+# every fixture dir is guarded: an unmade dir sends the writes below to
+# paths that do not exist, and a gate handed an empty tree reports clean
+# — which is what several of these assertions are checking FOR
+g="$temp_dir/green"; mkdir -p "$g" || die_temp "cannot create $g"
 printf '.a { color: red; }\n' > "$g/a.css"
 printf 'a.css\n' > "$g/changed.txt"
 out=$(PRETTIER="$stub" "$gate" --dir "$g" --changed "$g/changed.txt" a.css); rc=$?
@@ -54,7 +74,7 @@ out=$(PRETTIER="$stub" "$gate" --dir "$g" --changed "$g/changed.txt" a.css); rc=
 printf '%s\n' "$out" | grep -q 'format-scope-gate: clean'; check "GREEN: reports clean" $?
 
 # --- RED-A: a declared touched file is not prettier-clean. ---
-ra="$temp_dir/reda"; mkdir -p "$ra"
+ra="$temp_dir/reda"; mkdir -p "$ra" || die_temp "cannot create $ra"
 printf '.a{color:red} @dirty\n' > "$ra/a.css"
 printf 'a.css\n' > "$ra/changed.txt"
 out=$(PRETTIER="$stub" "$gate" --dir "$ra" --changed "$ra/changed.txt" a.css); rc=$?
@@ -62,7 +82,7 @@ out=$(PRETTIER="$stub" "$gate" --dir "$ra" --changed "$ra/changed.txt" a.css); r
 printf '%s\n' "$out" | grep -q 'VIOLATION A .*not prettier-clean: a.css'; check "RED-A: cites the unclean touched file" $?
 
 # --- RED-B: out-of-scope file reformatted (clean, not declared). ---
-rb="$temp_dir/redb"; mkdir -p "$rb"
+rb="$temp_dir/redb"; mkdir -p "$rb" || die_temp "cannot create $rb"
 printf '.a { color: red; }\n' > "$rb/a.css"       # touched, clean
 printf 'const x = 1;\n'       > "$rb/vendor.js"   # changed, NOT touched, clean
 printf 'a.css\nvendor.js\n'   > "$rb/changed.txt"
@@ -75,7 +95,7 @@ printf '%s\n' "$out" | grep -q 'full-tree drift OR an undeclared edit'; check "R
 # logo.png is touched but prettier-unsupported -> note not violation
 # (out-of-glob carve-out). notes.txt changed out-of-scope but UNCLEAN ->
 # not format drift.
-c="$temp_dir/control"; mkdir -p "$c"
+c="$temp_dir/control"; mkdir -p "$c" || die_temp "cannot create $c"
 printf '.a { color: red; }\n'  > "$c/a.css"
 printf 'PNGDATA @unsupported\n' > "$c/logo.png"
 printf 'raw @dirty\n'           > "$c/notes.txt"
@@ -86,16 +106,20 @@ printf '%s\n' "$out" | grep -q 'note .*unsupported/parse.*logo.png'; check "CONT
 ! printf '%s\n' "$out" | grep -q 'notes.txt'; check "CONTROL: unclean out-of-scope file is NOT flagged as drift" $?
 
 # --- GIT-DERIVED: the real-wave path (no --changed; gate reads git). ---
-gd="$temp_dir/gitderived"; mkdir -p "$gd"
+gd="$temp_dir/gitderived"; mkdir -p "$gd" || die_temp "cannot create $gd"
 (
-  cd "$gd"
+  # never let the git fixture run in whatever the caller's CWD happens to be
+  cd "$gd" || die_temp "cannot cd into $gd"
   git init -q -b main
   git config user.email test@example.com
   git config user.name  test
   printf '.a { color: red; }\n' > a.css
   printf 'const x = 1;\n'       > vendor.js
   git add -A && git commit -q -m baseline
-) >/dev/null 2>&1
+# a bare `exit 2` here would end only the subshell — this file sets no -e —
+# and the two GIT-DERIVED cases below would run against a fixture that was
+# never built. Fail the parent on the subshell's status instead.
+) >/dev/null 2>&1 || die_temp "git fixture setup failed in $gd"
 
 # RED: an undeclared, clean, tracked change (what a full-tree format does)
 # — the gate must derive it from git and fire VIOLATION B.

@@ -12,10 +12,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate agent + skill specs
         run: ./scripts/validate-looper-config.sh
+      - name: Config validator itself (both directions)
+        run: ./scripts/validate-looper-config.test.sh
       - name: Guardrail replay predicates (both directions)
         run: ./scripts/custodian-guardrails.test.sh
       - name: Skill spec lint (both directions)
         run: ./scripts/custodian-skill-lint.test.sh
+      - name: Doc-bloat detector (both directions)
+        run: ./scripts/doc-bloat-scan.test.sh
       - name: Correction-gates runner (both directions)
         run: ./scripts/correction-gates/run-correction-gates.test.sh
       - name: Correction-gate format-scope (both directions)
@@ -24,3 +28,5 @@ jobs:
         run: ./scripts/correction-gates/no-ai-attribution/gate.test.sh
       - name: Destructive-git guard hook (both directions)
         run: ./hooks/guard-destructive-git.test.sh
+      - name: Temp-dir guard across suites (both directions)
+        run: ./scripts/temp-dir-guard.test.sh

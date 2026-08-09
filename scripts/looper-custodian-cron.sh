@@ -43,6 +43,28 @@
 # die identically, so it's detected like a ceiling-kill, breadcrumbed, and the
 # wrapper sleeps until the window's real reset epoch (usage-window-probe.sh)
 # before running the resume path once. Only if that also fails does it alert.
+#
+# Those three all react AFTER a session was spent. The run-start gate below
+# fires first: the skill's usage-window probe guards only Phase E, so a
+# weekly tick landing in an already-hot window burns C/A/B before anything
+# looks. This wrapper therefore probes BEFORE launching claude at all,
+# against the same 95% default the Phase E gate uses.
+#   hot on the 5-hour window   => wait out the reset, launch once, and
+#                                 defer if it is still hot after the wait
+#   hot on the WEEKLY window   => defer straight away, without the wait: a
+#                                 7-day window cannot roll inside the 6h
+#                                 wait cap, so waiting would burn the
+#                                 morning and defer anyway
+#   unread window              => launch unguarded and log it; unread is
+#                                 not 0%
+# Either defer path is as loud as a failure (notification + "Custodian
+# INCOMPLETE" issue), because the original sin these alert paths exist for
+# is a Monday that quietly did nothing.
+#
+# Exit codes: 0 ran (or resumed) cleanly; 3 bg-wait ceiling cut the run
+# short, resumable; 4 session limit hit and the post-reset resume also
+# failed; 5 the run-start usage-window gate deferred the run before any
+# phase ran; anything else is claude's own exit from the last attempt.
 set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -66,6 +88,16 @@ LOG="$LOGDIR/cron.log"
 
 MAX_ATTEMPTS=3
 BACKOFFS=(60 900)  # zsh arrays are 1-indexed: wait before attempt 2, attempt 3
+
+# Usage-window threshold for the run-start gate. Deliberately the SAME
+# default as the Phase E gate in skills/looper-custodian/SKILL.md — one
+# rule checked at two points, not two policies. Move both or they drift.
+# Overridable so the doc's word "tunable" is true of the code as well.
+WINDOW_THRESHOLD="${WINDOW_THRESHOLD:-0.95}"
+# Operator-facing copy says percent, because every doc surface and the
+# probe's own output do. Derived once: interpolating the raw 0.95 next to
+# an observed `97%` put two units in one sentence.
+WINDOW_THRESHOLD_PCT="$(printf '%.0f%%' "$((WINDOW_THRESHOLD * 100))")"
 
 # The harness prints this when it terminates background tasks at the ceiling.
 # Matched as a substring so it holds regardless of the "<n>s" in the message.
@@ -110,6 +142,117 @@ EOF
     >>"$LOG" 2>&1 || true
 }
 
+# Render a window_state string as a clause naming WHY the window is hot.
+# `rejected` must NOT borrow the threshold narrative: window_state flags it
+# at ANY utilization precisely because the bare pct would read like a
+# threshold trip that never happened, and an alert that then hardcodes
+# "at or over the N% threshold" reintroduces the same misread.
+window_reason() {
+  local state="$1" win
+  win="${state#hot }"; win="${win%% *}"
+  case "$state" in
+    *rejected@*)
+      printf 'the API rejected requests on the %s window, which is a hard stop at any utilization (observed: `%s`)' "$win" "$state" ;;
+    'hot '*)
+      printf 'the %s window was at or over the %s threshold (observed: `%s`)' "$win" "$WINDOW_THRESHOLD_PCT" "$state" ;;
+    # defensive: only `hot *` states reach alert_deferred today, and this
+    # arm must stay true of whatever else ever does
+    *)
+      printf 'the run-start gate did not clear the usage window (observed: `%s`)' "$state" ;;
+  esac
+}
+
+# Run-start defer: the window blocked the run at launch, so NO phase ran.
+# Nothing is logged and there is no tail to replay, which is why the
+# breadcrumb names a fresh run rather than `resume`. Kept as loud as a hard
+# failure on purpose — a weekly job that quietly does nothing is the
+# 2026-07 silent Monday again.
+#
+# $2 is the caller's own history sentence, the way alert_partial takes its
+# $cause. The two callers reach here with materially different histories —
+# the weekly branch defers immediately, having waited zero seconds — and a
+# single hardcoded "still over it after waiting for the reset" told the
+# operator about a wait that never happened.
+alert_deferred() {
+  local state="$1" cause="$2"
+  cat > "$LOGDIR/resume.json" <<EOF
+{"date":"$DATE","reason":"usage-window","partial":false,"started":false,"window":"$state","resume_cmd":"/looper-custodian"}
+EOF
+  osascript -e "display notification \"Usage window blocked the run ($state) — deferred. Retry: /looper-custodian\" with title \"looper-custodian INCOMPLETE\"" >>"$LOG" 2>&1 || true
+  gh issue create \
+    --title "Custodian INCOMPLETE $DATE" \
+    --body "$(printf 'The weekly run never started: %s. %s No phase ran, so nothing is logged and there is no tail to replay.\n\n**Run it:** `/looper-custodian` — a fresh run, not `resume`.\n' "$(window_reason "$state")" "$cause")" \
+    >>"$LOG" 2>&1 || true
+}
+
+# Read the real rate-limit window and classify it against WINDOW_THRESHOLD.
+# Echoes exactly one of:
+#   hot <window> <why>   over threshold, or the server said "rejected"
+#   ok                   under threshold on both windows
+#   unread <reason>      probe could not read the window, or WINDOW_THRESHOLD
+#                        was not a number to compare it against
+# <why> names which signal fired, not just a number: a "rejected" status is
+# a hard stop at ANY utilization, so reporting its (possibly tiny) pct
+# alone would read like a threshold trip that never happened.
+# An unread window is UNREAD, not 0% — the caller launches and says so, the
+# same contract usage-window-probe.sh documents for read_ok:false. That
+# includes an absent python3: with no interpreter this echoed nothing, the
+# caller's `case ""` fell through to its catch-all, and the log said the
+# window was ok — a fabricated reading, the exact thing the unread arm
+# exists to prevent.
+window_state() {
+  command -v python3 >/dev/null 2>&1 || { echo "unread no_python3"; return; }
+  "$REPO/scripts/usage-window-probe.sh" 2>/dev/null \
+    | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
+import json, os, sys
+try:
+    p = json.load(sys.stdin)
+except Exception:
+    print("unread parse_failed"); sys.exit(0)
+if not p.get("read_ok"):
+    print("unread %s" % p.get("reason", "unknown")); sys.exit(0)
+# a non-numeric WINDOW_THRESHOLD raised here, which printed nothing, and
+# the caller read an empty state as "unrecognized probe output: ''" and
+# launched with both windows possibly at 99%. Fail-open stays the
+# contract; naming the threshold is what makes it fixable, since the env
+# override is the only way to reach this at all.
+try:
+    t = float(os.environ["THRESHOLD"])
+except ValueError:
+    print("unread bad_threshold=%r" % os.environ["THRESHOLD"]); sys.exit(0)
+# weekly first, both passes. Returning on the first hit of a
+# ("five_hour", "weekly") scan let a hot 5-hour window MASK a hot weekly
+# one: the caller then took the wait arm, slept up to 6h, re-probed and
+# deferred anyway — the outcome the weekly fast path exists to avoid, and
+# not an exotic case, since a weekly window at 95% generally got there by
+# burning 5-hour windows.
+names = ("weekly", "five_hour")
+def pct(w):
+    u = w.get("utilization")
+    return "%.0f%%" % (u * 100) if u is not None else "unread"
+# rejected is a hard stop at ANY utilization, so it outranks every
+# threshold comparison and is scanned across BOTH windows first.
+for name in names:
+    w = p.get(name) or {}
+    if w.get("status") == "rejected":
+        print("hot %s rejected@%s" % (name, pct(w))); sys.exit(0)
+readable = 0
+for name in names:
+    w = p.get(name) or {}
+    u = w.get("utilization")
+    if u is None:
+        continue
+    readable += 1
+    if u >= t:
+        print("hot %s %s" % (name, pct(w))); sys.exit(0)
+# read_ok with no utilization on either window is still no reading. Saying
+# "ok" here would fabricate 0% just as surely as an absent probe does.
+if readable == 0:
+    print("unread no_utilization"); sys.exit(0)
+print("ok")
+'
+}
+
 # Sleep until the 5h usage window resets. Reads the real reset epoch from the
 # ratelimit-header probe; a bounded fallback covers an unreadable probe. Capped
 # at 6h so a bad epoch can't park the job forever.
@@ -129,6 +272,49 @@ except Exception: pass' 2>/dev/null)
   echo "=== waiting ${wait}s for the usage window to reset ($(date)) ===" >> "$LOG"
   sleep "$wait"
 }
+
+# Run-start gate. The Phase E probe guards only the run's biggest dispatch;
+# C/A/B run before it and are not free, so a cron firing into an already
+# hot window has spent what's left by the time E looks. Probe before
+# spending a headless session at all: hot on the 5h window => wait the
+# reset and launch once, defer if still hot; hot on the weekly window =>
+# defer straight away, no wait. Unread => launch, say so.
+gate_state="$(window_state)"
+case "$gate_state" in
+  'hot weekly'*)
+    # A 7-day window does not roll inside wait_for_window_reset's 6h cap,
+    # and that helper reads the 5h reset epoch anyway — so waiting one out
+    # would burn the morning and defer regardless. Defer now, loudly.
+    echo "=== run-start gate: usage window $gate_state — weekly window will not reset inside the wait cap, deferring the run ===" >> "$LOG"
+    alert_deferred "$gate_state" \
+      'The run deferred immediately, without waiting: a 7-day window cannot reset inside the wrapper 6-hour wait cap, so waiting would have burned the morning and deferred anyway.'
+    exit 5
+    ;;
+  'hot '*)
+    echo "=== run-start gate: usage window $gate_state (threshold $WINDOW_THRESHOLD_PCT) — waiting for reset before launching ($(date)) ===" >> "$LOG"
+    wait_for_window_reset
+    gate_state="$(window_state)"
+    if [[ "$gate_state" == 'hot '* ]]; then
+      echo "=== run-start gate: window still $gate_state after the wait — deferring the run ===" >> "$LOG"
+      alert_deferred "$gate_state" \
+        'The wrapper waited out the window reset and re-probed; the window was still blocking.'
+      exit 5
+    fi
+    echo "=== run-start gate: window cleared ($gate_state) — launching ($(date)) ===" >> "$LOG"
+    ;;
+  'unread '*)
+    echo "=== run-start gate: usage window $gate_state — launching unguarded ($(date)) ===" >> "$LOG"
+    ;;
+  ok)
+    echo "=== run-start gate: usage window ok — launching ($(date)) ===" >> "$LOG"
+    ;;
+  # anything window_state has no vocabulary for is UNREAD, not ok. This
+  # arm used to log "usage window ok", so a probe that echoed nothing —
+  # no python3, a crashed interpreter — recorded a reading never taken.
+  *)
+    echo "=== run-start gate: usage window unread (unrecognized probe output: '$gate_state') — launching unguarded ($(date)) ===" >> "$LOG"
+    ;;
+esac
 
 attempt=1
 while true; do

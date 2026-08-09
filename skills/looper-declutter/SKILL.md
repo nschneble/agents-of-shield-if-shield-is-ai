@@ -23,6 +23,8 @@ Same discipline the loop, custodian, and defend hold. A comment is a judgment ca
 - **Scan / triage / report run automatically** — read-only, no source touched. They find, route, and rank candidates.
 - **Snip is propose-only** — every trim lands as a checkbox in the report and proceeds through the build pipeline ONLY after a human ticks it. There is NO auto-apply class here (unlike defend's dep-bump): a comment edit is never mechanical enough to skip the tick.
 
+The snip path also answers to the framework-wide attribution default (`docs/looper-framework.md` → `## Unexpected state is the owner's until proven otherwise`), which is why a comment that reads strangely is a candidate for the report, never a trim the pass makes on its own judgment.
+
 ## Invocation
 
 Noun-verb grammar (`docs/looper-skills.md` → `## Subcommand grammar`), same shape as custodian and defend:
@@ -48,10 +50,10 @@ Run the detector over the target tree. It ships in the looper definitions repo a
 ~/.claude/scripts/doc-bloat-scan.sh [<path> ...]
 ```
 
-It emits one JSONL candidate per hit — `{file, line, kind, text}` — across five kinds (v1, C-style `//` and `/* */`, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
+It emits one JSONL candidate per hit — `{file, line, kind, text}` — across five kinds (v1, C-style `//` and `/* */` plus JSX's braced `{/* … */}` spelling of the latter, full-line comments only, so a `//` inside a string or `https://` URL is never mis-read):
 
-- `block-overexplained` — a bare `/* … */` block spanning multiple lines (at least one content line between opener and closer), `*`-prefixed or free-form prose alike. The primary quarry: a multi-line block wedged mid-execution. A free-form block whose lines don't start with `*` used to be invisible — the worst offender slipped the net; it no longer does.
-- `jsdoc-block` — the same shape but a `/**` opener, i.e. a doc header. Kept by default; snipped only when it is NOT actually a header.
+- `block-overexplained` — a bare `/* … */` or `{/* … */}` block spanning multiple lines (at least one content line between opener and closer), `*`-prefixed or free-form prose alike. The primary quarry: a multi-line block wedged mid-execution. A free-form block whose lines don't start with `*` used to be invisible — the worst offender slipped the net; it no longer does.
+- `jsdoc-block` — the same shape but a `/**` (or `{/**`) opener, i.e. a doc header. The unbraced spelling is kept by default and snipped only when it is NOT actually a header. The braced `{/**` never is one: it parses only in JSX children position, so it is mid-execution by construction and routes to `block-overexplained`.
 - `stacked-slashes` — two or more consecutive `//` lines
 - `over-75` — a comment line longer than 75 chars (break belongs at column 76)
 - `capitalized-slash` — a single-line `//` whose first word is Capitalized
@@ -64,7 +66,7 @@ For each candidate, decide keep-vs-snip and which owner's rule the snip applies 
 
 **What survives:**
 
-- **Declaration-position doc blocks.** A `/**` (or `/*`) block against the file top or immediately before an `interface`/`type`/`function`/`export`/prop — context pushed UP out of the execution flow, where both `the-chronicler.md` and the global CLAUDE.md say longer context belongs. These are the `jsdoc-block` kind and are KEEP-LEANING: the aggression is aimed at mid-execution, not headers. NOT a blanket pass, though — a multi-line block on a self-evident prop, or one echoing the type signature, is still a snip (`the-chronicler.md` `## Do NOT document`). A genuine header carrying real content is dropped in triage like generated code — no report line, no checkbox.
+- **Declaration-position doc blocks.** A `/**` (or `/*`) block against the file top or immediately before an `interface`/`type`/`function`/`export`/prop — context pushed UP out of the execution flow, where both `the-chronicler.md` and the global CLAUDE.md say longer context belongs. The braced spellings (`{/**`, `{/*`) cannot reach declaration position at all, so they never survive on this ground. These are the `jsdoc-block` kind and are KEEP-LEANING: the aggression is aimed at mid-execution, not headers. NOT a blanket pass, though — a multi-line block on a self-evident prop, or one echoing the type signature, is still a snip (`the-chronicler.md` `## Do NOT document`). A genuine header carrying real content is dropped in triage like generated code — no report line, no checkbox.
 - **Genuine one-liners.** A single-line `// loads metadata in an async job`, or a one-line `// GOTCHA:` / `// TODO:` / `// KNOWN ISSUE:` marker. One line, kept.
 
 **What burns** — everything else, default verb DESTROY. A "non-obvious WHY" does NOT earn length; it earns ONE line or the axe. These are the reason this skill exists, and the reactive crew keeps letting them stand:
@@ -104,8 +106,8 @@ The heart of the skill. Each kind maps to an existing rule; declutter applies th
 
 | Kind                  | Owner rule (source of truth)                                                                                                                             |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `block-overexplained` | the primary quarry — a free-form `/* … */` block mid-execution. Collapse to ONE `// WHY` line or delete (`the-chronicler` `## Comment Style Rules`: no multi-line blocks mid-execution). Explains a known primitive / restates code → `the-improver` deletes it; glosses a design-token/color/style that IS the answer → `the-chronicler` `## Do NOT document`. |
-| `jsdoc-block`         | a `/**` doc header — KEEP-LEANING (declaration-position context; `the-chronicler`: longer context lives in the overview). Snip only when it is not a genuine header: a self-evident per-field block, one echoing the type, or a `/**` stranded mid-execution — then treat as `block-overexplained`. |
+| `block-overexplained` | the primary quarry — a free-form `/* … */` or `{/* … */}` block mid-execution. Collapse to ONE `// WHY` line or delete (`the-chronicler` `## Comment Style Rules`: no multi-line blocks mid-execution). Explains a known primitive / restates code → `the-improver` deletes it; glosses a design-token/color/style that IS the answer → `the-chronicler` `## Do NOT document`. |
+| `jsdoc-block`         | a `/**` (or `{/**`) doc header. The unbraced spelling is KEEP-LEANING (declaration-position context; `the-chronicler`: longer context lives in the overview), snipped only when it is not a genuine header: a self-evident per-field block, one echoing the type, or a `/**` stranded mid-execution — then treat as `block-overexplained`. A braced `{/**` is always that last case, since it parses only in JSX children position. |
 | `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line, or delete if it only narrates the code                                                             |
 | `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                                                                       |
 | `capitalized-slash`   | `the-chronicler` — lowercase the first word of a single-line `//`                                                                                        |

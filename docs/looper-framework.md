@@ -11,6 +11,11 @@ Per-wave flow inside `the-looper`:
 
 - `research → plan → build → verify → review → learn → commit`
 
+Each of those steps is checkpointed to a per-wave journal under
+`local/loops/<branch>/` as it completes, so a dispatch killed mid-wave
+resumes at its next unfinished step rather than repeating the wave. The
+contract lives with the executor, in `agents/the-looper.md`.
+
 Cross-wave flow inside Loop de Looper:
 
 - `nonbeliever → scope → wave loop × N → final crew → recap → terminate`
@@ -30,13 +35,47 @@ the loop stays autonomous unless real residual judgment is needed. When
 plan emits `ESCALATE: <gate>`, the agent stops; orchestrator invokes the
 named specialist, appends its output as `gate outputs`, and re-dispatches.
 
+## Unexpected state is the owner's until proven otherwise
+
+Every looper skill and agent works in repos the owner also works in
+between runs, so state that does not match what a run expected is more
+likely their deliberate act than an errant process. A PR that reads
+differently, a file that moved, a commit no wave made, a memory that
+contradicts another: assume authorship before assuming malfunction.
+
+Surface it and say what you observed; do not revert, overwrite, or
+restore. Where a merge is genuinely needed, augment additively, leaving
+the owner's own content byte-identical. The `pr.body_sha` guard in
+`skills/loop-de-looper/SKILL.md` (Step 4) is the worked example.
+
+Acting anyway is allowed on a mechanically verified cause, never on an
+inference: a baseline the run itself wrote and can diff against, or a
+reproduced defect with a named mechanism. Two stray commits in this repo
+fit a rogue process and a deliberate act equally well; what settled it was
+reproducing an unguarded `mktemp -d` in the repo's own test suites
+committing into the invoking repo. A plausible story does not clear the
+bar, and external state is stricter still: a verified cause there routes
+to the owner rather than licensing a self-correction.
+
 ## Config validation
 
 The agent + skill specs are themselves checked. `scripts/validate-looper-config.sh`
-asserts every `agents/*.md` and `skills/*/SKILL.md` has the frontmatter the
-harness resolves on (`name`, `description`) and that the declared name matches
-its path — a malformed name silently breaks resolution. It also warns on
-backtick'd repo-relative path references that don't resolve (doc rot), while
-leaving `[[memory-links]]` alone (a dangling one is a valid forward-reference).
+carries three responsibilities, split across two severities.
+
+Two ERROR. It asserts every `agents/*.md` and `skills/*/SKILL.md` has the
+frontmatter the harness resolves on (`name`, `description`) and that the declared
+name matches its path — a malformed name silently breaks resolution. And it
+asserts every `*.test.sh` in the tree is actually invoked by
+`.github/workflows/validate.yml`, reading only the command text CI executes
+rather than any mention of the path: a suite CI never runs is a red nobody sees,
+which `doc-bloat-scan.test.sh` demonstrated by sitting out of the workflow for a
+week while failing. That check is why `scripts/validate-looper-config.test.sh`
+exists — the wiring match has been wrong in both directions, and both were
+silent.
+
+One WARNS. Backtick'd repo-relative path references that don't resolve are doc
+rot, reported without blocking a merge, while `[[memory-links]]` are left alone
+(a dangling one is a valid forward-reference).
+
 The `.github/workflows/validate.yml` CI job runs it on every push and PR, so a
 broken spec can't land; run it locally before committing spec edits.

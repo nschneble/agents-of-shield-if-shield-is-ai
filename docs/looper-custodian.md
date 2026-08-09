@@ -442,3 +442,74 @@ Found 2026-07-29 during a `linklater` metadata-fetch bugfix run, root-caused liv
     instead of one file. No new governance model: `B-migrate` is a sixth checkbox
     tag in an existing propose-only phase, applied through the existing Phase D
     path.
+
+Refined 2026-08-09 from the 2026-08-03 run's window burn:
+
+23. **The usage-window gate moves to the run's front door, and Phase E's
+    fan-out gets bounded by the headroom it just measured.** Decision 16
+    put a probe in front of Phase E and stopped there, which left two holes
+    the 2026-08-03 run walked straight through. (a) The probe gated only E,
+    so a weekly tick landing in an already-hot window spent C/A/B before
+    anything looked at the window. (b) Passing the gate was treated as
+    permission for an unbounded dispatch. Read the log rather than the
+    intuition: that run's pre-E probe recorded `five_hour` at 36% and
+    dispatched — then `deep-research` fanned out 25 candidate claims, each
+    drawing its own verifier panel, the window went dry, **all 25 panels
+    errored**, and the phase reported 0 verified / 25 unverified. Phase E's
+    discipline correctly refused to promote unverified claims to
+    checkboxes, so the run spent its whole window to produce a digest with
+    nothing actionable in it, and then hit the session limit at 09:49
+    before Phase F. Three fixes, one threshold between them:
+    - **Run-start gate.** The same `scripts/usage-window-probe.sh` and the
+      same 95% default now run before Phase C. On the cron, the wrapper
+      probes before it spends a headless session at all and waits out the
+      reset (reusing the `wait_for_window_reset` the session-limit path
+      already had) — except on a hot *weekly* window, which cannot roll
+      inside that helper's 6h cap and so defers immediately rather than
+      burning the morning first. **Every unattended defer takes the loud
+      path — notification plus a `Custodian INCOMPLETE <date>` issue —
+      whether it came after the wait or straight away**, because a job
+      that quietly does nothing is exactly the 2026-07-06 / 2026-07-13
+      failure the alert paths were built for. The two differ only in what
+      the issue body says happened. Invoked by hand, the run defers at
+      step 0 with a breadcrumb and no issue, because a person is already
+      watching. The breadcrumb names a fresh `/looper-custodian`, never
+      `resume`: no phase logged means no tail to replay.
+    - **Honest about what this gate does not cover.** It would NOT have
+      saved 2026-08-03 — the front door was clear at 36%. Its case is the
+      different one: a cron tick that never had room. Claiming otherwise
+      would have made the incident look closed while the mechanism that
+      caused it stayed live.
+    - **Fan-out bound.** The candidate count IS the fan-out width, because
+      every candidate draws a verifier panel, and it is the only dial
+      custodian holds — `deep-research` is invoked as a skill, and its
+      internal execution cannot be batched, throttled, or interrupted
+      mid-flight, which is why "check between batches" was considered and
+      rejected as unimplementable from this side. So the bound is on the
+      **ask**: a standing cap of 12 candidates across both tracks, shrunk
+      by observed headroom (`1 − max(five_hour, weekly)`) to 6 below 0.60
+      and 3 below 0.30, standing track only at either. Twelve is not a
+      modelled rate — the one measurement is 25 candidates collapsing at
+      0.64 headroom, and 12 is under half of a fan-out that demonstrably
+      did not fit. A second probe after E returns logs the real
+      `utilization` delta, so the cap is replaced by measurement rather
+      than left as a guess. `read_ok:false` keeps the standing cap
+      unshrunk: unguarded means unsized, and treating an unread window as
+      thin is the same fabrication as treating it as empty.
+    - **A zero is never reported bare.** The failure that hurt most was not
+      the collapse, it was that the collapse was invisible — a digest
+      reading like a quiet week. Phase E now distinguishes three zeros and
+      names which occurred: collapsed (panels errored, with counts and the
+      window pct), empty (no candidate), unvalidatable (no `validate-by`).
+      The report's E line carries it in the same shape as the existing
+      deferred line.
+
+    Tradeoff taken: this bounds an input, not an execution. If
+    `deep-research` ignores the cap, or its verification fans out
+    per-source rather than per candidate, the bound is weaker than it
+    reads — which is precisely why the post-E measurement and the
+    no-bare-zero rule are part of the same decision. They are what make a
+    bound that failed visible, instead of another quiet zero. Unverifiable
+    without a live cron run: nothing here can be exercised by CI (the
+    wrapper is unattended shell against a real rate-limit window), so the
+    first real Monday is the test.

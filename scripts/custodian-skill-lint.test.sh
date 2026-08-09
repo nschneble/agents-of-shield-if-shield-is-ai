@@ -11,7 +11,19 @@ set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 linter="$here/custodian-skill-lint.sh"
-temp_dir=$(mktemp -d)
+# a failing mktemp returns empty, which makes every derived fixture path
+# absolute (/red-unknown) and scatters the run outside the temp tree. Abort
+# loudly rather than half-run against paths nobody intended. The explicit
+# template is what makes TMPDIR the input the message names: a bare
+# `mktemp -d` ignores TMPDIR on BSD and allocates under /var/folders.
+# one arm per shape: mktemp's own stderr explains a nonzero exit, but the
+# empty-yet-successful shape prints nothing, so "failed" would be a lie
+die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
 fails=0
@@ -19,9 +31,6 @@ check() { # desc  rc-already-evaluated($?)
   if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"
   else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
 }
-
-# Small helper to write a skill fixture: mkskill <dir> <SKILL.md-body-file-content>
-mkskill() { mkdir -p "$1"; }
 
 # ── RED fixtures: one structural violation per check ───────────────────────────
 

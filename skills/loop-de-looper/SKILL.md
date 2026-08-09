@@ -145,6 +145,8 @@ Other stop conditions from the-looper (verify fails twice, review verdict `rethi
 
 Before bubbling a **retryable** the-looper stop up to Step 4, attempt EXACTLY ONE fresh-context re-dispatch — the "restart to escape a local optimum" move: a stuck agent escapes more often from a clean restart than from more turns on a rotted context (ComPilot's multi-run finding). "From scratch" means fresh CONTEXT — a clean re-dispatch dropping the rotted transcript — NOT a freshly-improvised plan (mechanic 2: revert to the next ranked alternate, improvise only when none exists).
 
+**Resume is not retry — classify before you re-dispatch.** A wave that died with NO hand-back (session limit, crash, a killed session) did not fail; it was interrupted. That is a RESUME: re-dispatch it plainly and `the-looper` picks up at its next unfinished journaled step (`## State tracking`). Only a wave that handed back a retryable STOP below is a RETRY, and a retry never resumes — its brief's `prior attempt failed:` note is also what tells the executor to open a fresh journal segment instead of continuing the dead one (`agents/the-looper.md` `## Step journal`, which is also where the executor opens one unprompted — only when a torn declaration has voided the journal's authority). Do NOT spend a retry, or its `wave_retries` count, on an interruption.
+
 **Retryable** (non-deterministic — a fresh attempt can plausibly differ):
 
 - `verify fails twice` on the same root cause
@@ -326,18 +328,20 @@ The final report's crew/gate claims must be backed by these lines. If `gates.jso
 
 Run state lives on disk, NOT only in the parent's working memory. A long unattended run gets context-compacted; queue + counters held only in-context can evaporate, and a resume that re-derives them by grepping commit messages is lossy. The snapshot is authoritative.
 
-Two files under `local/loops/<branch>/`, both branch-keyed so resume and parallel branches don't collide:
+Three files under `local/loops/<branch>/`, all branch-keyed so resume and parallel branches don't collide:
 
 - **`gates.jsonl`** — append-only audit log. One line per gate event, never rewritten. Source of truth for _what gates ran_.
 - **`run-state.json`** — mutable position snapshot. Rewritten after every wave and every crew pass. Source of truth for _where in the queue we are_.
+- **`wave-N.jsonl`** (+ its `wave-N-plan.md` artifact) — append-only per-wave step journal, written by `the-looper`, NOT by the orchestrator. Source of truth for _how far into a wave the executor got_. Contract in `agents/the-looper.md` `## Step journal`.
 
-Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
+Different shapes, different jobs: the jsonl is a log you append, the json is a snapshot you overwrite. The journal is a separate file from `run-state.json` out of necessity, not taste — the orchestrator rewrites that snapshot wholesale (write-tmp-then-`mv`), so an executor appending step lines into it concurrently would lose them to the next `mv`. Granularity matches ownership: the orchestrator checkpoints WAVES, the executor checkpoints STEPS inside one. Write `run-state.json` **atomically** — write `run-state.json.tmp`, then `mv` it over `run-state.json` — so a crash mid-write never leaves a half-file. Write it BEFORE acting on the budget governor or crew trigger (step 2c), so a halt still leaves a resumable snapshot.
 
-The `run-state.json` shape + the `usage` sub-object's fields are in `references/state-schemas.md`.
+The `run-state.json` shape + the `usage` sub-object's fields are in `references/state-schemas.md`, alongside the journal's own line shapes and reader rules.
 
 Resume mode (`/loop-de-looper resume`):
 
 - **Primary**: read `run-state.json`. Branch matches + file present → trust it for queue, counters, PR, last-crew. Reconcile `last_crew_wave` against `gates.jsonl` crew entries (jsonl wins on any disagreement about _what ran_).
+- **Mid-wave**: a wave the snapshot shows `pending` may still have a partly-finished journal. Re-dispatch it normally — do NOT parse the journal to decide which steps to hand it. `the-looper` reads its own journal and resumes at its next unfinished step; the orchestrator owns wave granularity, the executor owns step granularity.
 - **Fallback only** (file missing / corrupt / pre-snapshot run): re-derive as before — re-run scope, diff `git log main..HEAD` for shipped waves, re-derive counters from git stat, grep commit messages for last crew. Lossy; the snapshot exists so this is the exception, not the path.
 
 ## Budget governor
@@ -413,8 +417,8 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 - Does NOT loop unbounded — budget governor caps total/corrective/no-progress/retry churn (rail hit = STOP), railing on observed churn never metered token spend (`## Budget governor`).
 - Does NOT invent a usage percentage or dispatch into a near-exhausted window — reads the REAL rate-limit window, pauses at 95%, self-resumes; probe-unread logs not-run + unguarded, never a fabricated pause/percent or cost-axis substitute (`## Usage-window guard`).
 - Does NOT defer a wave's cross-file-incompleteness flag to the crew — a dangling reference it created is triaged immediately (`## Protocol` 2b-flags).
-- Does NOT retry a deterministic stop (write-gate, governor rail, scope refusal — same wall every time, bubble up); only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns ONE fresh-context retry reverting to the next ranked plan, never a resume (`## Protocol` 2b-retry).
-- Does NOT keep run state only in-context — queue + counters persist to `run-state.json` (atomic) every wave; in-context is a cache (`## State tracking`).
+- Does NOT retry a deterministic stop (write-gate, governor rail, scope refusal — same wall every time, bubble up); only a non-deterministic stop (verify-twice, `rethink`, no-progress) earns ONE fresh-context retry reverting to the next ranked plan, never a resume — and an interrupted wave that never handed back is a resume, not a retry (`## Protocol` 2b-retry).
+- Does NOT keep run state only in-context — queue + counters persist to `run-state.json` (atomic) every wave, and the executor journals its own steps to `wave-N.jsonl`; in-context is a cache (`## State tracking`).
 - Does NOT dispatch into a degraded context or interrupt a wave mid-flight — on observed pressure it halts at the NEXT wave boundary and hands off with `/loop-de-looper resume`, never a mid-wave abort or invented context-% gauge (`## Context-pressure handoff`).
 - Does NOT halt without naming the next command — every STOP / escalation / handoff / required-not-loopable termination ends with the literal runnable line (`## Voice + style`).
 - Does NOT skip nonbeliever pre-flight or halt on a mere challenge — only a STOP verdict halts; PROCEED-WITH-NOTES carries notes into scope (`## Protocol` Step 0).

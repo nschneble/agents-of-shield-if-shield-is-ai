@@ -57,7 +57,20 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
 ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
-  cand=$(mktemp); new=$(mktemp)
+  # `|| cand=""` so set -e cannot abort ahead of the check below: it did,
+  # and the terminal got mktemp's own line with no script name, no refusal
+  # word, and rc=1 where the empty shape gives 2 for the same failure.
+  # Both shapes land here because "no temp file" is true of both, and a
+  # nonzero mktemp explains itself on stderr. The explicit template is what
+  # makes TMPDIR the input the message names: a bare `mktemp` ignores
+  # TMPDIR on BSD and allocates under /var/folders.
+  cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
+  new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
+  [ -n "$cand" ] && [ -n "$new" ] || {
+    echo "FATAL: custodian-history: mktemp gave no temp file" \
+         "(TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
+    exit 2
+  }
   for repo in "${REPOS[@]}"; do
     rr="$REPOS_ROOT/$repo"
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }
@@ -101,7 +114,10 @@ ingest() {
   ' > "$new"
   n=$(grep -c . "$new" || true)
   cat "$new" >> "$INDEX"
-  echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || echo 0) line(s) at $INDEX"
+  # `|| true`, never `|| echo 0`: grep -c prints its own 0 and THEN exits 1
+  # on no match, so the fallback appended a second 0 and the summary read
+  # "index now 0\n0 line(s)" — split across two lines on a first ingest
+  echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
   rm -f "$cand" "$new"
 }
 

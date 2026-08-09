@@ -79,7 +79,7 @@ Discipline: the guardrail is *proposed*, not silently installed — same propose
 - Code patterns derivable from current code (`git blame` or `grep` find them)
 - Fix recipes (commit / PR carry that)
 - Ephemeral task details
-- Anything already in CLAUDE.md or existing memory: update instead of duplicate
+- Anything already in CLAUDE.md or existing memory: update instead of duplicate, where "update" means augment rather than overwrite, per `docs/looper-framework.md` → `## Unexpected state is the owner's until proven otherwise`
 
 ## Output
 
