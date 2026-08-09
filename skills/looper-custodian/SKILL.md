@@ -9,7 +9,7 @@ Full design rationale + decision log: `docs/looper-custodian.md`. This file is t
 
 ## Governing principle: custodian PROPOSES, human DISPOSES
 
-Same discipline the loop holds (does NOT auto-revert commits, does NOT flip draft→ready). An unattended job that auto-edits memories or agents is exactly the "merging outpaces comprehension" failure the loop-engineering sources warn about. Auto-deleting a memory because a later one "contradicts" it can silently destroy a deliberate exception.
+Same discipline the loop holds (does NOT auto-revert commits, does NOT flip draft→ready). An unattended job that auto-edits memories or agents is exactly the "merging outpaces comprehension" failure the loop-engineering sources warn about. Auto-deleting a memory because a later one "contradicts" it can silently destroy a deliberate exception. That caution is the framework-wide default applied to memory, and it binds every Phase D write to a memory or agent: `docs/looper-framework.md` → `## Unexpected state is the owner's until proven otherwise`.
 
 So the line is sharp:
 

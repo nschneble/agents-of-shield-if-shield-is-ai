@@ -23,6 +23,8 @@ Same discipline the loop, custodian, and defend hold. A comment is a judgment ca
 - **Scan / triage / report run automatically** — read-only, no source touched. They find, route, and rank candidates.
 - **Snip is propose-only** — every trim lands as a checkbox in the report and proceeds through the build pipeline ONLY after a human ticks it. There is NO auto-apply class here (unlike defend's dep-bump): a comment edit is never mechanical enough to skip the tick.
 
+The snip path also answers to the framework-wide attribution default (`docs/looper-framework.md` → `## Unexpected state is the owner's until proven otherwise`), which is why a comment that reads strangely is a candidate for the report, never a trim the pass makes on its own judgment.
+
 ## Invocation
 
 Noun-verb grammar (`docs/looper-skills.md` → `## Subcommand grammar`), same shape as custodian and defend:

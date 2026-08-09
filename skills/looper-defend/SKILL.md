@@ -5,7 +5,7 @@ description: On-demand autonomous vulnerability hunt + remediation over a whole 
 
 Proactive whole-repo vulnerability hunt + human-gated remediation. `looper-custodian` GCs and audits the looper system on a cadence; `looper-defend` hunts a TARGET codebase for security defects on demand. Structure mined from Anthropic's `defending-code-reference-harness` (threat-model → scan → triage → patch, plus its `/customize` stack-abstraction) — the STRUCTURE, not its ASAN/Docker/gVisor substrate, which is a hard third-party dependency this family forbids (`[[no-third-party-hosted-tool-reliance]]`).
 
-Full design rationale + decision log: `docs/looper-defend.md` (added wave 2). This file is the executable spec.
+Full design rationale + decision log: `docs/looper-defend.md`. This file is the executable spec.
 
 ## Why this exists — and how it differs from what already reviews security
 
@@ -23,6 +23,8 @@ Same discipline the loop and custodian hold. An autonomous hunt that auto-rewrit
 - **Recon / find / triage / report run automatically** — read-only analysis, no source touched. They enumerate, hunt, verify, and rank.
 - **Patch is propose-only by default** — every remediation lands as a checkbox in the report and proceeds through the build pipeline ONLY after a human ticks it.
 - **One narrow class MAY auto-apply** — a dependency version bump to a pinned CVE-fix version, when the existing suite stays green with ZERO application-code change (diff confined to the manifest/lockfile). It still lands as a reviewable **draft-PR commit** through the same `looper-plan`/`build`/`verify`/`review`/`commit` chain — the human gates the MERGE, not the tick. Any condition unmet (no pinned fix version, suite red, diff touches app code) demotes it to propose-only — and the diff-touches-app-code condition is enforced as a real post-build diff gate, not merely asserted at triage-time classification (`## Patch` → the auto-class halt step). Everything else — any logic change, any fix touching application code — needs the tick.
+
+The patch path also answers to the framework-wide attribution default (`docs/looper-framework.md` → `## Unexpected state is the owner's until proven otherwise`), which is what puts triage's reproduced cause, rather than code that merely reads oddly, behind every finding.
 
 ## Invocation
 

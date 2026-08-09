@@ -30,6 +30,28 @@ the loop stays autonomous unless real residual judgment is needed. When
 plan emits `ESCALATE: <gate>`, the agent stops; orchestrator invokes the
 named specialist, appends its output as `gate outputs`, and re-dispatches.
 
+## Unexpected state is the owner's until proven otherwise
+
+Every looper skill and agent works in repos the owner also works in
+between runs, so state that does not match what a run expected is more
+likely their deliberate act than an errant process. A PR that reads
+differently, a file that moved, a commit no wave made, a memory that
+contradicts another: assume authorship before assuming malfunction.
+
+Surface it and say what you observed; do not revert, overwrite, or
+restore. Where a merge is genuinely needed, augment additively, leaving
+the owner's own content byte-identical. The `pr.body_sha` guard in
+`skills/loop-de-looper/SKILL.md` (Step 4) is the worked example.
+
+Acting anyway is allowed on a mechanically verified cause, never on an
+inference: a baseline the run itself wrote and can diff against, or a
+reproduced defect with a named mechanism. Two stray commits in this repo
+fit a rogue process and a deliberate act equally well; what settled it was
+reproducing an unguarded `mktemp -d` in the repo's own test suites
+committing into the invoking repo. A plausible story does not clear the
+bar, and external state is stricter still: a verified cause there routes
+to the owner rather than licensing a self-correction.
+
 ## Config validation
 
 The agent + skill specs are themselves checked. `scripts/validate-looper-config.sh`
