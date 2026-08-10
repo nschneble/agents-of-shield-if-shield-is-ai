@@ -135,19 +135,41 @@ in_list() { # needle list...
 }
 
 # --- Internal-link extraction: markdown `](target)` + bare subdir path tokens ---
-# A bare token is only skill-relative when it STARTS a path. A fully qualified
-# cross-skill cite (`skills/loop-de-looper/references/state-schemas.md`) carries
-# `references/…` as a tail, and matching there would read another skill's file
-# as this skill's own — silent until a skill both bundles references/ and cites
-# another skill's reference by its full path.
-# So the match must open at line start or after a non-path char, which the sed
-# then strips (the alternation always begins with a letter, so a line-start
-# match is left alone).
-extract_refs() { # file -> candidate relative refs, one per line
-  local file="$1"
+# A bare token is only skill-relative when it STARTS a path. Three
+# spellings start one: line start, after a non-path character, and after
+# the token's own `./`. A fully qualified cite carries `references/…` as
+# a TAIL, and reading that as skill-relative names another skill's file
+# as this skill's own — silent until a skill both bundles references/
+# and cites another skill's reference by full path. So the prefix
+# decides ownership instead of being ignored: `skills/<this-skill>/` is
+# stripped (the remainder IS skill-relative), any other skill's prefix
+# drops the token. `../` is matched and passed to resolve_ref, which
+# rejects a parent escape on its own terms — a visible rejection beats a
+# silent non-match.
+BARE_REF_RE='(^|[^A-Za-z0-9._/-])(skills/[A-Za-z0-9._-]+/)?(\.\.?/)?(references|scripts|assets|templates)/[A-Za-z0-9._/-]+'
+
+# Normalize raw BARE_REF_RE matches on stdin into skill-relative refs.
+# Dropping one leading delimiter is unambiguous because `.` `_` `-` `/`
+# and the alphanumerics are all IN the path class, so a delimiter is
+# never `.` and a line-start match (which opens on a letter or a `.`) is
+# left alone. The own-skill test is a string compare, so a skill name
+# needs no regex escaping.
+skill_relative_refs() { # skill_name  (stdin: raw matches, stdout: refs)
+  awk -v own="$1" '
+    { sub(/^[^A-Za-z.]/, "") }
+    /^skills\// {
+      if (index($0, "skills/" own "/") != 1) next
+      sub(/^skills\/[^\/]+\//, "")
+    }
+    { sub(/^\.\//, ""); print }
+  '
+}
+
+extract_refs() { # skill_dir file -> candidate relative refs, one per line
+  local dir="${1%/}" file="$2" skill
+  skill=$(basename "$dir")
   { grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//'
-    grep -oE '(^|[^A-Za-z0-9._/-])(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null \
-      | sed -E 's/^[^A-Za-z]//'
+    grep -oE "$BARE_REF_RE" "$file" 2>/dev/null | skill_relative_refs "$skill"
   } || true
 }
 
@@ -162,15 +184,16 @@ extract_refs() { # file -> candidate relative refs, one per line
 # appears as BOTH a markdown link and a matching bare token (the two greps both
 # match on one line) to a single ref, so one broken link is counted exactly once.
 scoped_refs() { # skill_dir file -> in-scope relative refs, deduped, one per line
-  local dir="$1" file="$2" bref seg
+  local dir="${1%/}" file="$2" bref seg skill
+  skill=$(basename "$dir")
   {
     grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//'
     while IFS= read -r bref; do
       [ -n "$bref" ] || continue
       seg="${bref%%/*}"
       [ -d "$dir/$seg" ] && printf '%s\n' "$bref"
-    done < <(grep -oE '(^|[^A-Za-z0-9._/-])(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null \
-               | sed -E 's/^[^A-Za-z]//' || true)
+    done < <(grep -oE "$BARE_REF_RE" "$file" 2>/dev/null \
+               | skill_relative_refs "$skill" || true)
   } | sort -u || true
 }
 
@@ -380,7 +403,7 @@ lint_skill() {
           [ "$target" = "$rf" ] && continue
           viol "reference-nesting" "$rf" "references \`$r\` — reference chains must stay one level deep from SKILL.md"
         fi
-      done < <(extract_refs "$rf")
+      done < <(extract_refs "$dir" "$rf")
     done < <(find "$dir/references" -type f 2>/dev/null || true)
   fi
 
