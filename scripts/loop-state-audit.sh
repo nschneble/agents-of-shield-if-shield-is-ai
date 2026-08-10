@@ -23,7 +23,7 @@
 # behind --pr for that reason. A clean result means the snapshot is a
 # faithful summary of what the logs already recorded, no more.
 #
-# Over the ~100-line bar at 128, and the bulk is arithmetic rather than
+# Over the ~100-line bar at 152, and the bulk is arithmetic rather than
 # slack: seven comparison arms cost three lines each, and splitting the
 # oracles from the arms they feed would put the derivation and its
 # comparison in different files with nothing holding them in step —
@@ -92,8 +92,10 @@ shipped_waves=()
 declared_waves=()
 retry_dispatches=0
 unevaluable=()
+journals=0
 for j in "$DIR"/wave-*.jsonl; do
   [ -e "$j" ] || continue
+  journals=$((journals + 1))
   n=$(basename "$j" .jsonl); n="${n#wave-}"
   if grep -qv '^[[:space:]]*$' "$j" && ! jq -e . "$j" >/dev/null 2>&1; then
     unevaluable+=("$n"); continue
@@ -114,8 +116,25 @@ done
 gates="$DIR/gates.jsonl"
 gates_last_crew=""
 if [ -s "$gates" ] && jq -e . "$gates" >/dev/null 2>&1; then
-  gates_last_crew=$(jq -s '[.[] | select(.kind == "crew") | .wave] | max // 0' "$gates")
+  # numbers only: a crew line may carry `wave: null`, and a max over
+  # mixed types returns whichever the type ordering happens to rank
+  # last — a string like "9d" outranking every real wave number
+  gates_last_crew=$(jq -s '[.[] | select(.kind == "crew") | .wave | numbers] | max // empty' "$gates")
 fi
+
+# --- Schema probe. These records have a documented shape and older runs
+#     predate it: queue entries keyed `n` with a prose `status`, no
+#     `last_crew_wave`, no journals at all. Compared field-by-field a
+#     legacy snapshot reports as drift on every arm, which is this
+#     check's own failure mode wearing its output — a disagreement about
+#     SCHEMA read as a disagreement about POSITION. So each oracle is
+#     asked whether it can speak to this snapshot before it is believed
+#     over it. ---
+queue_len=$(jq -r '.queue | if type == "array" then length else 0 end' "$STATE")
+queue_modern=$(jq -r '[.queue[]? | select(has("wave"))] | length' "$STATE")
+legacy_queue=0
+[ "$queue_len" -gt 0 ] && [ "$queue_modern" -eq 0 ] && legacy_queue=1
+has_lcw=$(jq -r 'has("last_crew_wave")' "$STATE")
 
 # --- Compare. Each arm prints its own line whether it agrees or not:
 #     a silent pass is indistinguishable from an arm that never ran. ---
@@ -136,7 +155,15 @@ fi
 # waves_shipped, only when every journal was typeable: one unreadable
 # journal makes the oracle a floor rather than a count, and a floor
 # compared as a count reports drift that may not exist
-if [ ${#unevaluable[@]} -eq 0 ]; then
+if [ "$journals" -eq 0 ]; then
+  # absent journals are not zero waves. state-schemas.md reads an absent
+  # file as "first dispatch", but a whole dir without one is either a run
+  # predating the journal contract or a run whose journals are gone, and
+  # nothing here can tell those apart. Both make the oracle mute, and a
+  # mute oracle that returns 0 would report every shipped wave as drift.
+  notes+=("NOT EVALUABLE  the four journal-derived arms: no wave-N.jsonl in this dir, so the journals cannot settle position — a run predating the journal contract, or one that lost them")
+  skipped_arms=$((skipped_arms + 4))
+elif [ ${#unevaluable[@]} -eq 0 ]; then
   cmp_field "waves_shipped" \
     "$(jq -r '.counters.waves_shipped // "absent"' "$STATE")" \
     "${#shipped_waves[@]}" "journals"
@@ -154,27 +181,53 @@ else
   skipped_arms=$((skipped_arms + 4))
 fi
 
-if [ -n "$gates_last_crew" ]; then
+if [ "$has_lcw" != "true" ]; then
+  notes+=("NOT EVALUABLE  last_crew_wave: the snapshot carries no such key, so there is no claim to check against gates.jsonl")
+  skipped_arms=$((skipped_arms + 1))
+elif [ -n "$gates_last_crew" ]; then
   cmp_field "last_crew_wave" \
     "$(jq -r '.last_crew_wave // "absent"' "$STATE")" \
     "$gates_last_crew" "gates.jsonl"
 else
-  notes+=("NOT EVALUABLE  last_crew_wave: gates.jsonl is absent, empty or unparseable")
+  notes+=("NOT EVALUABLE  last_crew_wave: gates.jsonl is absent, empty, unparseable, or logs no crew line carrying a numeric wave")
   skipped_arms=$((skipped_arms + 1))
 fi
 
 # every queue entry marked shipped must name a commit that resolves —
 # a sha the snapshot invented, or one lost to a reset, is drift the
-# counters alone cannot show
-bad_sha=0
-while read -r sha; do
-  [ -n "$sha" ] || continue
-  git -C "$REPO_ROOT" rev-parse --verify --quiet "${sha}^{commit}" >/dev/null || bad_sha=$((bad_sha + 1))
-done < <(jq -r '.queue[]? | select(.status == "shipped") | .commit // empty' "$STATE")
-cmp_field "shipped commits resolve" "$bad_sha" "0" "git"
+# counters alone cannot show.
+#
+# REPO_ROOT has to be the repo that OWNS this run dir, which is not the
+# repo this script lives in whenever a caller sweeps other checkouts
+# (looper-custodian Phase A does exactly that). Ask git whether it is a
+# repo at all first: without the guard every sha reads as unresolvable
+# and a misconfigured root reports as five fabricated drifts, which is a
+# worse lie than declining to answer.
+if [ "$legacy_queue" -eq 1 ]; then
+  # a legacy queue keys entries `n` and writes `status` as prose, so
+  # `select(.status == "shipped")` matches nothing and BOTH sha arms
+  # would pass having examined no entry at all. A vacuous pass reads
+  # exactly like a real one in the headline, which is the reading this
+  # whole check exists to make impossible.
+  notes+=("NOT EVALUABLE  the two sha arms: $queue_len queue entry(s), none carrying a \`wave\` key — a snapshot predating the documented queue shape, so its shipped entries cannot be selected")
+  skipped_arms=$((skipped_arms + 2))
+elif git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  bad_sha=0
+  while read -r sha; do
+    [ -n "$sha" ] || continue
+    git -C "$REPO_ROOT" rev-parse --verify --quiet "${sha}^{commit}" >/dev/null 2>&1 \
+      || bad_sha=$((bad_sha + 1))
+  done < <(jq -r '.queue[]? | select(.status == "shipped") | .commit // empty' "$STATE")
+  cmp_field "shipped commits resolve" "$bad_sha" "0" "git"
+else
+  notes+=("NOT EVALUABLE  shipped commits resolve: REPO_ROOT ($REPO_ROOT) is not a git repo — set it to the repo owning this run dir")
+  skipped_arms=$((skipped_arms + 1))
+fi
 
-missing_sha=$(jq -r '[.queue[]? | select(.status == "shipped" and (.commit == null or .commit == ""))] | length' "$STATE")
-cmp_field "shipped entries have sha" "$missing_sha" "0" "snapshot"
+if [ "$legacy_queue" -eq 0 ]; then
+  missing_sha=$(jq -r '[.queue[]? | select(.status == "shipped" and (.commit == null or .commit == ""))] | length' "$STATE")
+  cmp_field "shipped entries have sha" "$missing_sha" "0" "snapshot"
+fi
 
 # --- The PR arm is opt-in because it is the only one that leaves the
 #     machine. Off by default so the check stays runnable offline and

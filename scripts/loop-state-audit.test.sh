@@ -8,7 +8,7 @@
 # `STATE DRIFT: 0` — the same words as a clean run. The arm count in the
 # headline is what separates those two, so it is asserted too.
 #
-# Four properties the audit's honesty depends on:
+# Five properties the audit's honesty depends on:
 #   - THE LIVE SEGMENT is load-bearing. A `commit` line above a later
 #     `_declared` belongs to a superseded dispatch, so the wave is NOT
 #     shipped. One fixture pair carries both directions: the same lines
@@ -30,6 +30,11 @@
 #     with every surviving arm green — and a disagreement the audit did
 #     settle outranks that, since drift is actionable and a gap is only
 #     a reason to go looking. Both directions have an arm.
+#   - A LEGACY SNAPSHOT IS NOT A DRIFTING ONE. Older run dirs key queue
+#     entries `n` with a prose status, carry no `last_crew_wave`, and
+#     hold no journals; each oracle must decline rather than report the
+#     schema gap as lost position. Caught by sweeping real dirs in
+#     sibling repos, where the first cut reddened every arm of all four.
 #
 # Fixtures are written by this file — never read from gitignored
 # `local/`. Pure bash + jq, self-contained.
@@ -201,6 +206,58 @@ check "PRECEDENCE: a settled disagreement still reddens beside a skipped arm" $?
 check "PRECEDENCE: and drift outranks INCOMPLETE at the exit code" $?
 agree "PRECEDENCE:"
 
+# --- A LEGACY snapshot must not read as a drifting one. Older runs key
+#     queue entries `n` with a prose status, carry no `last_crew_wave`,
+#     and have no journals at all; compared field-by-field every arm
+#     reddens, turning a disagreement about SCHEMA into a fabricated
+#     report of lost position. Each oracle has to decline instead. All
+#     three shapes are real, taken from run dirs in sibling repos. ---
+l="$temp_dir/legacy"; mkdir -p "$l"
+echo '{"wave":null,"kind":"crew","agent":"the-stickler","ran":true}' > "$l/gates.jsonl"
+jq -n '{
+  goal: "legacy",
+  queue: [{n: 1, title: "a", status: "shipped PR #120 (draft); crew running"},
+          {n: 2, title: "b", status: "queued"}],
+  counters: {waves_shipped: 9, total_waves: 12, wave_retries: 0}
+}' > "$l/run-state.json"
+out=$("$runner" --dir "$l" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  the four journal-derived arms: no wave-N.jsonl'
+check "LEGACY: no journals at all declines rather than reading as zero waves" $?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  last_crew_wave: the snapshot carries no such key'
+check "LEGACY: an absent last_crew_wave is no claim, so there is nothing to redden" $?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  the two sha arms: 2 queue entry(s), none carrying a `wave` key'
+check "LEGACY: a prose-status queue declines the sha arms instead of passing vacuously" $?
+! printf '%s\n' "$out" | grep -q 'DRIFT  '
+check "LEGACY: not one arm reports drift on a purely schema-level mismatch" $?
+printf '%s\n' "$out" | grep -q 'NOTHING CHECKED'
+check "LEGACY: and a snapshot no oracle can speak to asserts nothing" $?
+agree "LEGACY:"
+
+# a crew line carrying `wave: null` must not become the oracle's max —
+# jq's type ordering ranks a string above every number, so an unfiltered
+# max returns whatever junk the field holds
+n="$temp_dir/nullwave"; mkrun "$n" 1
+printf '%s\n' '{"wave":null,"kind":"crew","agent":"the-improver","ran":true}' \
+               '{"wave":"9d","kind":"crew","agent":"the-chemist","ran":true}' \
+  >> "$n/gates.jsonl"
+out=$("$runner" --dir "$n" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'ok     last_crew_wave           snapshot 1 · gates.jsonl 1'
+check "NULLWAVE: non-numeric crew waves are filtered out of the oracle's max" $?
+agree "NULLWAVE:"
+
+# --- REPO_ROOT owns the sha arm. A caller sweeping other checkouts
+#     (looper-custodian Phase A) sets it per run dir; pointed somewhere
+#     that is not a repo, the arm must decline rather than report every
+#     sha as unresolvable, which would be drift the run did not have. ---
+out=$(REPO_ROOT="$temp_dir" "$runner" --dir "$g" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  shipped commits resolve'
+check "REPO_ROOT: a non-repo root makes the sha arm decline, not redden" $?
+! printf '%s\n' "$out" | grep -q 'DRIFT  shipped commits resolve'
+check "REPO_ROOT: and it reports no fabricated sha drift" $?
+! printf '%s\n' "$out" | grep -q 'not a git repository'
+check "REPO_ROOT: git's own error does not leak into the report" $?
+agree "REPO_ROOT:"
+
 # --- NOTHING CHECKED is not clean either, at both the headline and the
 #     exit code, or an unreadable run dir greens the audit forever. ---
 out=$("$runner" --dir "$temp_dir/absent" 2>&1); rc=$?
@@ -225,6 +282,6 @@ echo
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 41 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 41\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 53 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 53\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-state-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-state-audit test(s) FAILED"; exit 1; fi
