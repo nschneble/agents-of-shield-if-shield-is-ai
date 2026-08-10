@@ -297,6 +297,33 @@ n=$(printf '%s\n' "$out" | grep -c 'broken-link')
 [ "$n" -eq 1 ] && result=0 || result=1;                          check "G-c: single broken link yields exactly one broken-link finding" "$result"
 printf '%s\n' "$out" | grep -q 'structural violations: 1';       check "G-c: structural count is 1, not double-counted" $?
 
+# ── G-d: a bare token is skill-relative only when it STARTS the path ──────────
+# Both directions on ONE fixture, because the two cites differ by nothing but
+# the leading `skills/<other>/`. A fully qualified cross-skill cite names
+# another skill's file and must stay out of scope even though this skill now
+# bundles references/; the bare sibling on the next line is this skill's own and
+# must still redden. Flagging the qualified one was silent until a skill both
+# bundled references/ and cited another skill's reference file.
+d="$temp_dir/gd-qualified"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/here.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gd-qualified
+description: Use this when a qualified cross-skill path must stay out of scope.
+---
+Reuses the lint in `skills/loop-de-looper/references/state-schemas.md`.
+Its own note lives in `references/here.md`.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-d: qualified cross-skill cite plus a resolving own ref exits 0" "$result"
+! printf '%s\n' "$out" | grep -q 'state-schemas';                 check "G-d: qualified cross-skill cite is not read as this skill's own" $?
+# Reverse: same file, the skill-relative sibling now dangles.
+sed -i.bak 's|references/here.md|references/absent.md|' "$d/SKILL.md"
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-d: a dangling bare skill-relative token still exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'broken-link.*gd-qualified.*references/absent.md'; check "G-d: the dangling bare token is the finding" $?
+! printf '%s\n' "$out" | grep -q 'state-schemas';                 check "G-d: and the qualified cite stays out of scope on the red path" $?
+
 # ── G-b: a reference file nested deeper than one level is a violation ──────────
 # references/a/b/c.md (two subdir levels deep) with a link to it → nesting
 # violation. The direct-child (green) direction is covered by the GREEN fixture

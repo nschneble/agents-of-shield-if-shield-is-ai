@@ -135,10 +135,19 @@ in_list() { # needle list...
 }
 
 # --- Internal-link extraction: markdown `](target)` + bare subdir path tokens ---
+# A bare token is only skill-relative when it STARTS a path. A fully qualified
+# cross-skill cite (`skills/loop-de-looper/references/state-schemas.md`) carries
+# `references/…` as a tail, and matching there would read another skill's file
+# as this skill's own — silent until a skill both bundles references/ and cites
+# another skill's reference by its full path.
+# So the match must open at line start or after a non-path char, which the sed
+# then strips (the alternation always begins with a letter, so a line-start
+# match is left alone).
 extract_refs() { # file -> candidate relative refs, one per line
   local file="$1"
   { grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//'
-    grep -oE '(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null
+    grep -oE '(^|[^A-Za-z0-9._/-])(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null \
+      | sed -E 's/^[^A-Za-z]//'
   } || true
 }
 
@@ -160,7 +169,8 @@ scoped_refs() { # skill_dir file -> in-scope relative refs, deduped, one per lin
       [ -n "$bref" ] || continue
       seg="${bref%%/*}"
       [ -d "$dir/$seg" ] && printf '%s\n' "$bref"
-    done < <(grep -oE '(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null || true)
+    done < <(grep -oE '(^|[^A-Za-z0-9._/-])(references|scripts|assets|templates)/[A-Za-z0-9._/-]+' "$file" 2>/dev/null \
+               | sed -E 's/^[^A-Za-z]//' || true)
   } | sort -u || true
 }
 
