@@ -1,4 +1,4 @@
-# Phase-order check — derivation, predicate spec, limits
+# Phase-order check
 
 Why the phase-order check's P2 discriminator is decidable, what each class it
 prints means, and what a clean result does not buy. The governing rules live
@@ -33,35 +33,36 @@ Three classes are REPORTED and never counted:
 
 - **`RESUME TAIL`** — a segment with phase-E lines, no phase-B line of its own,
   but at least one phase-B line logged earlier. The documented resume shape.
-- **`NOT EVALUABLE`** — a segment with no phase-E line. There is genuinely
-  nothing to order.
+- **`NOT EVALUABLE`** — a segment with phase-B lines and no phase-E line. There
+  is genuinely nothing to order. Only B and E lines are grouped into segments,
+  so a segment holding neither produces no row at all rather than this one.
 - **`MALFORMED`** — a line whose parsed value is not an object carrying a
-  `phase` key, whether it failed to parse at all or parsed without the key. Such
-  a line is pre-schema, and there is deliberately NO date-based exemption:
-  `phase` predates every log on disk and the asserted C → A → B → E order
-  predates decision 24, so an archived log is old, not pre-schema. A check that
-  floods false positives on history gets ignored.
+  `phase` key, whether it failed to parse at all or parsed without the key.
+  There is deliberately NO date-based exemption: `phase` predates every log on
+  disk, and the asserted C → A → B → E order predates decision 24 — decision 13
+  is where that order is set — so an archived log is old, not pre-schema. A
+  check that floods false positives on history gets ignored.
 
 A log yielding ZERO parseable phase records is neither clean nor violated —
 nothing was asserted at all. That is an unusable input (schema drift, or the
-wrong file), so it prints **`NOTHING CHECKED`** and exits 2 rather than a
-fabricated clean total.
+wrong file), so it prints **`NOTHING CHECKED`** rather than a fabricated clean
+total.
 
 Exit contract: **0 clean · 1 any violation (P1 or P2) · 2 usage/env error, an
 unreadable or empty log, or `NOTHING CHECKED`.**
 
 ## Why "at or before it" is decidable, not guessed
 
-P2 first read every no-B segment as a violation, which flagged conforming
-resumes — the defect decision 24 records. The discriminator that fixed it asks
-whether a phase-B line exists EARLIER in the log, and that question is decidable
-from the log rather than inferred:
+P2 first read every no-B segment as a violation. The discriminator that fixed it
+asks whether a phase-B line exists EARLIER in the log, and that question is
+decidable from the log rather than inferred:
 
 A no-B segment holds zero phase-B lines by construction, so every phase-B line
 in the log lies either before its first line or after its last. "A phase-B line
 with a lower line number" therefore names exactly the phase-B lines in a PRIOR
-segment. Segment 1 has no prior segment, so the modal shape can never match it
-and stays flagged.
+segment. The log's FIRST segment has no prior segment — whatever number the
+report gives it, which is 2 when the log opens on a resume marker — so the
+modal shape can never match it and stays flagged.
 
 When a prior phase-B line DOES exist, the segment is the documented resume shape
 rather than a violation. SKILL.md `## Two modes` defines a resume as replaying
@@ -70,7 +71,8 @@ rather than a violation. SKILL.md `## Two modes` defines a resume as replaying
 `## Resume`: "If the unlogged tail contains both B and E, B runs to completion
 before the resume's pre-E probe is taken". An E-only tail breaks no obligation,
 so it is reported as `RESUME TAIL` and never counted. Without the discriminator
-P2 flagged every conforming resume, against the rule it cites.
+P2 flagged every conforming resume against the rule it cites — the defect
+decision 24 records.
 
 ## Three limits, stated rather than papered over
 
@@ -78,7 +80,8 @@ P2 flagged every conforming resume, against the rule it cites.
    evidence the runtime was serialized — a run that dispatched out of order and
    logged in order passes. Nothing here measures dispatch, concurrency, or
    per-phase cost, and no such observable exists. This is the same cap P1
-   carries, and the check's own printed report states it on every run.
+   carries, and the check's own printed report states it on every run that
+   prints a report.
 2. **A prior phase-B line proves B was logged once in this run, NOT that the
    tail had no fresh phase-B obligation.** A resume that needed B again and
    never logged it goes quiet here. That is a live shape rather than a

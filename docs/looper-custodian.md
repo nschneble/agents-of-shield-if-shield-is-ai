@@ -628,29 +628,19 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       rather than heuristic.** P2 first read every no-B segment as a
       violation, which flagged 2026-07-27's fourth segment — a resume that
       legitimately had only E left, B having returned in segment 2. That was
-      not an accepted cost, it was a defect: an E-only tail is the resume
-      verb's *definition* (`## Two modes` — a resume "replays only the
-      unlogged tail (Phase E → report issue), reusing the C/A/B already in
-      `custodian-log.jsonl`"), and the rule above is conditional on the tail,
-      binding only *if* the unlogged tail contains both B and E. So the
-      unconditional predicate flagged every conforming resume, against the
-      rule it cites. The check now asks whether a phase-B line exists earlier
-      in the log, a question the derivation in
-      `skills/looper-custodian/references/phase-order-check.md` shows is
-      decidable from the log rather than inferred. Segment 1 has no prior
-      segment, so 2026-07-27's first — an E probe, an E dispatch, then a
-      resume marker reading `session-limit kill at 09:29 left B unlogged + E
-      digest lost` — can never match it and stays flagged. Measured over the
-      seven archived logs, the discriminator reclassifies exactly one
-      segment — 2026-07-27's fourth, from violation to `RESUME TAIL` — while
-      keeping 2026-07-27 segment 1 flagged and leaving every other segment's
-      verdict untouched, 2026-08-03's included.
+      not an accepted cost, it was a defect, and `phase-order-check.md`
+      carries the derivation: the check now asks whether a phase-B line
+      exists earlier in the log, a question that file shows is decidable
+      from the log rather than inferred. Measured over the seven archived
+      logs, the discriminator reclassifies exactly one segment —
+      2026-07-27's fourth, from violation to `RESUME TAIL` — while keeping
+      2026-07-27's first flagged and leaving every other segment's verdict
+      untouched, 2026-08-03's included.
     - **What the discriminator does NOT buy, stated plainly.** Three limits,
-      each with its live archive precedent, in
-      `skills/looper-custodian/references/phase-order-check.md`. They are
-      accepted rather than closed, and none of them costs P2 what it exists
-      for: the modal failure — E logged, B never logged, run then dead —
-      cannot pass silently.
+      each with its live archive precedent, in `phase-order-check.md`. They
+      are accepted rather than closed, and none of them costs P2 what it
+      exists for: the modal failure — E logged, B never logged, run then
+      dead — cannot pass silently.
     - **The check runs at Phase F, which is past where both incidents died.**
       2026-08-03 hit the session limit at 09:49 before Phase F; 2026-07-27's
       log records a `session-limit kill at 09:29 left B unlogged + E digest

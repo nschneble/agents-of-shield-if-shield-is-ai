@@ -3,12 +3,11 @@
 # phase-order log check.
 #
 # Standing rule: a new invariant is tested RED (goes off on a violating
-# fixture) AND green (clean fixture passes). Proves P1 flags an
-# out-of-order phase-E line citing both offending lines verbatim, P2
-# flags a segment whose phase-E lines have no phase-B line logged at or
-# before them, the exit code tracks both, and the three report-only
-# classes — malformed lines, segments with no phase-E line, and resume
-# tails — stay out of the violation set.
+# fixture) AND green (clean fixture passes). Proves both predicates go
+# off citing their offending lines verbatim, that the exit code tracks
+# them, and that every report-only class stays out of the violation set.
+# The predicates, those classes and the exit contract are spec'd in
+# skills/looper-custodian/references/phase-order-check.md.
 #
 # Five further properties the check's honesty depends on:
 #   - SEGMENTATION is load-bearing: deleting the `resume` marker from
@@ -252,6 +251,12 @@ printf '%s\n' "$out" | grep -q 'ASSERTS LOG ORDER ONLY, never runtime serializat
 check "CLAIM: the disclaimer is printed on a clean run too" $?
 no_overclaim "GREEN:"
 
+# --- The spec cite is user-facing too: a class token grepped out of a
+#     printed report has to land in the file that defines it, and only
+#     the reference does. Unpinned, that cite goes stale in silence. ---
+printf '%s\n' "$out" | grep -q '(spec skills/looper-custodian/references/phase-order-check.md ·'
+check "CLAIM: the report cites the reference that defines the classes it prints" $?
+
 # --- The P2 DISCRIMINATOR, both directions on ONE fixture pair. An
 #     E-only resume tail is the resume verb's definition (`## Two
 #     modes`: "replays only the unlogged tail (Phase E → report issue),
@@ -483,6 +488,6 @@ echo
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 76 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 76\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 77 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 77\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all phase-order tests passed ($checks assertions)"; exit 0
 else echo "$fails phase-order test(s) FAILED"; exit 1; fi

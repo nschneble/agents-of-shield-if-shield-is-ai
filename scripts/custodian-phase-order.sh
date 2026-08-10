@@ -12,31 +12,15 @@
 # unattended `claude -p` cron with nobody watching — the
 # recall-is-not-enforcement gap scripts/correction-gates/README.md names.
 #
-# Segments split at a `phase:"resume"` marker: a resume replays its own
-# tail, and decision 24 binds that tail on its own terms. Only B and E
-# lines are read — C/A/F are not ordered by this check, and `D-apply` is
-# a separate human-triggered invocation rather than part of the run.
+# This asserts log order and nothing beyond it.
 #
-# P1  no phase-E line before a phase-B line inside one run segment
-# P2  no segment carrying phase-E lines and NO phase-B line logged
-#     anywhere at or before it
-#
-# A no-B segment holding an EARLIER phase-B line is RESUME TAIL, a
-# segment with no phase-E line is NOT EVALUABLE, and a line with no
-# parseable `phase` key is MALFORMED — all three reported, never
-# counted. A log with zero parseable phase records reports NOTHING
-# CHECKED, the same class as the empty-file guard below rather than a
-# fabricated clean.
-#
-# WHY the "at or before it" discriminator is decidable rather than
-# guessed, what each reported class means, and the three limits a clean
-# result does NOT buy — starting with the fact that this asserts log
-# order and nothing beyond it — all live in one place:
+# What it reads, the two predicates, every class the report prints, the
+# exit contract, why the "at or before it" discriminator is decidable
+# rather than guessed, and the three limits a clean result does NOT buy
+# all live in one place:
 # skills/looper-custodian/references/phase-order-check.md
 #
 # Pure bash + jq, no third-party tool, no external store.
-# Exit 0 clean · 1 any violation (P1 or P2) · 2 usage/env error, an
-# unreadable log, or NOTHING CHECKED.
 #
 # Usage: custodian-phase-order.sh [--log PATH] [--date YYYY-MM-DD]
 set -euo pipefail
@@ -47,9 +31,9 @@ DATE="$(date +%Y-%m-%d)"
 LOG=""
 
 # a value-taking flag given no value must not fall through to `$2`
-# unbound: under `set -u` that aborts with status 1, which the header
-# reserves for "violations found". Usage errors exit 2 here and in
-# custodian-guardrails.sh.
+# unbound: under `set -u` that aborts with status 1, which the exit
+# contract reserves for "violations found". Usage errors exit 2 here and
+# in custodian-guardrails.sh.
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -117,13 +101,13 @@ analysis=$(jq -Rn --arg log "$LOG" '
   # follows. `first` is the NEAREST following B only because $g.bs
   # ascends by lineno, which holds because to_entries, map(select) and
   # group_by all preserve input order. That is the one assumption this
-  # check takes on faith. What the P2 discriminator does NOT depend on
-  # (skills/looper-custodian/references/phase-order-check.md) is WHICH
-  # phase-E line it measures from: segments are contiguous
-  # line ranges and a no-B segment holds no B line, so no phase-B line
-  # lies between its first and last phase E and `priorb` is identical for
-  # every one of them. Only the printed `first at line N` on that class
-  # is order-sensitive.
+  # check takes on faith. What the P2 discriminator
+  # (skills/looper-custodian/references/phase-order-check.md) does NOT
+  # depend on is WHICH phase-E line it measures from: segments are
+  # contiguous line ranges and a no-B segment holds no B line, so no
+  # phase-B line lies between its first and last phase E and `priorb` is
+  # identical for every one of them. Only the printed `first at line N`
+  # on that class is order-sensitive.
   | [ $checked[] as $g
       | $g.es[] as $e
       | (first($g.bs[] | select(.lineno > $e.lineno))) as $b
@@ -146,7 +130,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
       + [ "P1  no phase-E line before a phase-B line inside one run segment",
           "P2  no segment carrying phase-E lines with no phase-B line logged at or before it",
           "    (a no-B segment with an EARLIER phase-B line is a resume tail, reported not counted)",
-          "    (skills/looper-custodian/SKILL.md ## Maintenance run · decision 24, docs/looper-custodian.md)",
+          "    (spec skills/looper-custodian/references/phase-order-check.md · rule SKILL.md ## Maintenance run, decision 24 in docs/looper-custodian.md)",
           "    ASSERTS LOG ORDER ONLY, never runtime serialization: a run that dispatched",
           "    out of order and logged in order passes this check (decision 24).",
           "    segments: checked \($checked | length) · unordered \($p2) · resume tail \($tail | length) · not evaluable \($skipped | length) · violations \($p1 + $p2)" ]
@@ -168,7 +152,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
 printf '%s\n' "$analysis" | jq -r '.report[]'
 
 # verdict off the computed field, never off the rendered report — the
-# shape scripts/custodian-skill-lint.sh:429-430 already uses.
+# shape scripts/custodian-skill-lint.sh `run_lint` already uses.
 records=$(printf '%s\n' "$analysis" | jq -r '.records')
 violations=$(printf '%s\n' "$analysis" | jq -r '.total')
 [ "$records" -gt 0 ] || exit 2
