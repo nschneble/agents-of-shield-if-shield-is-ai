@@ -189,6 +189,7 @@ Maintain run state (persisted — see `## State tracking`):
 | `corrective_waves`         | every crew-blocker fix wave (not a queue item); never reset — budget governor input                             |
 | `consecutive_no_progress`  | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
 | `wave_retries`             | +1 on each stuck-wave from-scratch retry dispatch (2b-retry); never reset — budget governor input               |
+| `scaffolding_only_correctives` | +1 on a corrective wave whose commit touches no product file (`git show --stat` lists only `*.test.*`, `*.spec.*`, test helpers, tsconfig); reset on any wave that touches one — budget governor input |
 
 After updating counters, write `run-state.json` (atomic, see `## State tracking`), THEN evaluate the budget governor (`## Budget governor`), THEN the usage-window guard (`## Usage-window guard`), THEN the crew trigger. Order matters: persist before you might STOP or PAUSE, so a governor halt or a usage pause still leaves a resumable snapshot.
 
@@ -356,6 +357,9 @@ Evaluated in step 2c after `run-state.json` is written, before the crew trigger:
 | `max_corrective_waves`    | 6       | STOP + escalate: too many crew-blocker fixes; drift is structural, not patchable                                                       |
 | `consecutive_no_progress` | 3       | STOP + escalate: 3 waves running without shipping net-new queue work (thrash)                                                          |
 | `max_wave_retries`        | 4       | STOP + escalate: too many waves needed a from-scratch retry; the goal is systematically too hard for the executor, not a one-off wedge |
+| `scaffolding_only_correctives` | 2  | STOP + escalate: consecutive correctives touched only test scaffolding; the crew is reviewing the harness, not the fix                 |
+
+The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent four waves rebuilding a 400-line scanner around it).
 
 Hitting a rail is a STOP, not a failure — same discipline as a scope refusal. The persisted `run-state.json` makes the halt resumable: surface the state report, let the user raise a ceiling or redirect, then `/loop-de-looper resume`.
 
@@ -392,7 +396,7 @@ So context pressure is a **wave-boundary handoff**, not a mid-wave abort:
 - **Plan stops**: research output ambiguous, mechanized infra missing, all recovery options fail → STOP, surface plan output
 - **the-looper stops**: verify fails twice same root cause, review verdict `rethink`, gate not pre-flighted → ONE from-scratch retry first if retryable, STOP + surface only after the retry also fails or immediately if non-retryable (`## Protocol` 2b-retry)
 - **Crew finds blocker requiring rollback**: drift past patchable → STOP, escalate to user (no auto-revert commits)
-- **Budget governor rail hit**: `max_total_waves` / `max_corrective_waves` / `consecutive_no_progress` / `max_wave_retries` exceeded → STOP, escalate with the persisted state report (`## Budget governor`); resumable after the user raises a ceiling
+- **Budget governor rail hit**: `max_total_waves` / `max_corrective_waves` / `consecutive_no_progress` / `max_wave_retries` / `scaffolding_only_correctives` exceeded → STOP, escalate with the persisted state report (`## Budget governor`); resumable after the user raises a ceiling
 - **Context pressure at a wave boundary**: a compaction fired or in-context state had to be re-derived from `run-state.json` → finish the wave, halt BEFORE the next dispatch, emit `/loop-de-looper resume` (`## Context-pressure handoff`). Clean handoff, not a failure.
 - **Usage window at/above 95% at a wave boundary**: active 5-hour or weekly limit near-exhausted → finish the wave, pause BEFORE the next dispatch, schedule a self-resume (`## Usage-window guard`). A PAUSE, not a STOP.
 - **Queue exhausted, required-not-loopable items remain**: surface explicit list, await user action
@@ -429,14 +433,14 @@ Stopping not failure. Looping past known blocker = failure. Looping past a budge
 
 ## Crew trigger + budget tuning
 
-Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4` (see `## Budget governor`). Usage-window guard default: pause at `95%` utilization of the active 5-hour or weekly window (see `## Usage-window guard`).
+Crew-trigger defaults: every 4 waves OR 30 cumulative file changes, whichever first. Budget governor defaults: `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4`, `scaffolding_only_correctives=2` (see `## Budget governor`). Usage-window guard default: pause at `95%` utilization of the active 5-hour or weekly window (see `## Usage-window guard`).
 
 Single canonical override block in the project CLAUDE.md:
 
 ```
 ## Loop de Looper
 - crew-trigger: waves=N, files=M
-- budget: max-waves=N, max-corrective=N, no-progress=N, max-retries=N
+- budget: max-waves=N, max-corrective=N, no-progress=N, max-retries=N, scaffolding-only=N
 - usage-pause: pct=N   # 0 disables the usage-window guard
 ```
 
