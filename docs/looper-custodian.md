@@ -631,7 +631,7 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       not an accepted cost, it was a defect, and `phase-order-check.md`
       carries the derivation: the check now asks whether a phase-B line
       exists earlier in the log, a question that file shows is decidable
-      from the log rather than inferred. Measured over the seven archived
+      from the log rather than inferred. Measured over the eight archived
       logs, the discriminator reclassifies exactly one segment —
       2026-07-27's fourth, from violation to `RESUME TAIL` — while keeping
       2026-07-27's first flagged and leaving every other segment's verdict
