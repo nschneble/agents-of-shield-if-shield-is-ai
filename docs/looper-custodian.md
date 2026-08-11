@@ -617,57 +617,30 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       E dispatched while B was outstanding, dispatch read as done. Two
       consecutive runs is not a run that drifted once; it is the shape the run
       had settled into, and the rule is written against that.
-    - **What the check asserts, and what it cannot reach.** It reads B and E
-      lines inside a segment and applies two predicates. **P1**: no phase-E
-      line ahead of a phase-B line. **P2**: no segment carrying phase-E lines
-      with no phase-B line logged at or before it. A segment with no phase-E
-      line has genuinely nothing to order and is reported `NOT EVALUABLE`
-      without counting, and a no-B segment that DOES have a phase-B line
-      earlier is reported `RESUME TAIL` and likewise never counted — the
-      class the discriminator below produces, named here so that token,
-      grepped out of a printed report, lands on the decision that authorizes
-      it. A log yielding zero parseable phase records reports
-      `NOTHING CHECKED` and exits 2 — an unusable input, never a clean run.
+    - **What the check asserts.** It reads B and E lines inside a segment
+      and applies two predicates, reporting the shapes it cannot count as
+      named classes instead. Both predicates, every class the report can
+      print, and the exit contract are specified in
+      `skills/looper-custodian/references/phase-order-check.md` — one home,
+      so a token grepped out of a printed report lands somewhere that both
+      defines it and is kept current.
     - **P2's discriminator is the earlier phase-B line, and it is decidable
       rather than heuristic.** P2 first read every no-B segment as a
       violation, which flagged 2026-07-27's fourth segment — a resume that
       legitimately had only E left, B having returned in segment 2. That was
-      not an accepted cost, it was a defect: an E-only tail is the resume
-      verb's *definition* (`## Two modes` — a resume "replays only the
-      unlogged tail (Phase E → report issue), reusing the C/A/B already in
-      `custodian-log.jsonl`"), and the rule above is conditional on the tail,
-      binding only *if* the unlogged tail contains both B and E. So the
-      unconditional predicate flagged every conforming resume, against the
-      rule it cites. The check now asks whether a phase-B line exists earlier
-      in the log. A no-B segment holds zero phase-B lines by construction, so
-      every phase-B line in the log lies either before its first line or
-      after its last, and "a phase-B line with a lower line number" names
-      exactly the phase-B lines in a PRIOR segment. Segment 1 has no prior
-      segment, so 2026-07-27's first — an E probe, an E dispatch, then a
-      resume marker reading `session-limit kill at 09:29 left B unlogged + E
-      digest lost` — can never match it and stays flagged. Measured over the
-      seven archived logs, the discriminator reclassifies exactly one
-      segment — 2026-07-27's fourth, from violation to `RESUME TAIL` — while
-      keeping 2026-07-27 segment 1 flagged and leaving every other segment's
-      verdict untouched, 2026-08-03's included.
-    - **What the discriminator does NOT buy, stated plainly.** Three limits.
-      It is a claim about log order and nothing more, the same cap P1 carries.
-      An earlier phase-B line proves phase B was logged once in this run, not
-      that the tail had no fresh phase-B obligation — a resume that needed B
-      again and never logged it goes quiet here, which is a real blind spot,
-      bounded only by the fact that such a run is not the "B never logged at
-      all" shape P2's modal subject is. That bound is narrow, and the archive
-      holds the live precedent rather than a hypothetical: 2026-08-03's own
-      resume tail logged a FRESH phase-B obligation,
-      `B "staleness resolved against live tree (resume)"`, after two phase-E
-      lines. Had that run died between them, the tail would report
-      `RESUME TAIL` and exit 0 on a genuine E-before-B-then-dead shape. The
-      only discriminator would be reading the action text, which this design
-      refuses everywhere else, so the blind spot is accepted — named, not
-      closed. And it cannot show the earlier phase B RETURNED before the
-      tail's phase E was probed, only that its line precedes. What P2 buys is
-      that the modal failure — E logged, B never logged, run then dead —
-      cannot pass silently.
+      not an accepted cost, it was a defect, and `phase-order-check.md`
+      carries the derivation: the check now asks whether a phase-B line
+      exists earlier in the log, a question that file shows is decidable
+      from the log rather than inferred. Measured over the eight archived
+      logs, the discriminator reclassifies exactly one segment —
+      2026-07-27's fourth, from violation to `RESUME TAIL` — while keeping
+      2026-07-27's first flagged and leaving every other segment's verdict
+      untouched, 2026-08-03's included.
+    - **What the discriminator does NOT buy, stated plainly.** Three limits,
+      each with its live archive precedent, in `phase-order-check.md`. They
+      are accepted rather than closed, and none of them costs P2 what it
+      exists for: the modal failure — E logged, B never logged, run then
+      dead — cannot pass silently.
     - **The check runs at Phase F, which is past where both incidents died.**
       2026-08-03 hit the session limit at 09:49 before Phase F; 2026-07-27's
       log records a `session-limit kill at 09:29 left B unlogged + E digest

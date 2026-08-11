@@ -3,14 +3,13 @@
 # phase-order log check.
 #
 # Standing rule: a new invariant is tested RED (goes off on a violating
-# fixture) AND green (clean fixture passes). Proves P1 flags an
-# out-of-order phase-E line citing both offending lines verbatim, P2
-# flags a segment whose phase-E lines have no phase-B line logged at or
-# before them, the exit code tracks both, and the three report-only
-# classes — malformed lines, segments with no phase-E line, and resume
-# tails — stay out of the violation set.
+# fixture) AND green (clean fixture passes). Proves both predicates go
+# off citing their offending lines verbatim, that the exit code tracks
+# them, and that every report-only class stays out of the violation set.
+# The predicates, those classes and the exit contract are spec'd in
+# skills/looper-custodian/references/phase-order-check.md.
 #
-# Five further properties the check's honesty depends on:
+# Six further properties the check's honesty depends on:
 #   - SEGMENTATION is load-bearing: deleting the `resume` marker from
 #     the GREEN fixture, and changing nothing else, must turn it RED.
 #     Without that arm a check that ignored segments entirely would
@@ -40,6 +39,11 @@
 #     rather than the line it sits on: dropping the line hid every
 #     overclaim welded onto it, which is the one place a future edit is
 #     actually likely to put one.
+#   - SINGLE HOME, the one property here that is about the repo rather
+#     than the report. The discriminator argument is stated once, in
+#     the reference, and no linter compares two prose copies of a rule
+#     — so the restructure that gave it one home rests on review alone
+#     unless something counts. This counts.
 #
 # Fixtures are written by this file — never read from gitignored
 # `local/`. Pure bash + jq, self-contained.
@@ -251,6 +255,12 @@ out=$("$runner" --log "$green"); rc=$?
 printf '%s\n' "$out" | grep -q 'ASSERTS LOG ORDER ONLY, never runtime serialization'
 check "CLAIM: the disclaimer is printed on a clean run too" $?
 no_overclaim "GREEN:"
+
+# --- The spec cite is user-facing too: a class token grepped out of a
+#     printed report has to land in the file that defines it, and only
+#     the reference does. Unpinned, that cite goes stale in silence. ---
+printf '%s\n' "$out" | grep -q '(spec skills/looper-custodian/references/phase-order-check.md ·'
+check "CLAIM: the report cites the reference that defines the classes it prints" $?
 
 # --- The P2 DISCRIMINATOR, both directions on ONE fixture pair. An
 #     E-only resume tail is the resume verb's definition (`## Two
@@ -478,11 +488,42 @@ printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 2  (P1 2 phase-E lines · P2 0
 check "WEAVE: E,B,E,B,E flags the two E lines a later B follows, not the third" $?
 agree "WEAVE:"
 
+# --- SINGLE HOME: the discriminator derivation has exactly one home,
+#     and it is the reference. Nothing in the repo compares two prose
+#     copies of a rule, so the restructure that moved it there is held
+#     by convention plus review; this is the one part of it a machine
+#     can hold, and it is free. Counted over a ROOT so the red
+#     direction is a planted tree rather than a mutation of the
+#     checkout the suite is running from. ---
+# assembled from two pieces on purpose: this file sits inside the tree
+# it counts, so spelling the phrase out here would BE the second home
+# the arm exists to forbid
+phrase='holds zero phase-B'
+phrase="$phrase lines"
+root=$(cd "$here/.." && pwd)
+homes() { # root — counts occurrences, not files: two copies in one
+          # file is still two homes
+  grep -rF -o "$phrase" "$1/scripts" "$1/skills" "$1/docs" 2>/dev/null \
+    | wc -l | tr -d ' '
+}
+[ "$(homes "$root")" -eq 1 ]
+check "SINGLE HOME: the discriminator argument is stated exactly once" $?
+[ "$(grep -rlF "$phrase" "$root/scripts" "$root/skills" "$root/docs" \
+      2>/dev/null)" \
+  = "$root/skills/looper-custodian/references/phase-order-check.md" ]
+check "SINGLE HOME: and the one home is the reference file" $?
+planted="$temp_dir/planted"
+mkdir -p "$planted/scripts" "$planted/skills" "$planted/docs"
+printf 'a no-B segment %s by construction\n' "$phrase" > "$planted/docs/a.md"
+printf 'a no-B segment %s by construction\n' "$phrase" > "$planted/skills/b.md"
+[ "$(homes "$planted")" -eq 2 ]
+check "SINGLE HOME: RED — a second copy planted in a tree is counted" $?
+
 echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 76 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 76\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 80 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 80\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all phase-order tests passed ($checks assertions)"; exit 0
 else echo "$fails phase-order test(s) FAILED"; exit 1; fi
