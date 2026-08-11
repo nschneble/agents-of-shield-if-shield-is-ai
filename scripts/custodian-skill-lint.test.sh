@@ -297,6 +297,174 @@ n=$(printf '%s\n' "$out" | grep -c 'broken-link')
 [ "$n" -eq 1 ] && result=0 || result=1;                          check "G-c: single broken link yields exactly one broken-link finding" "$result"
 printf '%s\n' "$out" | grep -q 'structural violations: 1';       check "G-c: structural count is 1, not double-counted" $?
 
+# ── G-d: a cross-skill cite is another skill's, a bare sibling is this one's ───
+# The two cites differ by nothing but the leading `skills/<other>/`. A
+# fully qualified cross-skill cite names another skill's file and stays
+# out of scope even though this skill bundles references/; the bare
+# sibling is this skill's own and must still redden. Flagging the
+# qualified one was silent until a skill both bundled references/ and
+# cited another skill's reference.
+d="$temp_dir/gd-qualified"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/here.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gd-qualified
+description: Use this when a qualified cross-skill path must stay out of scope.
+---
+Reuses the lint in `skills/loop-de-looper/references/state-schemas.md`.
+Its own note lives in `references/here.md`.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-d: qualified cross-skill cite plus a resolving own ref exits 0" "$result"
+! printf '%s\n' "$out" | grep -q 'state-schemas';                 check "G-d: qualified cross-skill cite is not read as this skill's own" $?
+# Reverse: identical but for the bare sibling, which now dangles.
+d="$temp_dir/gd-dangling"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/here.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gd-dangling
+description: Use this when a bare sibling dangles beside a qualified cite.
+---
+Reuses the lint in `skills/loop-de-looper/references/state-schemas.md`.
+Its own note lives in `references/absent.md`.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-d: a dangling bare skill-relative token still exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'broken-link.*gd-dangling.*references/absent.md'; check "G-d: the dangling bare token is the finding" $?
+! printf '%s\n' "$out" | grep -q 'state-schemas';                 check "G-d: and the qualified cite stays out of scope on the red path" $?
+
+# ── G-e: a leading `./` starts a path, bare or backticked ─────────────────────
+# `./references/x.md` IS skill-relative — the char before `references`
+# is `/`, so a "preceded by a non-path char" test drops it and a
+# genuinely broken ref goes invisible. Two distinct targets, so the
+# backticked and bare spellings are each pinned rather than collapsing
+# into one deduped finding.
+d="$temp_dir/ge-dotslash"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/keep.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: ge-dotslash
+description: Use this when a dot-slash prose ref dangles.
+---
+The backticked note lives in `./references/gone-a.md` and nowhere else.
+The bare one is ./references/gone-b.md instead.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-e: dangling ./ refs exit 1" "$result"
+printf '%s\n' "$out" | grep -q 'broken-link.*ge-dotslash.*references/gone-a.md'; check "G-e: backticked ./ ref flagged" $?
+printf '%s\n' "$out" | grep -q 'broken-link.*ge-dotslash.*references/gone-b.md'; check "G-e: bare ./ ref flagged" $?
+
+# Green: the same two spellings resolving, plus a `../` parent escape
+# that is NOT this skill's to resolve — resolve_ref rejects the escape
+# on its own terms.
+d="$temp_dir/ge-dotslash-ok"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/keep-a.md"
+printf 'x\n' > "$d/references/keep-b.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: ge-dotslash-ok
+description: Use this when dot-slash refs resolve and a parent escape does not count.
+---
+The backticked note lives in `./references/keep-a.md` and nowhere else.
+The bare one is ./references/keep-b.md instead.
+A sibling skill keeps ../references/elsewhere.md out of our reach.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-e: resolving ./ refs exit 0" "$result"
+! printf '%s\n' "$out" | grep -q '^VIOLATION';                    check "G-e: no violation on the resolving path" $?
+! printf '%s\n' "$out" | grep -q 'elsewhere';                     check "G-e: a ../ parent escape is not read as skill-relative" $?
+
+# ── G-f: the same predicate applies to refs found INSIDE references/ ──────────
+# scoped_refs scans SKILL.md; extract_refs scans files under
+# references/ and feeds reference-nesting. A fixture citing only from
+# SKILL.md never reaches extract_refs, so these three put the cite in
+# references/note.md instead.
+# Green: a cross-skill cite must not be read as this skill's own, even
+# when the skill bundles a same-named reference file for the tail to
+# collide with.
+d="$temp_dir/gf-crossskill"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gf-crossskill
+description: Use this when a reference file cites another skill by full path.
+---
+See [note](references/note.md).
+EOF
+cat > "$d/references/note.md" <<'EOF'
+Reuses the lint in `skills/loop-de-looper/references/state-schemas.md`.
+EOF
+printf 'x\n' > "$d/references/state-schemas.md"
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-f: cross-skill cite from a reference file exits 0" "$result"
+! printf '%s\n' "$out" | grep -q 'reference-nesting';             check "G-f: cross-skill cite raises no reference-nesting" $?
+
+# Red 1: the same shape, but the cite is this skill's OWN file by full
+# path — the prefix strips and the remainder is a real second-level chain.
+d="$temp_dir/gf-own-fullpath"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gf-own-fullpath
+description: Use this when a reference file cites its own skill by full path.
+---
+See [note](references/note.md).
+EOF
+cat > "$d/references/note.md" <<'EOF'
+Reuses the lint in `skills/gf-own-fullpath/references/state-schemas.md`.
+EOF
+printf 'x\n' > "$d/references/state-schemas.md"
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-f: own-skill full-path cite from a reference file exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'reference-nesting.*note.md.*state-schemas.md'; check "G-f: own-skill full-path cite is a nesting violation" $?
+
+# Red 2: same, spelled `./` — pins the dot-slash arm of extract_refs'
+# own grep.
+d="$temp_dir/gf-own-dotslash"; mkdir -p "$d/references"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gf-own-dotslash
+description: Use this when a reference file cites a sibling with a dot-slash path.
+---
+See [note](references/note.md).
+EOF
+cat > "$d/references/note.md" <<'EOF'
+Reuses the lint in `./references/state-schemas.md`.
+EOF
+printf 'x\n' > "$d/references/state-schemas.md"
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-f: dot-slash cite from a reference file exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'reference-nesting.*note.md.*state-schemas.md'; check "G-f: dot-slash cite is a nesting violation" $?
+
+# ── G-g: a skill's own fully qualified self-cite is still its own ─────────────
+# `skills/<this-skill>/references/x.md` names a file this skill owns, so
+# the prefix strips and the remainder resolves. Skipping it wholesale (as
+# any `skills/`-prefixed token) would let a skill's own broken link go
+# unreported.
+d="$temp_dir/gg-selfcite"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/keep.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gg-selfcite
+description: Use this when a skill cites its own missing file by full path.
+---
+The note lives in `skills/gg-selfcite/references/gone.md` and nowhere else.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-g: broken own-skill self-cite by full path exits 1" "$result"
+printf '%s\n' "$out" | grep -q 'broken-link.*gg-selfcite.*references/gone.md'; check "G-g: broken own-skill self-cite flagged" $?
+
+d="$temp_dir/gg-selfcite-ok"; mkdir -p "$d/references"
+printf 'x\n' > "$d/references/keep.md"
+cat > "$d/SKILL.md" <<'EOF'
+---
+name: gg-selfcite-ok
+description: Use this when a skill cites its own present file by full path.
+---
+The note lives in `skills/gg-selfcite-ok/references/keep.md` and nowhere else.
+EOF
+out=$("$linter" "$d"); rc=$?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-g: resolving own-skill self-cite by full path exits 0" "$result"
+! printf '%s\n' "$out" | grep -q '^VIOLATION';                    check "G-g: resolving own-skill self-cite raises nothing" $?
+
 # ── G-b: a reference file nested deeper than one level is a violation ──────────
 # references/a/b/c.md (two subdir levels deep) with a link to it → nesting
 # violation. The direct-child (green) direction is covered by the GREEN fixture

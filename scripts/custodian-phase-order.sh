@@ -12,88 +12,15 @@
 # unattended `claude -p` cron with nobody watching — the
 # recall-is-not-enforcement gap scripts/correction-gates/README.md names.
 #
-# WHAT THIS ASSERTS, EXACTLY: log order, and nothing beyond it.
-# Decision 24 states the limit itself — "a run that dispatched out of
-# order and logged in order would pass it." A clean result here is
-# evidence the log is well ordered, NOT evidence the runtime was
-# serialized. Nothing here measures dispatch, concurrency, or per-phase
-# cost, and no such observable exists.
+# This asserts log order and nothing beyond it.
 #
-# Segments split at a `phase:"resume"` marker: a resume replays its own
-# tail, and decision 24 binds that tail on its own terms. Only B and E
-# lines are read — C/A/F are not ordered by this check, and `D-apply` is
-# a separate human-triggered invocation rather than part of the run.
-#
-# P1  no phase-E line before a phase-B line inside one run segment
-# P2  no segment carrying phase-E lines and NO phase-B line logged
-#     anywhere at or before it
-#     P2 exists because P1 alone cannot see the MODAL failure. "E
-#     logged, B never logged" is what a run looks like when the order
-#     broke and the run then died (2026-07-27 segment 1). That segment
-#     cannot be shown ordered against anything, because no phase B was
-#     ever logged for the run to order it against.
-#
-# The "at or before it" is the whole discriminator, and it is decidable
-# from the log rather than inferred. A no-B segment holds ZERO phase-B
-# lines by construction, so every phase-B line in the log lies either
-# before its first line or after its last — "a phase-B line with a lower
-# lineno" therefore names exactly the phase-B lines in a PRIOR segment.
-# Segment 1 has no prior segment, so the modal shape can never match it.
-# When a prior phase-B line DOES exist, the segment is the documented
-# resume shape rather than a violation:
-# skills/looper-custodian/SKILL.md `## Two modes` defines a resume as
-# replaying "only the unlogged tail (Phase E → report issue), reusing
-# the C/A/B already in custodian-log.jsonl", and the rule binds a tail
-# only conditionally — SKILL.md `## Resume`: "If the unlogged tail
-# contains both B and E, B runs to completion before the resume's pre-E
-# probe is taken". An E-only tail breaks no obligation, so it is
-# reported as RESUME TAIL and never counted. 2026-07-27 segment 4 is
-# exactly that shape and 2026-07-27 segment 1 is exactly the other; the
-# archive holds both.
-#
-# THREE LIMITS, stated rather than papered over. (1) Log order only, the
-# same cap P1 carries. (2) A prior phase-B line proves B was logged once
-# in this run, NOT that the tail had no fresh phase-B obligation — a
-# resume that needed B again and never logged it goes quiet here. That
-# is a live shape rather than a hypothetical: 2026-08-03's own resume
-# tail logged B "staleness resolved against live tree (resume)" after
-# two phase-E lines, and a death between them would print RESUME TAIL
-# and exit 0 on a genuine E-before-B-then-dead tail. Accepted because
-# the only discriminator left is reading the action text, which this
-# design refuses everywhere else. (3) It cannot show the prior phase B
-# RETURNED before the tail's phase E was probed, only that its line
-# precedes.
-#
-# A segment with NO phase-E line is different and stays report-only:
-# there is genuinely nothing to order (archived 2026-06-29 and
-# 2026-07-13 are real examples). Malformed lines are likewise REPORTED,
-# never violations, the same per-line shape custodian-guardrails.sh
-# gives its legacy exemption: a line with no parseable `phase` key is
-# pre-schema. There is deliberately NO date-based exemption — `phase`
-# predates every log on disk and the asserted C → A → B → E order
-# predates decision 24 (decision 16 already leaned on it), so an
-# archived log is old, not pre-schema.
-#
-# A log yielding ZERO parseable phase records is neither clean nor
-# violated — nothing was asserted at all. That is an unusable input
-# (schema drift, or the wrong file), so it reports NOTHING CHECKED and
-# exits 2, the same class as the empty-file guard below rather than a
-# fabricated clean.
-#
-# WHERE THIS CANNOT REACH: Phase F runs it, so a run killed before F
-# makes no verdict at all until a resume carries it to F. That is the
-# shape of both runs it was written for — 2026-08-03 hit the session
-# limit at 09:49 and 2026-07-27 logged a kill at 09:29, each before F.
-# Both got there eventually, but only on the far side of a resume, and a
-# run nobody resumes is never checked. The cron wrapper's INCOMPLETE
-# path already renders phases_summary() over the partial log and is
-# where a partial-log check could run; considered and deferred, named
-# here so the incident does not look closed (decision 23's standard,
-# applied to this check).
+# What it reads, the two predicates, every class the report prints, the
+# exit contract, why the "at or before it" discriminator is decidable
+# rather than guessed, and the three limits a clean result does NOT buy
+# all live in one place:
+# skills/looper-custodian/references/phase-order-check.md
 #
 # Pure bash + jq, no third-party tool, no external store.
-# Exit 0 clean · 1 any violation (P1 or P2) · 2 usage/env error, an
-# unreadable log, or NOTHING CHECKED.
 #
 # Usage: custodian-phase-order.sh [--log PATH] [--date YYYY-MM-DD]
 set -euo pipefail
@@ -104,9 +31,9 @@ DATE="$(date +%Y-%m-%d)"
 LOG=""
 
 # a value-taking flag given no value must not fall through to `$2`
-# unbound: under `set -u` that aborts with status 1, which the header
-# reserves for "violations found". Usage errors exit 2 here and in
-# custodian-guardrails.sh.
+# unbound: under `set -u` that aborts with status 1, which the exit
+# contract reserves for "violations found". Usage errors exit 2 here and
+# in custodian-guardrails.sh.
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -160,12 +87,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
   | ($s | map(select((.es | length) > 0 and (.bs | length) > 0)))       as $checked
   | ($s | map(select((.es | length) == 0)))                             as $skipped
 
-  # Split the no-B segments by whether a phase-B line exists EARLIER in
-  # the log. A no-B segment holds zero B lines by construction, so every
-  # B line in the log is either before its first line or after its last
-  # — and `lineno < firstE.lineno` therefore selects exactly the B lines
-  # in a PRIOR segment. Segment 1 has no prior segment and so can never
-  # match, which is what keeps the modal shape flagged.
+  # split the no-B segments by whether a phase-B line exists EARLIER
   | ($tagged | map(select(.phase == "B")))                              as $allbs
   | ($s | map(select((.es | length) > 0 and (.bs | length) == 0))
         | map(. as $g
@@ -179,12 +101,13 @@ analysis=$(jq -Rn --arg log "$LOG" '
   # follows. `first` is the NEAREST following B only because $g.bs
   # ascends by lineno, which holds because to_entries, map(select) and
   # group_by all preserve input order. That is the one assumption this
-  # check takes on faith. What the P2 discriminator above does NOT depend
-  # on is WHICH phase-E line it measures from: segments are contiguous
-  # line ranges and a no-B segment holds no B line, so no phase-B line
-  # lies between its first and last phase E and `priorb` is identical for
-  # every one of them. Only the printed `first at line N` on that class
-  # is order-sensitive.
+  # check takes on faith. What the P2 discriminator
+  # (skills/looper-custodian/references/phase-order-check.md) does NOT
+  # depend on is WHICH phase-E line it measures from: segments are
+  # contiguous line ranges and a no-B segment holds no B line, so no
+  # phase-B line lies between its first and last phase E and `priorb` is
+  # identical for every one of them. Only the printed `first at line N`
+  # on that class is order-sensitive.
   | [ $checked[] as $g
       | $g.es[] as $e
       | (first($g.bs[] | select(.lineno > $e.lineno))) as $b
@@ -207,7 +130,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
       + [ "P1  no phase-E line before a phase-B line inside one run segment",
           "P2  no segment carrying phase-E lines with no phase-B line logged at or before it",
           "    (a no-B segment with an EARLIER phase-B line is a resume tail, reported not counted)",
-          "    (skills/looper-custodian/SKILL.md ## Maintenance run · decision 24, docs/looper-custodian.md)",
+          "    (spec skills/looper-custodian/references/phase-order-check.md · rule SKILL.md ## Maintenance run, decision 24 in docs/looper-custodian.md)",
           "    ASSERTS LOG ORDER ONLY, never runtime serialization: a run that dispatched",
           "    out of order and logged in order passes this check (decision 24).",
           "    segments: checked \($checked | length) · unordered \($p2) · resume tail \($tail | length) · not evaluable \($skipped | length) · violations \($p1 + $p2)" ]
@@ -229,7 +152,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
 printf '%s\n' "$analysis" | jq -r '.report[]'
 
 # verdict off the computed field, never off the rendered report — the
-# shape scripts/custodian-skill-lint.sh:429-430 already uses.
+# shape scripts/custodian-skill-lint.sh `run_lint` already uses.
 records=$(printf '%s\n' "$analysis" | jq -r '.records')
 violations=$(printf '%s\n' "$analysis" | jq -r '.total')
 [ "$records" -gt 0 ] || exit 2
