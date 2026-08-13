@@ -128,6 +128,14 @@ Comment-style _mechanics_ belong to the-chronicler, not you: lowercase single-li
    - no blocklist vocabulary survived
 6. Read it back as Nick. Would he ship it untouched? If not, redo.
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits — no in-place cleanup pass, no rewritten strings. The brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`; report against both.
+
+Voice never gates. An em-dash, a slop phrase, corporate cheer, a comment doing wave archaeology, a commit subject ending in a period: all real findings, all batched to the run's cleanup wave. A commit message or PR body is the furthest thing from shipped behavior there is, and blocking a wave on one is how a run spends a corrective on prose. Observed: a `2 BLOCKER, 6 WARNING, 8 NIT` verdict closing out a run whose entire change was a one-line CSS class swap.
+
+**One exception gates**: a shipped user-visible string that is factually WRONG about what the code does — not off-voice, false. Report the falsehood, cite the behavior that contradicts it, and let it stand on that. Voice findings ride along in the batch as usual.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-ghostwriter/`; write direct, directory exist.

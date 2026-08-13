@@ -18,13 +18,54 @@ contract lives with the executor, in `agents/the-looper.md`.
 
 Cross-wave flow inside Loop de Looper:
 
-- `nonbeliever → scope → wave loop × N → final crew → recap → terminate`
+- `nonbeliever → scope → wave loop × N → cleanup batch → final crew → recap → terminate`
 
 The nonbeliever pre-flight challenges the goal + approach against CLAUDE.md,
 existing agents, skills, and directives before any wave runs — advisory
 unless it hits a hard rule conflict. The recap closes the run with a clean,
 shareable summary drawn from the gate log + git history; it narrates, it
 never decides.
+
+## What holds a run to the ask
+
+The failure mode a multi-wave loop drifts into is not shipping the wrong
+code, it is shipping the right code and then not stopping. A crew of
+seven reviewers will always find something; each finding is real, cited,
+and defensible; and a protocol that treats "a reviewer called it a
+blocker" as "this blocks" converts every one of them into a wave. Two
+runs measured it: a one-line CSS fix that took four waves and three
+correctives, and a twenty-wave run that spent ten correctives while one
+of its two stated asks never got started.
+
+Two rules answer that, both in `skills/loop-de-looper/SKILL.md`:
+
+The **goal contract** is `looper-scope`'s section 0 — the user's asks in
+their own words, each with the criterion that closes it. It is persisted
+to `run-state.json`, carried verbatim into every wave brief and every
+crew prompt, and fixed for the run. Work discovered later goes to the
+user as a question, never into the contract.
+
+The **severity floor** is what a finding must clear to block a wave: a
+correctness regression in the run's own diff, a security defect, data
+loss, an a11y regression on UI the run shipped, or a false user-visible
+string — and it must cite a contract ask or a line the run changed.
+Docs, naming, conventions, test hygiene, surviving mutants, refactor
+opportunities, and voice are real findings that batch to one terminal
+cleanup wave. Nothing is dropped; it is scheduled.
+
+Each crew agent's own definition names which of its findings can gate,
+so the rule is not only in the orchestrator's prose. And
+`scripts/loop-finding-audit.sh` fails a run whose corrective waves
+cannot be accounted for by justified gating findings — a prose rule the
+orchestrator can out-narrate is what these two runs already disproved.
+
+That audit checks accounting, not substance. It can tell that a
+corrective named a gating class and cited something; it cannot tell
+whether the class was chosen honestly or the citation points at real
+code. What bounds a run that lies fluently is still the corrective
+ceiling in the budget governor. The audit closes the gap between a rule
+written down and a rule observed, which is the one these runs fell
+through.
 
 Loop de Looper's operational safety rails – the budget governor,
 usage-window guard, gate artifacts, and durable run-state – are specified

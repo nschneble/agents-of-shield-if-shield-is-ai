@@ -128,6 +128,12 @@ Qualitative review, independent from build and verify. Question is not
 which specialist reviewers the orchestrator should invoke in parallel
 via Task tool. Synthesizes findings.
 
+Findings sort into two buckets, not three: blocker (clears the severity
+floor and cites what it protects) or batched (everything else, fixed in
+the run's cleanup wave). The old "warning" band was a blocker on a
+delay, and a reviewer with a reason to re-raise one eventually got its
+wave.
+
 ## Looper "verify"
 
 **File:** `skills/looper-verify/SKILL.md`
@@ -174,7 +180,12 @@ Added in framework v1.3.
 
 Strategic queue producer. Reads the raw goal + existing state, emits an
 ordered list of candidate waves with risk tags + dependencies, and sets
-the exit contract. Classifies goals across six shapes (single-wave bugfix,
+the exit contract. Its section 0 is the goal contract: the user's asks
+transcribed verbatim, one per line, each with the criterion that closes
+it. That section is what every downstream finding is measured against,
+so it is transcription rather than authorship — a sharpened restatement
+hands the run a bar the user never set. Classifies goals across six
+shapes (single-wave bugfix,
 feature increment, multi-file refactor, cross-cutting initiative,
 release-readiness, open-ended). Open-ended goals are refused — bounded
 scope is the deliverable. Output distinguishes `required, not loopable`
@@ -193,12 +204,22 @@ Parent orchestrator. Composes looper-nonbeliever (pre-flight) + looper-scope
 (queue) + the-looper (per-wave executor) + the crew (periodic + final) +
 looper-recap (closing summary). The crew runs every 4 waves or 30 cumulative
 file changes (whichever first) interim, and once mandatory before
-goal-complete. Blocker on crew loops back into a corrective wave; no "ship
-anyway" path. Termination surfaces the loopable work shipped alongside
-required-not-loopable items so the user gets verified work + open human gates
-in one report.
+goal-complete. Interim passes are domain-matched at three agents; the
+final pass runs all seven. Termination surfaces the loopable work shipped
+alongside required-not-loopable items so the user gets verified work + open
+human gates in one report.
 
-Added in framework v1.1.
+A crew finding only loops back into a corrective wave when it clears the
+severity floor — correctness regression in the run's own diff, security,
+data loss, an a11y regression on UI the run shipped, or a false
+user-visible string — AND cites a goal-contract ask or a line the run
+changed. Everything else is recorded to a cleanup batch and worked in one
+terminal wave. One corrective per wave, one scoped re-crew, and the crew
+may not add queue items. `scripts/loop-finding-audit.sh` fails a run whose
+correctives cannot be accounted for that way, so the rule is checked
+rather than merely written down.
+
+Added in framework v1.1. Severity floor + goal contract added in v1.4.
 
 ### Looper "recap"
 
