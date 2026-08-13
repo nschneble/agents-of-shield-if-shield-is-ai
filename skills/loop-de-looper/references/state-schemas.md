@@ -49,20 +49,44 @@ Admissibility is checked separately by `scripts/loop-finding-audit.sh` over five
   "goal": "<scope's goal restatement>",
   "goal_contract": {
     "asks": [
-      { "id": "A1", "ask": "<the user's words>", "done_when": "<exit criterion>" },
+      {
+        "id": "A1",
+        "ask": "<the user's words>",
+        "done_when": "<exit criterion>"
+      },
       { "id": "A2", "ask": "...", "done_when": "..." }
     ],
     "fixed_at": "step-1"
   },
   "sizing": "full-orchestration",
   "queue": [
-    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234", "closes": ["A1"] },
-    { "wave": 2, "candidate": "...", "status": "pending", "commit": null, "closes": ["A2"] }
+    {
+      "wave": 1,
+      "candidate": "...",
+      "status": "shipped",
+      "commit": "abc1234",
+      "closes": ["A1"]
+    },
+    {
+      "wave": 2,
+      "candidate": "...",
+      "status": "pending",
+      "commit": null,
+      "closes": ["A2"]
+    }
   ],
   "cleanup_batch": [
-    { "wave": 1, "agent": "the-chronicler", "class": "docs", "ref": "src/lib/x.ts:40", "finding": "<one line, cited>" }
+    {
+      "wave": 1,
+      "agent": "the-chronicler",
+      "class": "docs",
+      "ref": "src/lib/x.ts:40",
+      "finding": "<one line, cited>"
+    }
   ],
-  "open_questions": ["<a crew finding implying scope the contract does not carry>"],
+  "open_questions": [
+    "<a crew finding implying scope the contract does not carry>"
+  ],
   "counters": {
     "waves_shipped": 1,
     "waves_since_crew": 1,
@@ -77,7 +101,12 @@ Admissibility is checked separately by `scripts/loop-finding-audit.sh` over five
     "batched_findings": 1
   },
   "last_crew_wave": 0,
-  "pr": { "number": 214, "url": "...", "state": "draft", "body_sha": "9f2a3c7e" },
+  "pr": {
+    "number": 214,
+    "url": "...",
+    "state": "draft",
+    "body_sha": "9f2a3c7e"
+  },
   "usage": {
     "paused": false,
     "window_reset": 1784258400,
@@ -133,8 +162,8 @@ Completion, appended AFTER each step finishes:
 Reader rules:
 
 - **Segments.** Only the lines after the LAST `_declared` describe the live attempt. A retry appends a new declaration; a resume appends none and continues the current segment, the one exception being the torn-declaration case below. Everything above the last declaration is audit trail, never an input to a skip.
-- **An unparseable COMPLETION line is discarded — that line, wherever it sits, never the file.** A kill mid-append leaves a truncated line, not a corrupt file, and it need not be the last one: a dispatch that appends onto an unterminated fragment fuses its line to the wreckage and leaves the mess mid-file. Read a discarded line's step as not-done. Discarding errs in exactly one direction and it is the safe one — a *completion* line is written only after its step completes, so the worst case is re-running a step that had already finished, which its oracle then confirms. Never repair or rewrite a line, and never void the whole journal over one: the good checkpoints around it are still good, and the oracles, not the parse, are what stop a bad line from authorizing a skip.
-- **A `_declared` line is never discarded, and that exception is what makes the rule above safe.** The discard rule rests on "written only after the step completed", which is false of exactly one line kind: the declaration is written BEFORE step one. A retry that dies mid-declaration therefore leaves a torn line that, if discarded, hands segment-boundary duty back to the *initial* declaration — so the dead-end attempt's `done` lines read as live, and the plan oracle confirms them, because the dead end really did write a non-empty `wave-N-plan.md`. The oracles cannot arbitrate this; they confirm both attempts equally. So: **an unparseable line that cannot be typed as a completion voids skip authority for the segment below it.** Treat its position as a segment boundary of unknown intent — re-run every step from the top of the wave, ignoring the `done` lines above and below it. Say so in the hand-back.
+- **An unparseable COMPLETION line is discarded — that line, wherever it sits, never the file.** A kill mid-append leaves a truncated line, not a corrupt file, and it need not be the last one: a dispatch that appends onto an unterminated fragment fuses its line to the wreckage and leaves the mess mid-file. Read a discarded line's step as not-done. Discarding errs in exactly one direction and it is the safe one — a _completion_ line is written only after its step completes, so the worst case is re-running a step that had already finished, which its oracle then confirms. Never repair or rewrite a line, and never void the whole journal over one: the good checkpoints around it are still good, and the oracles, not the parse, are what stop a bad line from authorizing a skip.
+- **A `_declared` line is never discarded, and that exception is what makes the rule above safe.** The discard rule rests on "written only after the step completed", which is false of exactly one line kind: the declaration is written BEFORE step one. A retry that dies mid-declaration therefore leaves a torn line that, if discarded, hands segment-boundary duty back to the _initial_ declaration — so the dead-end attempt's `done` lines read as live, and the plan oracle confirms them, because the dead end really did write a non-empty `wave-N-plan.md`. The oracles cannot arbitrate this; they confirm both attempts equally. So: **an unparseable line that cannot be typed as a completion voids skip authority for the segment below it.** Treat its position as a segment boundary of unknown intent — re-run every step from the top of the wave, ignoring the `done` lines above and below it. Say so in the hand-back.
 - **Type a damaged line by its HEAD, not by whatever suffix parses.** Fusion is the common shape, not the exotic one — a dispatch appending onto an unterminated fragment produces one line carrying wreckage followed by a complete object, which satisfies "unparseable completion, discard it" and "never discard a `_declared`" at the same time. The hinge is the wreckage, not the tail: if the text before the first well-formed object mentions `_declared`, the line is a torn declaration and gets the never-discard treatment, whatever else rides on it. Only when that leading text is completion wreckage — or absent — does the discard rule apply.
 - **A resume that voids skip authority appends a fresh `_declared`, `reason: "resume-after-torn"`, `dispatch` unchanged.** Without it the void is permanent: a resume otherwise appends no declaration, only a retry does, and a retry is issued off a hand-back that a mid-declaration kill is defined by not having. So one torn line would cost the wave its journal forever, every later resume restarting from step one — the failure the journal exists to prevent, under exactly the repeated-kill conditions that produce it. The new declaration is honest, because a resume under a void really is about to run every step it names. `dispatch` does not move: it counts retries, and this is not one.
 - **The `commit` terminal marker reads only the LIVE segment.** A `commit` line below a torn declaration is audit trail like everything else there, so it does not report the wave shipped; the wave re-runs from the top. What keeps that re-run from duplicating anything is the oracles, which the void never touched — `git log` already holds the commit, and `learn`'s memory files already hold the memory, so each step's re-run reconciles against what it finds rather than appending a second copy. The void takes the journal's word away, never the oracles'.

@@ -48,29 +48,29 @@ A finding may block a wave and spawn a corrective ONLY when it is in a gating cl
 
 **Gating classes:**
 
-| class | test |
-| --- | --- |
-| correctness regression | a defect at a `file:line` inside THIS run's diff (`git diff <wave1>^..HEAD`) |
-| security | an exploitable defect on a line the run touched |
-| data loss | irreversible state or unrecoverable user data |
-| a11y regression | a WCAG failure on UI THIS run shipped |
-| false user-visible string | a shipped string that is factually wrong about what the code does |
+| class                     | test                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| correctness regression    | a defect at a `file:line` inside THIS run's diff (`git diff <wave1>^..HEAD`) |
+| security                  | an exploitable defect on a line the run touched                              |
+| data loss                 | irreversible state or unrecoverable user data                                |
+| a11y regression           | a WCAG failure on UI THIS run shipped                                        |
+| false user-visible string | a shipped string that is factually wrong about what the code does            |
 
 **Batched, never gating:** docs, comments, docstrings, naming, conventions, LOC and god-file size, test hygiene, surviving mutants, oracle shape or completeness, refactor opportunities, voice and tone, commit-message and PR-body prose, and anything pre-existing that this run did not cause.
 
 **Admissibility, on top of class.** A gating finding must also cite either a `goal_contract` ask it protects or a `path:Lstart-Lend` the run changed. A finding citing neither batches regardless of class. This is the rule that ends the unrelated-issue chase: a defensible defect about code the run never touched is still not this run's business.
 
-A crew agent calling something a blocker does not make it gating — the floor does, and `## Step 3` applies it. Voice and tone never gate: a string that is *false* gates under the last class and may be raised by any agent, a string that is merely off-voice batches. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
+A crew agent calling something a blocker does not make it gating — the floor does, and `## Step 3` applies it. Voice and tone never gate: a string that is _false_ gates under the last class and may be raised by any agent, a string that is merely off-voice batches. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
 
 Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.jsonl` line and checked by `scripts/loop-finding-audit.sh` (`## Gate artifacts`).
 
 ## Corrective budget
 
-| sizing | interim crew | correctives |
-| --- | --- | --- |
-| `inline` | none | 0 |
-| `single-wave` | none (one final crew only) | 1 for the whole run |
-| `full-orchestration` | cadence (`## Step 2d`) | 1 per wave, `max_corrective_waves` per run |
+| sizing               | interim crew               | correctives                                |
+| -------------------- | -------------------------- | ------------------------------------------ |
+| `inline`             | none                       | 0                                          |
+| `single-wave`        | none (one final crew only) | 1 for the whole run                        |
+| `full-orchestration` | cadence (`## Step 2d`)     | 1 per wave, `max_corrective_waves` per run |
 
 **One corrective per wave, then batch.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped is recorded to `cleanup_batch` and surfaced in the report — the wave advances. A wave needing two correctives is a wave whose approach is wrong; that is a `rethink`, not a third patch.
 
@@ -118,19 +118,19 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 
 **2c. Update counters.**
 
-| Counter | Updated when |
-| --- | --- |
-| `waves_shipped` | wave commit succeeds |
-| `waves_since_crew` | every wave; reset on crew pass |
-| `cumulative_files_changed` | sum of `files changed` for shipped waves; reset on crew pass |
-| `last_review_verdict` | from the-looper's review step |
-| `total_waves` | every wave dispatched, queue + corrective (never reset) |
-| `corrective_waves` | every floor-gated fix wave (not a queue item); never reset |
-| `correctives_this_wave` | +1 per corrective on the current wave; reset when the wave advances |
-| `consecutive_no_progress` | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
-| `wave_retries` | +1 on each stuck-wave retry dispatch; never reset |
-| `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one |
-| `batched_findings` | count of `cleanup_batch` entries; reported, never a rail |
+| Counter                        | Updated when                                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `waves_shipped`                | wave commit succeeds                                                                                            |
+| `waves_since_crew`             | every wave; reset on crew pass                                                                                  |
+| `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass                                                    |
+| `last_review_verdict`          | from the-looper's review step                                                                                   |
+| `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
+| `corrective_waves`             | every floor-gated fix wave (not a queue item); never reset                                                      |
+| `correctives_this_wave`        | +1 per corrective on the current wave; reset when the wave advances                                             |
+| `consecutive_no_progress`      | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
+| `wave_retries`                 | +1 on each stuck-wave retry dispatch; never reset                                                               |
+| `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
+| `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
 Then, in this order: write `run-state.json` (atomic), run `scripts/loop-finding-audit.sh`, evaluate the budget governor, the usage-window guard, and the crew trigger. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
 
@@ -194,14 +194,14 @@ The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuc
 
 Evaluated in step 2c after `run-state.json` is written and the finding audit has run, before the crew trigger:
 
-| Rail | Default | Hit → |
-| --- | --- | --- |
-| `max_correctives_per_wave` | 1 | batch the finding, advance the wave (`## Corrective budget`) — the only rail that is not a STOP |
-| `max_total_waves` | 25 | STOP + escalate: queue + corrective waves exceeded the ceiling |
-| `max_corrective_waves` | 6 | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable |
-| `consecutive_no_progress` | 3 | STOP + escalate: 3 waves without shipping net-new queue work (thrash) |
-| `max_wave_retries` | 4 | STOP + escalate: the goal is systematically too hard for the executor |
-| `scaffolding_only_correctives` | 2 | STOP + escalate: consecutive correctives touched only test scaffolding |
+| Rail                           | Default | Hit →                                                                                           |
+| ------------------------------ | ------- | ----------------------------------------------------------------------------------------------- |
+| `max_correctives_per_wave`     | 1       | batch the finding, advance the wave (`## Corrective budget`) — the only rail that is not a STOP |
+| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                                  |
+| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                 |
+| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                           |
+| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                           |
+| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                          |
 
 The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent three waves rebuilding a scanner around it). The floor is the primary defense against that shape now — oracle completeness is a batched class — and this rail is the backstop for when a finding gets dressed as correctness.
 

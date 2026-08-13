@@ -51,7 +51,6 @@ For non-refused goals, produce waves that satisfy:
 Nine sections, numbered from zero:
 
 0. **Goal contract**
-
    - The user's asks as numbered atomic items, IN THEIR WORDS, one per line, each with the exit criterion that closes it: `A<N>. <the ask, verbatim or near> — done when: <criterion>`.
    - Two asks in one sentence are two items. "Fix the centering and look at the cold start" is `A1` and `A2`, and a run that ships `A1` and never starts `A2` must be able to see that.
    - Verbatim, not improved. This is the section every downstream finding is measured against (`loop-de-looper` `## Goal contract`), so a paraphrase that sharpens the ask has already moved the bar the run is held to. Where the user hedged ("probably the auth-form pattern"), record the hedge as a hedge; a "probably" is not a directive, and reading it as one is how a run starts solving a problem nobody has.
@@ -59,39 +58,32 @@ Nine sections, numbered from zero:
    - The orchestrator persists this to `run-state.json` as `goal_contract` and reproduces it verbatim in every wave brief and every crew-agent prompt. It is fixed for the run: work discovered later goes to the user as a question, never into the contract.
 
 1. **Goal restatement**
-
    - One sentence: what scope think user mean. User correction step before queue acted on.
    - Distinct from section 0 by altitude and authority: the restatement is scope's reading, the contract is the user's text. When they disagree the contract wins.
 
 2. **Classification**
-
    - One of rows from table above. State explicitly.
 
 3. **Wave queue (ordered)**
-
    - One line per wave: `Wave N | <candidate>  | <scope> | risk: low/medium/high | depends on: <wave M | none>`
    - `<scope>` column accept either file count (`files ~K`) for code waves OR change kind for non-file waves (`PR body`, `GitHub release`, `external config`). Non-file waves are real waves and belong in queue.
    - Aim queue length ≤ 15. Longer = goal too broad, recommend split.
 
 4. **Exit criteria**
-
    - Goal done when: <bulleted criteria>. Concrete + objective. Used by Loop de Looper to terminate. Every criterion traces to a section-0 ask; a criterion that closes nothing the user asked for is scope creep with a checkbox.
    - Example: "goal done when all 12 candidate components migrated to bundle utilities, `chrome-token-migration.test.ts` MIGRATED_FILES list complete, no `--bg-elevated` / legacy flat tokens grep matches in migrated files."
 
 5. **Required, not loopable**
-
    - Items REQUIRED for goal completion but loops can't execute (human approval, third-party action, manual baseline review, user decision). Each line: `<item>: not loopable because <reason>`.
    - Goal cannot complete until these clear. Loop de Looper must surface to user explicitly.
    - Empty section fine if goal fully loopable.
 
 6. **Deferred to separate scope run**
-
    - Things that COULD be in scope but consciously excluded for now, will likely surface in future scope run. Each line cite reason: `<item>: deferred because <reason>`.
    - Prevent scope creep mid-loop; document conscious choices for future runs to pick up.
    - Deferring is not debt — it holds the option. Naming a future candidate and NOT queuing it preserves the choice to build once the need is real (cheaper, better-informed) instead of guessing this run. Don't pad the queue with speculative waves to "save a future scope run"; the future run is cheap and better-informed.
 
 7. **Out of goal scope**
-
    - Things consciously excluded forever from this goal (different PR, different initiative, architectural decision out of scope). Each line: `<item>: out of scope because <reason>`.
    - Distinguish "will come back to" (deferred) from "won't come back to this goal" (out of scope).
 
