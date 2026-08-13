@@ -48,11 +48,20 @@ For non-refused goals, produce waves that satisfy:
 
 ## Output
 
-Eight sections:
+Nine sections, numbered from zero:
+
+0. **Goal contract**
+
+   - The user's asks as numbered atomic items, IN THEIR WORDS, one per line, each with the exit criterion that closes it: `A<N>. <the ask, verbatim or near> — done when: <criterion>`.
+   - Two asks in one sentence are two items. "Fix the centering and look at the cold start" is `A1` and `A2`, and a run that ships `A1` and never starts `A2` must be able to see that.
+   - Verbatim, not improved. This is the section every downstream finding is measured against (`loop-de-looper` `## Goal contract`), so a paraphrase that sharpens the ask has already moved the bar the run is held to. Where the user hedged ("probably the auth-form pattern"), record the hedge as a hedge; a "probably" is not a directive, and reading it as one is how a run starts solving a problem nobody has.
+   - Anything scope infers, needs, or recommends belongs in sections 3-8, NEVER here. The contract is the user's; everything else is scope's.
+   - The orchestrator persists this to `run-state.json` as `goal_contract` and reproduces it verbatim in every wave brief and every crew-agent prompt. It is fixed for the run: work discovered later goes to the user as a question, never into the contract.
 
 1. **Goal restatement**
 
    - One sentence: what scope think user mean. User correction step before queue acted on.
+   - Distinct from section 0 by altitude and authority: the restatement is scope's reading, the contract is the user's text. When they disagree the contract wins.
 
 2. **Classification**
 
@@ -66,7 +75,7 @@ Eight sections:
 
 4. **Exit criteria**
 
-   - Goal done when: <bulleted criteria>. Concrete + objective. Used by Loop de Looper to terminate.
+   - Goal done when: <bulleted criteria>. Concrete + objective. Used by Loop de Looper to terminate. Every criterion traces to a section-0 ask; a criterion that closes nothing the user asked for is scope creep with a checkbox.
    - Example: "goal done when all 12 candidate components migrated to bundle utilities, `chrome-token-migration.test.ts` MIGRATED_FILES list complete, no `--bg-elevated` / legacy flat tokens grep matches in migrated files."
 
 5. **Required, not loopable**
@@ -96,6 +105,7 @@ Eight sections:
 - Scope NOT write code or change branch state. Read-only.
 - Scope NOT re-classify mid-run. If goal shape change (user expand scope), scope re-run from top. No incremental patches.
 - Scope NOT speculate on future waves. If goal completion reveal new candidates, that new scope run.
+- Scope NOT improve the goal contract. Section 0 is transcription, not authorship — sharpening a vague ask into a crisper one hands the run a bar the user never set.
 
 ## Stop conditions
 

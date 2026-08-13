@@ -143,6 +143,16 @@ Never convey info by color alone: status pills, form errors, chart series, links
 
 Each finding: file:line, what fails, WCAG SC number + name + level, user impact one-liner, current code, fixed code (React/JSX/Tailwind). Then list items needing designer or product input.
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+
+What gates: a WCAG failure on UI THIS run shipped, cited at its `path:Lstart-Lend` inside the run's own diff. A 🔴 Critical on a surface the run built is exactly the finding the floor exists to let through.
+
+What batches: everything pre-existing. A keyboard trap the run did not introduce is a real defect and still gets reported — into the cleanup batch, or, if it is bigger than a cleanup item, into the run's open questions for the user. It does not become this run's corrective wave. Same for AAA gaps, missed `prefers-*` queries, and landmark-labeling on untouched pages: report, don't gate.
+
+Severity is not the same question as ownership. A pre-existing Critical is more urgent than a shipped Warning and still isn't this run's job — it did not cause it, and a run that fixes every a11y defect it walks past never finishes what it was asked to do.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-auditor/`. Write direct, directory exists.

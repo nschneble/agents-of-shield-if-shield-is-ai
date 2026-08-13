@@ -9,7 +9,7 @@ Qualitative review. Independent from build + verify. Question not "does work" (v
 
 Domains beyond general eng → orchestrator invoke specialists via Task tool. Skill recommend + synthesize reports.
 
-Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass mechanism, fired at trigger points (every 4 waves OR 30 cumulative file changes, plus mandatory final crew), not per-wave parallel spawns inside wave loop. Per-wave review surface blockers/warnings/nits; crew pass on cumulative diff catch cross-wave drift single-wave review cannot see.
+Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass mechanism, fired at trigger points (every 4 waves OR 30 cumulative file changes, plus mandatory final crew), not per-wave parallel spawns inside wave loop. Per-wave review sorts findings into blockers and batched, same two buckets as `## Output`; crew pass on cumulative diff catch cross-wave drift single-wave review cannot see.
 
 | Domain                                                 | Reviewer                                  |
 | ------------------------------------------------------ | ----------------------------------------- |
@@ -37,9 +37,12 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 
 ## What to look for
 
+Read the wave's goal contract FIRST — under `loop-de-looper` the brief carries it verbatim (`loop-de-looper` `## Goal contract`). It is what the run was asked for, and every finding below is measured against it plus the diff this wave actually produced. A finding about neither is not a review finding; it is a future scope run.
+
+- **Contract fit:** does the change close the ask it was queued to close? An implementation that is excellent and answers a different question is the most expensive defect on this list, and the only one that gets more convincing the longer a run goes.
 - **Design fit:** change match existing patterns? New pattern = better, or different?
-- **Rung fit:** approach sit at right ladder rung (YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)? Rung-6 custom code where rung 2/3/4 (stdlib / platform / existing dep) cover? Plan brief named rung; implementation match? Downgrade opportunity (custom → one-liner → existing dep) = blocker or warning by cost. Escape-hatch claims (perf, a11y, security, data-loss, trust), verify requirement real, not asserted.
-- **Speculative build (YAGNI):** structure, config hooks, abstraction, or params built for a need NOT in this wave's spec? Flag it. Cost is optionality + NPV (committed early on a guess, value deferred), NOT "only a few lines." Loop's cheap codegen is why this leaks — easier to over-build, never cheaper to own. Unused-future code shaping a public contract = blocker; otherwise warning. See `looper-plan` rung ladder, rung 1.
+- **Rung fit:** approach sit at right ladder rung (YAGNI → stdlib → platform → existing dep → one-liner → minimal custom)? Rung-6 custom code where rung 2/3/4 (stdlib / platform / existing dep) cover? Plan brief named rung; implementation match? Downgrade opportunity (custom → one-liner → existing dep) = batched, whatever its cost; a rung too high is a refactor finding. Escape-hatch claims (perf, a11y, security, data-loss, trust), verify requirement real, not asserted — a FALSE escape-hatch claim covering a real defect is that defect, and blocks on its own class.
+- **Speculative build (YAGNI):** structure, config hooks, abstraction, or params built for a need NOT in this wave's spec? Flag it. Cost is optionality + NPV (committed early on a guess, value deferred), NOT "only a few lines." Loop's cheap codegen is why this leaks — easier to over-build, never cheaper to own. Batched: unused-future code is code nobody called yet, so it regresses nothing. See `looper-plan` rung ladder, rung 1.
 - **Hidden costs:** change add bundle weight, runtime cost, DB load, maintenance burden out of proportion to value?
 - **Regression risk:** break adjacent code? Tests cover change, but cover seams between change + what touches?
 - **Spec drift:** implementation match spec, or build sneak scope? (Compare vs PRD / bug report / research output.)
@@ -51,20 +54,23 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 - No re-run lint / test / build (verify job, build passed)
 - No bike-shed naming or whitespace
 - No propose alternatives merely-different, not better
-- No pile on. Blocker found → surface clean; no bundle five nits with it
+- No pile on. Blocker found → surface clean; the batched findings go in their own list, not stapled to it as leverage
 
 ## Output
 
-Three categories findings:
+Every finding is cited `file:line` + reason + suggested fix if obvious, then sorted into one of two buckets by `loop-de-looper` `## Finding severity floor` — NOT by how serious it feels:
 
-- **🚫 Blocker**: must fix before merge. Cite file:line + reason + suggested fix if obvious.
-- **⚠ Warning**: should fix soon, ship-blockable only if review pass keep surfacing same warning. Cite file:line + reason.
-- **💭 Nit**: optional improvement. No action required from loop. Save for next refactor pass.
+- **🚫 Blocker**: in a gating class (correctness regression in this run's diff, security, data loss, a11y regression on shipped UI, a false user-visible string) AND admissible — it cites a goal-contract ask it protects, or a `file:line` this run changed. These stop the wave.
+- **📋 Batched**: everything else. Docs, comments, naming, conventions, LOC, test hygiene, oracle shape, refactor opportunities, voice, commit/PR prose, and anything pre-existing this run did not cause. Real findings, reported in full, fixed in the run's terminal cleanup wave.
+
+The old middle category is gone on purpose. "⚠ Warning: should fix soon, ship-blockable if it keeps surfacing" is a blocker on a delay, and a reviewer with an incentive to re-surface is a reviewer that eventually gets its wave. A finding either meets the floor now or it batches.
+
+**Severity is not the same axis as confidence.** A finding can be certain, well-cited, and still batched. Reviewers reach for Blocker to make sure a real defect gets fixed — the batch is what makes that unnecessary: nothing is dropped, it is scheduled.
 
 End with verdict line:
 
-- `ship`: no blockers, warnings acceptable
+- `ship`: no blockers; batched findings recorded
 - `fix-blockers-then-ship`: blockers exist but surgical fixes
 - `rethink`: approach wrong; findings show change need redesign, not patches
 
-Verdict `rethink` → STOP + escalate to user. No loop into build with same approach.
+Verdict `rethink` → STOP + escalate to user. No loop into build with same approach. Two blockers in a row on the same wave is also a `rethink`, not a second patch (`loop-de-looper` `## Corrective budget`).

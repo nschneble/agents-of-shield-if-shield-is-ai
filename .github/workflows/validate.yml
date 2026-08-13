@@ -22,6 +22,8 @@ jobs:
         run: ./scripts/custodian-phase-order.test.sh
       - name: Loop run-state drift audit (both directions)
         run: ./scripts/loop-state-audit.test.sh
+      - name: Loop finding admissibility audit (both directions)
+        run: ./scripts/loop-finding-audit.test.sh
       - name: Doc-bloat detector (both directions)
         run: ./scripts/doc-bloat-scan.test.sh
       - name: Correction-gates runner (both directions)

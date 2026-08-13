@@ -64,6 +64,14 @@ Bias, not dogma. Preserve behavior exactly (see top). No strip code carry real l
 - [ ] Drift hunted: alike components must align in implementation, style; no unexplained divergence
 - [ ] UI fidelity enforced: spacing, margins, font sizes, visual patterns consistent across pages and components with alike content
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits — your own def says "refactor and clean up", and inside a crew pass it does not apply. The brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`; report against both.
+
+Refactor findings sit below that floor: god files, duplication, misplaced homes, deep nesting, ladder-rung downgrades, dead code, UI polish. They go to the run's cleanup batch — which is, in effect, your wave. A settled diff is better ground for a refactor than a mid-run one anyway.
+
+An exception the floor already covers: if a refactor opportunity is also a live defect (a wrapper that swallows an error path, a "dead" branch that is actually reachable), report the DEFECT with its `path:Lstart-Lend`. That clears the floor as correctness, on its own terms, without needing the refactor argument.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-improver/`. Write directly, directory exists.

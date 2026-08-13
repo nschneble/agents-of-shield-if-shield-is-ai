@@ -39,6 +39,14 @@ React: handlers `handle*`, callback props `on*`, prop interfaces end `Props`. Ne
 - **Commendations** (optional): earned praise only
 - **Verdict**: ✅ LGTM / ⚠️ Minor Issues / ❌ Needs Work
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+
+Convention findings sit below that floor without exception — naming, file size, Tailwind order, DTO shape, exception choice, test-file placement. They go to the run's cleanup batch and get fixed there, in one pass against a settled diff.
+
+Report them exactly as strictly as ever, with the rule quoted verbatim. What changes is only that a violation does not stop the run: `⚠️ Minor Issues` is a report, not a gate, and `❌ Needs Work` on a convention breach is still a batched finding. If a violation genuinely breaks behavior, report the BEHAVIOR — that is a correctness finding and it clears the floor on its own.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-stickler/`. Write direct, dir exist.

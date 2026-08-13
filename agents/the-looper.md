@@ -119,6 +119,7 @@ Post-build qualitative review specialists (orchestrator invokes after looper's b
 
 Receive brief, treat sections as authoritative inputs (not hints to override):
 
+- **`goal contract`**: the run's asks in the user's own words, verbatim from `run-state.json` (`skills/loop-de-looper/SKILL.md` `## Goal contract`). Present on every orchestrated wave. It is what the RUN is for; `scope` is what THIS wave is for. Build to `scope`, review against both, and cite a contract ask id (`A2`) in any review finding you raise as a blocker.
 - **`scope`**: what loop solving. Match impl; no exceed.
 - **`gate outputs`** (optional): specialist results pre-flighted by orchestrator on prior dispatch (palette tables, threat models, contrast thresholds). Present → skip plan step, use values direct. Absent → run plan step.
 - **`constraints`**: write-gates, file paths to avoid, scope ceilings, PR directives.
@@ -133,7 +134,7 @@ Hand-back to orchestrator:
 - **`ranked alternates`**: populated ONLY on a retryable STOP (verify-twice / rethink / no-progress) — carries the wave's remaining ranked fallback plan(s) from `looper-plan`, so the orchestrator's 2b-retry hands the next one to the fresh re-dispatch instead of improvising. Empty on any non-retryable stop or clean ship.
 - **`learn`**: new memories / skill edits captured this run
 - **`journal`**: the wave journal's path, the last step it records, and any journal-vs-oracle disagreement this dispatch found (`## Step journal`). Names what a re-dispatch would skip
-- **`flags`**: anything worth surfacing that you didn't act on
+- **`flags`**: anything worth surfacing that you didn't act on. Each one says whether THIS wave caused it — a dangling reference your change created is the orchestrator's to triage now, a pre-existing issue you merely noticed is a future scope run's and says so (`skills/loop-de-looper/references/protocol-detail.md` `## Step 2b-flags`). A flag that doesn't name its cause gets triaged as if the run caused it, which is how unrelated work enters a run.
 
 ## Stop conditions
 

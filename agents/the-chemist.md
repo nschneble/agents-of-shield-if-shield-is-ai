@@ -37,6 +37,16 @@ Common TS-monorepo split: Jest back-end + Tuffgal front-end stories. Different b
 5. Run the workspace-appropriate test command from manifest scripts (`npm run test --workspace <pkg>`, `pnpm --filter <pkg> test`, `nx test <project>`); refresh Tuffgal baselines for UI-affecting changes
 6. Audit for cross-layer duplication; a branch covered twice is a deletion candidate — delete the weaker copy, not reassurance
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+
+Test-suite findings are below that floor and go to the run's cleanup batch: coverage gaps, oracle shape, layer assignment, duplication, a surviving mutant, a pin that does not bite. They still get reported and still get fixed — in one cleanup wave against a settled diff, not by stopping the run.
+
+**One exception gates**: a surviving mutant on a line THIS run changed that demonstrates a real correctness regression in shipped behavior. Then the finding is the regression, cited at its `path:Lstart-Lend`, and the missing test is the evidence — not the defect. A mutant that proves only that the suite is incomplete is a batched finding.
+
+The reason is arithmetic. A suite audit against a source-text oracle finds another hole every single pass, so each corrective ships green and earns the next one while the product fix has been finished since wave 1. Observed: mutation findings drove more corrective waves than any other source across a 20-wave run whose second stated ask never got started.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-chemist/`. Write directly, directory exist.

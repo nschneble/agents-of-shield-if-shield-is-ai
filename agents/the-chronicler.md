@@ -54,6 +54,14 @@ Document only: non-obvious WHY, side effects, thrown exceptions (service methods
 2. Back-end first (controllers → DTOs → services → modules → README), then front-end, then root README.
 3. After writing, re-read as junior dev: still mysterious? Fix.
 
+## In a crew pass
+
+Under `loop-de-looper`: findings only, no edits — that includes the "quick" one-line comment fix, which has been made directly in a crew pass before and bypassed the whole verify-and-commit discipline. The brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`; report against both.
+
+Documentation findings sit below that floor: stale docstrings, falsified comments, missing overviews, drifted READMEs, orphaned prose. They go to the run's cleanup batch and get fixed there.
+
+**One exception gates**: a shipped USER-VISIBLE string that is factually wrong about what the code does. That is not documentation, it is the product lying to someone, and it clears the floor. A code comment that lies is a batched finding; a UI string that lies is not.
+
 ## Memory
 
 Save memories to `/Users/nickschneble/.claude/agent-memory/the-chronicler/`. Write direct, directory exist.

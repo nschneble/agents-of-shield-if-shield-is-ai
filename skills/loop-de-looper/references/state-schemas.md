@@ -12,12 +12,23 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
   "task_tool_available": true, // false = orchestrator could NOT invoke; rules in SKILL.md `## Gate artifacts`
   "ran": true, // false when task_tool_available is false
   "verdict": "MERGE-READY", // agent's own words, verbatim — no paraphrase
-  "outcome": "promote", // refutation-posture reviewers only: "refute" | "promote"; else null
+  "outcome": "promote", // refutation-posture reviewers only: "refute" | "batch" | "promote"; else null
   "verified_by": "llm", // provenance: "executable" | "llm" | null
+  "gates": false, // true = this line's finding blocks the wave and earns a corrective
+  "gated_by": null, // one class from SKILL.md `## Finding severity floor`; null unless gates is true
+  "contract_ref": null, // goal_contract ask id ("A2") or `path:Lstart-Lend` in the run's diff; null unless gates is true
   "blockers": 0,
   "summary": "one line, cited from agent output"
 }
 ```
+
+`gates` is the field that separates a finding from a corrective wave. A crew agent's own severity label does NOT set it — the orchestrator sets it after applying `SKILL.md` `## Finding severity floor`, and a `true` without both `gated_by` and `contract_ref` is inadmissible. Everything else is a batched finding: `gates: false`, both justification fields `null`, and the finding itself recorded in `run-state.json` `cleanup_batch` rather than here.
+
+`gated_by` takes one of exactly five literal tokens, and the audit rejects anything else — write them as spelled here, not as the prose table's labels: `correctness-regression`, `security`, `data-loss`, `a11y-regression`, `false-user-string`. The last one is the trap, since its prose label is "false user-visible string".
+
+`contract_ref` takes either a `goal_contract` ask id (`A2`, which must be one the contract declares) or a citation into the run's own diff, `path:Lstart-Lend`. The citation is checked for shape only — the audit cannot resolve it against the diff without the repo, so a well-formed reference to nothing passes. That gap is real and the run-wide corrective ceiling, not this field, is what bounds it.
+
+`outcome: "batch"` is the refutation-posture reviewer's own way of saying the same thing — a defensible defect it can cite, below the floor. It exists because a binary `refute|promote` forces a reviewer to either block on a nit or stay silent about it, and the first is what produced four consecutive `refute` verdicts on a one-line CSS fix.
 
 ## Provenance lint
 
@@ -29,16 +40,29 @@ jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialis
 
 The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope in SKILL.md `## Gate artifacts`); the `outcome` check is crew-refutation-only. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt.
 
+Admissibility is checked separately by `scripts/loop-finding-audit.sh` over five arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, and the interim crew size. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other three read the log alone.
+
 ## run-state.json shape
 
 ```json
 {
   "goal": "<scope's goal restatement>",
+  "goal_contract": {
+    "asks": [
+      { "id": "A1", "ask": "<the user's words>", "done_when": "<exit criterion>" },
+      { "id": "A2", "ask": "...", "done_when": "..." }
+    ],
+    "fixed_at": "step-1"
+  },
   "sizing": "full-orchestration",
   "queue": [
-    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234" },
-    { "wave": 2, "candidate": "...", "status": "pending", "commit": null }
+    { "wave": 1, "candidate": "...", "status": "shipped", "commit": "abc1234", "closes": ["A1"] },
+    { "wave": 2, "candidate": "...", "status": "pending", "commit": null, "closes": ["A2"] }
   ],
+  "cleanup_batch": [
+    { "wave": 1, "agent": "the-chronicler", "class": "docs", "ref": "src/lib/x.ts:40", "finding": "<one line, cited>" }
+  ],
+  "open_questions": ["<a crew finding implying scope the contract does not carry>"],
   "counters": {
     "waves_shipped": 1,
     "waves_since_crew": 1,
@@ -46,8 +70,11 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
     "last_review_verdict": "clean",
     "total_waves": 1,
     "corrective_waves": 0,
+    "correctives_this_wave": 0,
     "consecutive_no_progress": 0,
-    "wave_retries": 0
+    "wave_retries": 0,
+    "scaffolding_only_correctives": 0,
+    "batched_findings": 1
   },
   "last_crew_wave": 0,
   "pr": { "number": 214, "url": "...", "state": "draft", "body_sha": "9f2a3c7e" },
@@ -59,6 +86,8 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
   }
 }
 ```
+
+`goal_contract` is written once, at the end of Step 1, and never edited afterwards — a run that grows its own contract can always justify whatever it did. `queue[].closes` names which asks a wave is meant to close, which is what makes "shipped 9 waves, ask A2 unstarted" visible in the snapshot rather than only in hindsight. `cleanup_batch` accumulates every finding the severity floor did not gate, and drains in one terminal wave; `open_questions` holds what the crew surfaced that the contract does not cover, and drains only by the user answering.
 
 This file is the one of the three that gets overwritten, so it is the only one that can silently lose position while the records beside it stay correct. `scripts/loop-state-audit.sh` compares it against them — the journals settle `waves_shipped`, `total_waves`, `wave_retries` and the queue's shipped entries, `gates.jsonl` settles `last_crew_wave`, and git settles the shas those entries name. Run it before trusting a snapshot on resume (SKILL.md `## State tracking`); exit 0 means every arm was compared and agreed, 1 means a named field disagreed and the records win, 2 means the audit could not settle everything it exists to settle. The `pr` arm is opt-in behind `--pr` because it needs the network.
 
