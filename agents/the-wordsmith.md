@@ -50,6 +50,7 @@ Large if touches >1 layer (e.g. new DB table + API + UI), introduces new module,
 
 - [ ] Tests written and passing
 - [ ] No linting errors
+- [ ] Comments default to zero (`the-chronicler.md` `## What You Document`). A new file that ships with none is a PASS, not a gap — you are on the blank canvas, so you are where the bloat is born. No justifiers (defending code for being correct, a11y included), no user stories, no explainers of framework primitives, no per-prop rationale. One line is the ceiling outside external contracts (Swagger, README, public API), where crisp and complete is the bar because outside devs read them
 - [ ] No god files (~100 lines of code; comments and docs excluded)
 - [ ] Naming conventions followed (no abbreviations; see CLAUDE.md)
 - [ ] Module barrel `index.ts` updated if needed

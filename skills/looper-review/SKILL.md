@@ -31,7 +31,7 @@ Each crew reviewer's bar is fixed **before** the diff is seen — curated upfron
 - **`the-stickler`** (convention adherence): naming taboos, suffix conventions, DTO/shape/union choice, Tailwind class order, barrel structure — rule quoted verbatim.
 - **`accessibility-agents:accessibility-lead`** (shipped UI): WCAG SC met and measured at every real paint site, decorative-vs-interactive ARIA, focus + keyboard reach, live-region announcements.
 - **`the-chemist`** (test coverage and quality): every error branch covered, real-behavior assertions over mocked plumbing, role/label queries, at least one real-user-flow integration test.
-- **`the-chronicler`** (documentation): external contracts thorough, internal comments WHY-only, comment-style conformance.
+- **`the-chronicler`** (documentation): external contracts thorough because strangers read them, internal comments at a zero default, one line the ceiling, and every named offense the wave shipped itemized — justifier, user story, explainer, restater, gloss. Reviews for comments that were NOT earned; a bare internal file is the target, never a finding.
 - **`the-ghostwriter`** (voice and tone): prose surfaces read like Nick wrote them — no em-dashes, no slop vocabulary, no commit-linked comment archaeology, per-surface case/punctuation matrix respected. Findings only in crew mode, no edits.
 - **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split (by lines of code, docs excluded), extract only at real repetition, behavior preserved, no drive-by scope.
 

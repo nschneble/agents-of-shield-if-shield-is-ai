@@ -16,10 +16,17 @@
 #                         The primary quarry: a multi-line block wedged
 #                         mid-execution.
 #   jsdoc-block         : the same shape, but a `/**` (or `{/**`) opener — a
-#                         doc header, kept by default (top-of-file/symbol
-#                         context). The skill snips it only when it is NOT
-#                         actually a header, which a braced `{/**` never
-#                         is: it parses only in JSX children position.
+#                         doc header. Reported, not excused: the skill keeps
+#                         it only on an external-contract surface (Swagger,
+#                         DTO fields, README, public API). Declaration
+#                         position buys placement, not length.
+#   jsdoc-oneline       : a `/** … */` (or `{/** … */}`) opening and closing on
+#                         ONE line — a symbol doc, which is the shape a
+#                         per-prop doc takes. Emitted because props get no
+#                         docs at all, not because one line is too long. A
+#                         bare one-line `/* … */` is an inline note, not a
+#                         symbol doc, and is NOT flagged; nor is an empty
+#                         `/**/`.
 #   stacked-slashes     : two or more consecutive full-line `//` comments (a wall
 #                         of `//` that wants collapsing to a single WHY line).
 #   over-75             : a comment line whose length exceeds 75 chars (content
@@ -40,7 +47,9 @@
 # to comment in JSX children position, so a `.tsx` tree would otherwise scan as
 # comment-free. The brace must abut the slash (`{ /*` is an object literal or
 # an open block). Capitalization is judged on single-line `//` only; a one-line
-# `/* … */` or `{/* … */}` is length-checked, not case-checked.
+# `/* … */` or `{/* … */}` is length-checked, not case-checked — and a one-line
+# `/** … */` is additionally flagged for EXISTING, since the `/**` spelling
+# declares a symbol doc rather than an inline note.
 # Trailing end-of-line comments (`code(); // x`) and `#`-comment languages are
 # out of scope — deliberately, so a `//` inside a string or a `https://` URL is
 # never mis-read as a comment. A candidate is a suggestion, not a verdict: the
@@ -130,8 +139,21 @@ FNR == 1 { flush_slashes(); reset() }
   if (t ~ /^\{?\/\*/) {
     flush_slashes()
     if (len > 75) emit(FILENAME, FNR, "over-75", t)
-    # a `/* … */` or `{/* … */}` that closes on its own line is not a block
-    if (index(t, "*/") > 1) { next }
+    # a `/* … */` or `{/* … */}` that closes on its own line is not a block.
+    # The `/**` spelling still emits: it declares "this is documentation of a
+    # symbol," which is the shape a per-prop doc takes, and props get no docs
+    # (the-chronicler `## Internal code`). A bare one-line `/* … */` does NOT
+    # emit — it is an inline note, the same survivor class as a one-line `//`.
+    if (index(t, "*/") > 1) {
+      if (t ~ /^\{?\/\*\*/ && t ~ /\*\/\}?$/) {
+        one = t
+        sub(/^\{?\/\*+[ \t]*/, "", one)
+        sub(/[ \t]*\*+\/\}?$/, "", one)
+        # an alnum is what separates real prose from an empty `/**/` husk
+        if (one ~ /[A-Za-z0-9]/) emit(FILENAME, FNR, "jsdoc-oneline", t)
+      }
+      next
+    }
     in_block = 1; block_body = 0; block_first = ""
     block_line = FNR; block_file = FILENAME
     # `/**` is a doc header (keep-leaning); a bare `/*` mid-code is the quarry
