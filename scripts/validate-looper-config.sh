@@ -177,5 +177,43 @@ else
              | sed 's|^\./||' | sort)
 fi
 
+# --- Deploy links: every shipped file must resolve through ~/.claude ---
+# Definitions only run once ~/.claude points at them, so a file that exists
+# here and is unreachable there is shipped in name only. Four reference
+# files sat unlinked for weeks that way — SKILL.md cited them and the
+# runtime could not load them. Derived from the tree for the same reason
+# the CI check above is.
+#
+# WARN, never err: this is machine-local deploy state, not a property of
+# the commit, and CI has no ~/.claude at all. Skipped whole when the tree
+# is undeployed, so a fresh clone and CI both stay silent.
+
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+real_path() {  # realpath is not on stock macOS; readlink -f is not on bash 3.2 macOS either
+  ( cd "$(dirname "$1")" 2>/dev/null && p=$(basename "$1")
+    while [ -L "$p" ]; do
+      t=$(readlink "$p")
+      case "$t" in /*) cd "$(dirname "$t")" ;; *) cd "$(dirname "$t")" ;; esac 2>/dev/null || return 1
+      p=$(basename "$t")
+    done
+    printf '%s/%s\n' "$(pwd -P)" "$p" )
+}
+
+if [ -d "$CLAUDE_HOME/agents" ]; then
+  repo_root=$(pwd -P)
+  for area in agents skills hooks; do
+    [ -d "$area" ] || continue
+    while IFS= read -r rel; do
+      deployed="$CLAUDE_HOME/$area/$rel"
+      if [ ! -e "$deployed" ]; then
+        warn "$area/$rel is not deployed: no $CLAUDE_HOME/$area/$rel"
+      elif [ "$(real_path "$deployed")" != "$repo_root/$area/$rel" ]; then
+        warn "$area/$rel resolves to $(real_path "$deployed"), not this repo"
+      fi
+    done < <(find "$area" -type f ! -name '.DS_Store' | sed "s|^$area/||" | sort)
+  done
+fi
+
 printf '\n%d error(s), %d warning(s)\n' "$errors" "$warnings" >&2
 [ "$errors" -eq 0 ]

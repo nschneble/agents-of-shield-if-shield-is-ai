@@ -71,7 +71,12 @@ printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\nBody.\n' \
 
 wf="$fix/.github/workflows/validate.yml"
 run_fixture() { # sets $out and $rc — not a subshell, so both survive
-  out=$(cd "$fix" && ./scripts/validate-looper-config.sh 2>&1); rc=$?
+  # point the deploy-link check at an absent config dir so it skips: the
+  # fixture is a throwaway tree nobody deploys, and letting the real
+  # ~/.claude answer would make every assertion below depend on the dev
+  # machine's link state. Its own assertions set this deliberately.
+  out=$(cd "$fix" && CLAUDE_CONFIG_DIR="$temp_dir/undeployed" \
+          ./scripts/validate-looper-config.sh 2>&1); rc=$?
 }
 
 # `wired` = the validator must not complain about alpha.test.sh (it may
@@ -258,11 +263,46 @@ run_fixture
 [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'does not exist'
 check "resolving reference does not warn (exit $rc)" $?
 
+# --- deploy links: warn on anything the tree ships but ~/.claude can't
+# reach. Three arms, because the check has been able to fail as silence
+# (undeployed machine) and as noise (CI) as easily as it can bite. ---
+deploy_fixture() { # $1 = config dir handed to the validator
+  out=$(cd "$fix" && CLAUDE_CONFIG_DIR="$1" \
+          ./scripts/validate-looper-config.sh 2>&1); rc=$?
+}
+
+# an undeployed tree is silent, not 37 warnings — this is the CI case
+deploy_fixture "$temp_dir/nothing-here"
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'is not deployed'
+check "undeployed tree skips the link check entirely (exit $rc)" $?
+
+# a deployed dir missing one file names that file and stays exit 0
+dep="$temp_dir/deployed"
+mkdir -p "$dep/agents" "$dep/skills/beta"
+ln -s "$fix/skills/beta/SKILL.md" "$dep/skills/beta/SKILL.md"
+deploy_fixture "$dep"
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'agents/alpha.md is not deployed'
+check "an unlinked file warns without failing (exit $rc)" $?
+
+# a link pointing somewhere else is a different failure than an absent one
+printf 'decoy\n' > "$temp_dir/decoy.md"
+ln -s "$temp_dir/decoy.md" "$dep/agents/alpha.md"
+deploy_fixture "$dep"
+printf '%s\n' "$out" | grep -q 'agents/alpha.md resolves to' \
+  && ! printf '%s\n' "$out" | grep -q 'agents/alpha.md is not deployed'
+check "a link into the wrong file warns as misresolved, not missing" $?
+
+# and the fully-linked tree is silent
+rm "$dep/agents/alpha.md"; ln -s "$fix/agents/alpha.md" "$dep/agents/alpha.md"
+deploy_fixture "$dep"
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'alpha.md is not deployed\|alpha.md resolves to'
+check "a fully linked tree is silent (exit $rc)" $?
+
 # --- the tally, derived from the log rather than from a counter ---------
 # EXPECTED_CHECKS is the floor. Add or remove a fixture block and this
 # number moves with it — that is the point: a block deleted on its own
 # reads as silence, and silence is what this file exists to stop.
-EXPECTED_CHECKS=17
+EXPECTED_CHECKS=21
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \
