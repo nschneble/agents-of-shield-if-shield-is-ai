@@ -77,6 +77,9 @@ export const j = 6
 
 // a comment running exactly one character past the seventy-five column wrap
 export const k = 7
+
+/** a one-line symbol doc */
+export const m = 8
 EOF
 
 # ── RED fixture: the JSX braced spelling of the same shapes ────────────────────
@@ -100,14 +103,19 @@ export const Panel = () => (
       and continues on a second line
     */}
     <span>e</span>
+    {/** a braced one-line symbol doc */}
+    <span>f</span>
   </div>
 )
 EOF
 
 # ── green fixtures: nothing should fire ────────────────────────────────────────
 cat > "$temp_dir/clean.ts" <<'EOF'
-/** a single-line doc comment stays put */
+/* a one-line inline note is not a symbol doc */
 export const f = 1
+
+/**/
+export const n = 8
 
 // lowercase single comment
 export const g = 2
@@ -142,8 +150,6 @@ export const Ok = () => (
     <span>a</span>
     {/* another braced one-liner */}
     <span>b</span>
-    {/** a braced doc one-liner */}
-    <span>c</span>
     {/*
     */}
     <span>{"{/* not a comment, just a string */}"}</span>
@@ -192,6 +198,27 @@ check "braced multi-line block fires block-overexplained" "$([ $? -eq 0 ] && ech
 
 echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":8,"kind":"jsdoc-block","text":"{/\*\* a braced doc opener"'
 check "braced multi-line doc block fires jsdoc-block" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# a one-line `/** … */` is a SYMBOL doc — the shape a per-prop doc takes, and
+# props get no docs. Both spellings fire; the bare `/* … */` twin must not,
+# or every inline one-line note in the tree becomes a candidate.
+echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"jsdoc-oneline","text":"/\*\* a one-line symbol doc \*/"'
+check "one-line /** … */ fires jsdoc-oneline" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*braced.tsx".*"kind":"jsdoc-oneline","text":"{/\*\* a braced one-line symbol doc \*/}"'
+check "braced one-line {/** … */} fires jsdoc-oneline" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*clean.ts".*"kind":"jsdoc-oneline"'
+check "a bare one-line /* … */ note fires no jsdoc-oneline" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# `/**/` strips to a lone `/`, which is why the emit gate tests for an alnum
+# rather than for a non-empty remainder
+echo "$out" | grep -q '"text":"/\*\*/"'
+check "an empty /**/ husk fires nothing" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# a one-line doc opens no block: the block kinds must not double-count it
+oneline_blocks=$(echo "$out" | grep -c '"kind":"\(block-overexplained\|jsdoc-block\)","text":"[{]*/\*\* a[^.]*one-line symbol doc')
+check "a one-line symbol doc opens no block" "$([ "$oneline_blocks" -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*braced.tsx","line":12,"kind":"over-75"'
 check "braced one-liner reaches the over-75 check" "$([ $? -eq 0 ] && echo 0 || echo 1)"
