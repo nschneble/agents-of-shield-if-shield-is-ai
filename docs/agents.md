@@ -28,10 +28,12 @@ user flows. Actively prunes weak or duplicate tests.
 - **Tools:** `Bash, Edit, Read, Write`
 - **When:** After new features, API changes, or any complex logic
 
-Documentation guardian. **Depth scales with audience distance.** External
-API contracts get thorough Swagger + DTO docs. Internal code gets smaller
-inline comments. Leans on self-documenting names. Writes Swagger
-decorators, README updates, and JSDocs on non-obvious modules.
+Documentation guardian. **Depth scales with audience distance, and the
+default is zero.** External API contracts get thorough Swagger + DTO docs
+because strangers read them. Internal code gets nothing until one of four
+named earners fires. Owns the list of named offenses — justifier, user
+story, explainer, restater, gloss, archaeology — and in a crew pass it
+subtracts rather than adds: a bare internal file is the target state.
 
 ## The Diamantaire
 

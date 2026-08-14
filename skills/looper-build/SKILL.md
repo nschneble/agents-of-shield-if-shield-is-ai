@@ -42,7 +42,8 @@ No bypass via Bash. Plan ESCALATE without orchestrator-fired specialist → STOP
 
 ## Quality bars
 
-- No comments explain WHAT; well-named identifiers carry that. Comments only for non-obvious WHY.
+- **Comments default to ZERO** (`the-chronicler.md` `## What You Document` owns the budget; it is not restated here). A wave that adds source files and adds no comments has passed this bar, not skipped it. A comment ships only when the budget forces it: a WHY a reader would otherwise UNDO, a one-line landmine marker, a `@throws`, or an external-contract surface (Swagger, README, public API) where prose is the product. One line is the ceiling everywhere else, declaration position included.
+- **Never write a justifier.** Code that is correct is not a story: aria/a11y that works, focus that lands, errors that get caught, types that hold. Do not narrate a user, a persona, or a scenario either. Both are named offenses (`the-chronicler.md` `## Do NOT document`) and both are what waves keep shipping. Where a mechanism is genuinely unusual, ONE short line, never a paragraph defending it.
 - No god files. Refactor when a file's lines of code cross the project threshold (often 100 per CLAUDE.md; comments and docs don't count).
 - Follow project style: import order, naming conventions, class-ordering rules (e.g. Tailwind ordering in CLAUDE.md).
 - No untrusted optimization. Chase only proven hot paths.
