@@ -822,6 +822,18 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     where a reviewer can see what it bought. The failure names both remedies —
     extract, or raise — so it cannot be read as an instruction to shrink.
 
+    **The margin is derived, not round.** A ceiling set to the file's exact
+    size fails on the next sentence anyone writes, which trains people to
+    raise the number reflexively and turns the deliberate decision back into
+    a formality. So the recorded ceiling carries roughly one mechanism's
+    worth of slack, priced off the last real one — the Phase A receipts
+    sweep cost 646 tokens across its paragraph, report line, roster entry and
+    does-NOT line. One ordinary addition fits without ceremony; a second
+    forces the extract-or-raise call, which is where the decision belongs.
+    The slack note stays quiet at that size (it fires above a fifth of the
+    ceiling), so a margin this size does not read as a ceiling that has
+    stopped constraining anything.
+
     Two shapes it refuses to call clean, both learned from the checks written
     beside it: a ceilings file it cannot read (`-s` tests size, not
     readability, and a mode-000 file passes it while yielding no rows), and a
