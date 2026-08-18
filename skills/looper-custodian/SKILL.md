@@ -112,20 +112,7 @@ Know what this gate does not cover: it would NOT have saved the 2026-08-03 run, 
 
 ### `history` — query the cross-run index (read-only, never on cron)
 
-Backed by `scripts/custodian-history.sh query`:
-
-```
-scripts/custodian-history.sh query <q> \
-  [--agent S] [--verdict S] [--kind S] [--repo S] [--file S] [--blocked] [--limit N]
-```
-
-Read-only lookup over `history-index.jsonl`. Returns **ranked, cited matches** — most-recent-first (by the source `gates.jsonl` mtime), each printed with its `cite` (`<repo>/local/loops/<branch>/gates.jsonl:<n>`) so every hit traces to source, same way `ctx` returns cited snippets rather than raw logs. `<q>` is a case-insensitive substring over summary+agent+verdict+kind; all flags are case-insensitive substrings too (real `verdict`s are free-text prose like `"CHANGES REQUESTED"`, not an enum — so match on substrings, and use `--blocked` for the reliable `blockers>0` "flagged" signal). Filters compose:
-
-- `--file src/auth.ts` → "what happened last time we touched this" (ctx's file filter, re-created from the indexed `files`).
-- `--agent the-diamantaire --blocked` → "everything this crew agent flagged with blockers."
-- `--kind wave-retry --repo linklater` → "which waves needed retries here."
-
-`scripts/custodian-history.sh rebuild` wipes and re-derives the whole index from every `gates.jsonl` — safe anytime, since the index is a derived cache. Query writes nothing; disposes nothing; never part of the scheduled run. Human- or agent-triggered, like `apply`/`undo`.
+The query grammar, the filter flags, and what a ranked cited result guarantees all live in one place: `references/history-verb.md`. Cite it rather than restating it.
 
 ### Phase E — external research (auto digest, read-only)
 
@@ -184,78 +171,19 @@ To approve, tick the boxes you want and run `/looper-custodian apply #<issue>`.
 
 ## Phase D — apply (gated, the only place custodian writes)
 
-Triggered ONLY by `/looper-custodian apply #<issue>`. Never on the cron.
-
-1. Read the issue body via `gh`. Parse the checkboxes: a ticked `[x]` tag applies; an unticked `[ ]` is skipped. **No free-text approval parsing** — boxes only.
-2. **Snapshot before any write.** Copy every file a ticked item will touch into `local/custodian/<date>/backup-<issue>-<seq>/`, alongside a `manifest.json` listing each backed-up path + its original location + the issue tag that touched it. The snapshot is taken whole, BEFORE the first edit, so `undo` restores a consistent pre-apply state even if apply halts mid-run. (`--dry-run` skips this — it writes nothing to snapshot.)
-3. For each ticked `B-merge`/`B-retire`/`B-distill`/`B-repoint`/`B-migrate`: apply the memory merge/retire/distill/re-point/migrate (the only place custodian writes a memory). Leave the `[[link]]` breadcrumb on retire, and on distill link the retired episodic instances into the new semantic memory as its evidence. A `B-repoint` is the one NON-destructive memory write that touches a single file: edit the stale citation in place to its new location, keeping the memory otherwise intact — no removal, no breadcrumb. A `B-migrate` is non-destructive across TWO namespaces: copy the entry (unchanged) into the correct namespace's memory dir, add its `MEMORY.md` index line there, and leave a one-line `[[breadcrumb]]` in the original pointing at the new location — the original file stays in place, never deleted, so a wrong migration call is a cheap `undo` away.
-4. For each ticked `D-turncoat`: invoke `the-turncoat` via the Task tool with the specific flagged target. Custodian decides *what* to hand it; turncoat decides *how* to trim; the human approved *that it runs*. Custodian never hand-edits an agent itself.
-5. For each ticked `E-<n>` that maps to a build: hand it off as a scoped change (note it for the user / a `loop-de-looper` run) — custodian does not itself implement features.
-6. **Idempotent.** Diff current state first; an already-applied item is a no-op, never a double-edit. Re-running `apply` on the same issue is safe.
-7. **Audit every write.** Log each applied edit (file, before/after summary, backup path) to `custodian-log.jsonl`, and comment the summary back on the issue — including the backup dir and the `undo` command so the reversal is one copy-paste away.
-8. Applied edits to tracked files (memory dir, agents) go through the **normal review/commit path** — never silently committed by custodian.
-
-### `--dry-run` — preview, write nothing
-
-`apply #<issue> --dry-run` runs steps 1 + 3–5 in *describe* mode: for each ticked item it prints the exact before/after (the verbatim memory lines being merged/retired/distilled, the turncoat target + its current vs proposed shape, the scoped-change hand-off text) and STOPS. No snapshot (step 2), no write, no log, no issue comment. The point: the human approves the literal diff, not a paraphrase of it. A real `apply` after a `--dry-run` is the same command without the flag.
-
-### `undo` — restore the last snapshot
-
-`undo` reads the most recent `backup-*/manifest.json` under `local/custodian/`, and restores each listed file to its backed-up content, reverting the last `apply`. Idempotent: if the current files already match the backup (nothing to revert, or `undo` already ran), it's a no-op and says so. `undo` reverts custodian's *working-tree* writes; tracked-file edits already committed are reverted through the normal git path (custodian never force-rewrites history — the destructive-git guard blocks that anyway). One level deep: `undo` restores the latest snapshot, not a stack.
+The apply steps, the snapshot-and-idempotence contract, and the `--dry-run` and `undo` mechanics all live in one place: `references/phase-d-apply.md`. Cite it rather than restating it.
 
 ## Scheduling
 
-**Local launchd, NOT cloud `/schedule`.** Phases A/B/C read local-only state — `local/loops/` scratch (gitignored), the `~/.claude` memory dir (outside any repo), `gates.jsonl` across local repos — none of which an isolated cloud session can reach. So the host is a macOS launchd job on the dev machine.
-
-- Job: `~/Library/LaunchAgents/com.nickschneble.looper-custodian.plist` → runs `scripts/looper-custodian-cron.sh`, **weekly, Monday 09:00 local**, all phases on one tick, one at a time (C → A → B → E, then F checks the log order and opens the report). Low frequency — hygiene, not a hot loop.
-- The wrapper runs `claude -p "/looper-custodian" --dangerously-skip-permissions` because an unattended job can't answer prompts. Bounded: the scheduled run is propose-only (see below), so no tracked-file edits happen on it, and the destructive-git guard hook still blocks history rewrites.
-- **The wrapper retries and alerts.** The headless `claude -p` call gets up to 3 attempts with backoff (transient `API Error: Connection closed mid-response` killed the 2026-07-06 and 2026-07-13 runs). If all attempts fail, it fires a macOS notification AND opens a `Custodian run FAILED <date>` GitHub issue — a dead Monday must be loud, not discovered two weeks later.
-- **The wrapper gates on the usage window before it spends a session.** It probes at launch, and which branch it takes depends on WHICH window is hot. Hot on the 5-hour window: it waits out the reset before starting, rather than feeding a headless run into a window that cannot serve it, and defers if the window is still over threshold after that wait. Hot on the *weekly* window: it defers straight away without the wait, because a 7-day window will not roll inside the wait's 6-hour cap. So an unattended Monday has two loud endings, not one — quiet-then-loud after a wait, and loud immediately with no wait at all. Either way the defer is loud (notification + `Custodian INCOMPLETE <date>`), never quiet, and the issue body says which of the two happened. See the run-start gate under `## Maintenance run`.
-- **Phase E gets room, and a ceiling-kill is resumable, not lost.** Phase E's `deep-research` runs as a harness-backgrounded workflow; in `-p` mode the CLI blocks at end-of-turn waiting for it, capped by `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`. The 2026-07-20 run hit the old 600s default mid-research — the harness killed Phase E, and because a ceiling-kill still exits 0 the wrapper counted it a clean success, so no report opened and ~1.4M tokens of research were thrown away silently. Fixed two ways: the ceiling is raised to 30 min to give a normal Phase E room to finish so Phase F runs; and a ceiling-kill is now detected (log marker), **not retried** (a retry re-runs C/A/B and re-hits the ceiling), and turned into a loud resumable state — a `resume.json` breadcrumb plus a `Custodian INCOMPLETE <date>` issue. Each attempt runs under a known `--session-id` so `resume` can locate the killed workflow's on-disk findings. See **Resume** below. **How much room 30 min actually is has never been measured.** The one figure on disk for that kill is the run's own `cron.log`: `Background tasks still running after 600s; terminating.` That is where the fan-out was KILLED, not how long it needed — a lower bound from a run that never finished (decision 15) — so 30 min is an unmeasured margin over a lower bound, not headroom. (The `~11 min` the original comment cited has no source at all; 600s is 10 min.) It stands unchanged until a live Monday measures a fan-out that completes, and it is also what absorbs the one-at-a-time rule's wall-clock cost (`## Maintenance run`, where that trade is stated).
-- launchd runs a missed tick on next wake, so a sleeping Mac just defers the run rather than skipping it.
-- The scheduled run only ever opens/updates the report issue. `apply` is always a separate, human-triggered invocation.
-
-To change cadence, edit `StartCalendarInterval` in the plist and reload (`launchctl bootout` then `bootstrap`).
+The launchd job, the wrapper's retry, usage-window and ceiling-kill branches, and the bg-wait ceiling itself all live in one place: `references/scheduling.md`. Cite it rather than restating it.
 
 ## Resume — finish a run that was cut short
 
-`/looper-custodian resume [<date>]` continues a maintenance run that ended before Phase F opened the report. It exists so the phases that already ran aren't redone: the work is on disk, the run just needs its tail.
-
-**Two things cut a run short, and they reach this path differently.** A **bg-wait ceiling-kill** leaves a `resume.json` breadcrumb and a `Custodian INCOMPLETE` issue and then stops — nothing runs until a human invokes the resume verb (`scripts/looper-custodian-cron.sh`, the ceiling branch). A **session-limit kill** is resumed by the wrapper itself: it breadcrumbs, sleeps out the window's real reset, and relaunches `/looper-custodian resume <date>` headless, unattended (the session-limit branch). So "until someone resumes the run" describes the ceiling path only; the session-limit path resumes on its own. Both archived runs decision 24 is written against — 2026-07-27 and 2026-08-03 — were cut short by a session limit, not by the ceiling, and each reached Phase F only through a resume. 2026-07-27's was not the wrapper's: its log records a one-shot launchd job installed by hand for 19:10 that evening, and the wrapper had no session-limit resume path to run at 09:29 — `LIMIT_MARKER`, `wait_for_window_reset` and the headless relaunch all entered with `86e961f` ("fix cron lack of resume"), committed later the same day.
-
-- **Log the `resume` marker FIRST, before replaying anything.** The tail's first write is a `phase:"resume"` line whose `action` says what cut the run short and what it left unlogged (2026-07-27's reads `session-limit kill at 09:29 left B unlogged + E digest lost`). This is not bookkeeping: it is the boundary `scripts/custodian-phase-order.sh` segments on, so a tail that logs no marker is merged into the segment before it and judged against phases it never ran (`## Artifacts`).
-- **`custodian-log.jsonl` is the source of truth for what's done — not memory, not the issue.** Resume reads `local/custodian/<date>/custodian-log.jsonl` and treats any phase with a logged **completion** as done. It re-runs ONLY the unlogged tail, then Phase F.
-- **A `phase:"F"` line is NOT a completed Phase F.** F logs the phase-order check's verdict (`## Maintenance run`), and that line is written before the report issue is. So a resume that saw `phase:"F"` and called F done would skip the report — the one thing a resume exists to deliver. **Phase F always runs on a resume, unconditionally**, and it is idempotent: an existing `Custodian report <date>` issue is updated in place. What marks F complete is the issue, not a log line.
-- **C and A are never re-run.** Phase C already appended its lines to the history index; Phase A already reaped the dirs (and reaping an already-reaped tree is a no-op that also loses the ingest-guard's meaning). Re-mining and re-GCing burn cost for nothing. Phase B is read-only and cheap — re-run it only if it never logged.
-- **Re-probe the usage window before re-running E.** A resume can fire while the window that deferred E (or that the ceiling-kill happened under) is still hot. So before launching `deep-research`, resume runs the same `scripts/usage-window-probe.sh` gate as a fresh run: if the window is still over threshold, it re-defers rather than slamming it again — updates the report's E line + `resume.json` and stops. Interactive, it also schedules a wake (`ScheduleWakeup`) off the window `reset` and names `/looper-custodian resume <date>` so a later attempt is one command. The resume gate is the *fresh* probe, never the stale `reset` epoch in `resume.json`. When it does proceed, it sizes the ask by the same observed-headroom tiers a fresh run uses — a resume that clears the threshold at 92% still has no room for a full fan-out.
-- **A resume runs its tail one phase at a time too.** The rule in `## Maintenance run` binds every path that reaches Phase E, not just a fresh run. If the unlogged tail contains both B and E, B runs to completion before the resume's pre-E probe is taken — a probe read beside a re-running Phase B has exactly the defect a fresh run's would. This is a correction, not a precaution: the 2026-08-03 resume tail did it, logging its usage-window re-probe and its synthesized E digest ahead of `staleness resolved against live tree (resume)`. The tail looking small is why it happens.
-- **Phase E recovery reuses the killed workflow's findings when they're reachable.** `resume.json` records the terminated run's `session_id` + `transcript_dir`. Each sub-agent's returned findings persist in that dir's workflow journal (`journal.jsonl` / `agent-*.jsonl`). If it's present, resume synthesizes the Phase E digest from those already-collected findings instead of re-fanning every web search. If the transcript is gone (a much later resume, cleaned up), Phase E re-runs from scratch — `resumeFromRunId`'s agent cache is **same-session only**, so a cross-session resume can't reuse it; the breadcrumb captures the research question so the re-run is at least faithful, not the token savings.
-- **Ends exactly like a normal run.** Phase F opens/updates the `Custodian report <date>` issue, and resume closes the `Custodian INCOMPLETE <date>` marker issue. Idempotent: if a report issue already exists it's updated in place, and a resume with nothing left to do is a no-op that says so.
+What a resume replays, what it never re-runs, how each of the two cut-short paths reaches it, and how it ends all live in one place: `references/resume.md`. Cite it rather than restating it.
 
 ## Artifacts
 
-Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
-
-- **`custodian-log.jsonl`** — append-only run log, one JSON line per phase action, never rewritten. The machine record / audit trail. It is both the INPUT to the phase-order check and the DESTINATION of that check's output: Phase F appends a `phase:"F"` line whose `action` carries the verdict counts and whose `detail` carries the cited line numbers, because the check prints its cites to stdout and an unattended cron's stdout is not a destination (`## Maintenance run`). That line records the CHECK, never Phase F's completion (`## Resume`).
-- **`backup-<issue>-<seq>/`** — pre-apply snapshot of every file a Phase D `apply` touched, plus a `manifest.json` (path + original location + issue tag per file). Written by `apply` before its first edit; read by `undo` to revert. The reversibility backstop behind the human-checked apply.
-- **`history-index.jsonl`** — lives at `local/custodian/` (NOT under `<date>/`; it's cross-run, not a per-date artifact). The append-only rollup that backs Phase C + `history`: one record per indexed `gates.jsonl` line, carrying the gate fields verbatim + `repo`/`branch`/`files`/`cite`. A **derived cache** of `gates.jsonl` across repos — regenerable via `history --rebuild`, gitignored like the rest of `local/`. Never a source of truth.
-
-```json
-{
-  "phase": "A",                       // "start" | "C" | "A" | "B" | "E" | "F"
-                                      // | "resume" | "D-apply"
-  "repo": "tuffgal",
-  "task_tool_available": true,        // false = could NOT invoke a sub-skill/agent
-  "ran": true,                        // false when a needed tool was unavailable
-  "action": "reaped local/loops/fix-auth (merged+deleted)",
-  "detail": "1 dir, 2 files"
-}
-```
-
-- The **GitHub issue** is the human-review + approval surface; the jsonl is the machine record. They agree — the issue's claims trace to logged lines.
-- `phase` is read by `scripts/custodian-phase-order.sh`, which orders B against E and splits segments at each `resume` line. So a `resume` line is not bookkeeping — it is the boundary that lets a replayed tail be judged on its own terms, and a resume that logs no marker merges its tail into the segment before it.
-
-**`task_tool_available: false` ⇒ `ran: false` ⇒ no invented outcome.** Per the loop's `[[feedback-task-tool-availability]]` discipline: if custodian can't actually invoke `deep-research` / `the-turncoat` (no Task/Skill tool), it logs `ran: false` and says so in the issue — NEVER an invented digest or a claimed-but-unrun edit.
+The artifact paths, the log line's schema, and what each artifact is authoritative for all live in one place: `references/artifacts.md`. Cite it rather than restating it.
 
 ## Safety rails (carried from the loop's own discipline)
 
