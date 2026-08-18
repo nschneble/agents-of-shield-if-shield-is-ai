@@ -801,3 +801,31 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     it. Nothing reads the field — the check uses existence and `interrupted`
     — and storing it whole made the log a verbatim transcript of every shell
     command in the repo: 123KB of a 158KB log on one branch in one day.
+
+28. **An advisory nobody can satisfy is not a guard.** The skill lint reports
+    the published ~5000-token body budget as INFO. `looper-custodian` cannot
+    reach it — a five-phase unattended cron spec is not a 5000-token
+    document — so the finding was permanently present and permanently
+    ignored, which is the recall-is-not-enforcement gap
+    `scripts/correction-gates/README.md` names. The extraction in decision 27's
+    branch proved both halves: `the-turncoat` took the body from 16451 to
+    12430 tokens, and it drifted back to 13076 within the same session, one
+    paragraph at a time, with every check green throughout.
+
+    `scripts/skill-body-ceiling.sh` guards the property that was actually
+    violated. Not "is this file small enough" — nobody believes it is — but
+    "is it the size somebody last agreed to", recorded per skill in
+    `scripts/skill-body-ceilings.tsv`. **Deliberately not a one-way ratchet.**
+    The 646 tokens the Phase A receipts sweep added were worth adding, and a
+    check that forbade them would be wrong; raising the ceiling in the same
+    commit that grows the file is the mechanism, because the number then moves
+    where a reviewer can see what it bought. The failure names both remedies —
+    extract, or raise — so it cannot be read as an instruction to shrink.
+
+    Two shapes it refuses to call clean, both learned from the checks written
+    beside it: a ceilings file it cannot read (`-s` tests size, not
+    readability, and a mode-000 file passes it while yielding no rows), and a
+    file whose every line is a comment, which measures nothing and reports
+    `NOTHING CHECKED` rather than success. Opt-in by design: a skill with no
+    recorded row is not checked, so this governs the one spec that earned it
+    rather than silently binding all eighteen.

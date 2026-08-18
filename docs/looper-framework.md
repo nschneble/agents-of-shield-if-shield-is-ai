@@ -123,3 +123,16 @@ verbs had already drifted that way when the check landed.
 
 The `.github/workflows/validate.yml` CI job runs it on every push and PR, so a
 broken spec can't land; run it locally before committing spec edits.
+
+`scripts/skill-body-ceiling.sh` guards a different property: not whether a
+skill is small, but whether it is the size somebody last agreed to. The skill
+lint reports the published ~5000-token body budget as INFO, and for a spec
+governing a five-phase unattended cron that number is unreachable — so the
+advisory sits permanently red and permanently unread, which is recall rather
+than enforcement. `scripts/skill-body-ceilings.tsv` records a per-skill
+ceiling instead, opt-in, and the check fails when a body passes it. It is
+deliberately NOT a one-way ratchet: a new mechanism may raise its ceiling, and
+raising it in the same commit that grows the file is the point — the number
+moves where a reviewer sees what the growth bought. What it stops is drift
+nobody decided on, which is how `looper-custodian` went 16451 → 12430 tokens
+by extraction and then back to 13076 one paragraph at a time.

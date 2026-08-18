@@ -1,0 +1,20 @@
+# Recorded body-size ceilings, in approximate tokens (whole-file chars/4,
+# the same proxy scripts/custodian-skill-lint.sh reports).
+#
+# WHY THIS EXISTS. The lint reports the ~5000-token body budget as INFO,
+# and 5000 is not reachable for a spec governing a five-phase unattended
+# cron — so the advisory is permanently red and permanently ignored,
+# which is recall rather than enforcement. These ceilings are the
+# enforcement half: not the budget, but the size this file was LAST
+# DELIBERATELY AGREED to be.
+#
+# THIS IS NOT A ONE-WAY RATCHET. A genuinely new mechanism is allowed to
+# raise its ceiling — looper-custodian's body grew 646 tokens for the
+# Phase A receipts sweep, and that growth paid for itself. What is not
+# allowed is growing without anyone deciding. Raise the number in the
+# same commit that grows the file, and the diff shows the trade.
+#
+# Opt-in: a skill with no row here is not checked.
+#
+# skill	ceiling	note
+looper-custodian	13076	extraction to references/ took it from 16451; grew for the Phase A receipts sweep

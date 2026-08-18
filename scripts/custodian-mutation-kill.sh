@@ -124,6 +124,9 @@ hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/
 hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cut -c "1-\$CMD_KEEP"/cat/
 hook-cmd-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd_sha=\$\(sha_of "\$cmd"\)/cmd_sha=""/
 hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
+ceiling-comparison-never-fires|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/if \[ "\$actual" -gt "\$ceiling" \]; then/if false; then/
+ceiling-slack-note-off|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/\$slack" -gt \$\(\(ceiling \/ 5\)\)/\$slack" -gt 999999/
+ceiling-comment-skip-eats-rows|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/case "\$\{skill:-\}" in ''\|\\#\*\) continue ;; esac/continue/
 g3-group-drop-wave|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[.repo, .branch, (.wave | tostring)]\E/[.repo, .branch]/
 TABLE
 }

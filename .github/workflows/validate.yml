@@ -26,6 +26,10 @@ jobs:
         run: ./scripts/custodian-mutation-kill.test.sh
       - name: Every declared mutant is killed by its suite
         run: ./scripts/custodian-mutation-kill.sh
+      - name: Skill body ceilings (both directions)
+        run: ./scripts/skill-body-ceiling.test.sh
+      - name: No skill body past its recorded ceiling
+        run: ./scripts/skill-body-ceiling.sh
       - name: Execution receipts + writer hook (both directions)
         run: ./scripts/loop-receipts.test.sh
       - name: Loop run-state drift audit (both directions)
