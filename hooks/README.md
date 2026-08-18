@@ -61,6 +61,13 @@ blind spots is one people route around.
 `local/loops/<branch>/receipts.jsonl` — the command, whether it was
 interrupted, digests of stdout and stderr, and a timestamp.
 
+The command is truncated to 200 characters (`RECEIPT_CMD_KEEP`), with
+`command_sha` and `command_len` carrying its full identity. Nothing reads
+the text — the check uses the receipt's existence and `interrupted` — so
+storing it whole bought nothing and made the log a verbatim transcript of
+every shell command in the repo: 123KB of a 158KB log on one branch in
+one day, one entry an 8695-character heredoc.
+
 It exists because `verified_by` on a gate line is free text the audited
 agent types, so a rule reading it asks that agent to grade itself. A
 receipt is written by the runtime and no agent authors it.

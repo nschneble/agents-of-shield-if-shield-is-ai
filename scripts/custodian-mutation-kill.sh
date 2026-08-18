@@ -121,6 +121,8 @@ po-tail-counted-as-p2|custodian-phase-order.sh|custodian-phase-order.test.sh|s/\
 po-segment-marker-dead|custodian-phase-order.sh|custodian-phase-order.test.sh|s/if \$l\.obj\.phase == "resume" then \.seg \+= 1/if false then .seg += 1/
 receipts-era-gate-off|loop-receipts.sh|loop-receipts.test.sh|s/if \[ ! -s "\$receipts" \]; then/if false; then/
 hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ "\$tool" = "Bash" \] \|\| exit 0/: /
+hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cut -c "1-\$CMD_KEEP"/cat/
+hook-cmd-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd_sha=\$\(sha_of "\$cmd"\)/cmd_sha=""/
 hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
 g3-group-drop-wave|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[.repo, .branch, (.wave | tostring)]\E/[.repo, .branch]/
 TABLE

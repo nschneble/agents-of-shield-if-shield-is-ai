@@ -171,6 +171,29 @@ bash "$hook" < "$payload"
 [ ! -e "$temp_dir/local/loops" ]
 check "a cwd outside any git repo writes nothing" $?
 
+# a long command is truncated, and its full identity survives as a digest
+long=$(python3 -c "print('echo ' + 'y'*900)")
+python3 - "$repo" "$long" > "$payload" <<'PY2'
+import json,sys
+print(json.dumps({"tool_name":"Bash","cwd":sys.argv[1],
+                  "tool_input":{"command":sys.argv[2]},
+                  "tool_response":{"interrupted":False,"stdout":"","stderr":""}}))
+PY2
+bash "$hook" < "$payload"
+last=$(tail -1 "$written")
+[ "$(printf '%s' "$last" | jq -r '.command | length')" -le 200 ] \
+  && [ "$(printf '%s' "$last" | jq -r '.command_len')" -gt 200 ] \
+  && [ -n "$(printf '%s' "$last" | jq -r '.command_sha')" ]
+check "a long command is truncated but keeps its length and digest" $?
+
+# a short command is stored whole — truncation must not be unconditional
+cat > "$payload" <<JSON
+{"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"git status"},"tool_response":{"interrupted":false,"stdout":"","stderr":""}}
+JSON
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command')" = "git status" ]
+check "a short command is stored verbatim" $?
+
 # the hook must never break the call it observes
 cat > "$payload" <<'JSON'
 not json at all
@@ -194,7 +217,7 @@ out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "a wholly unparseable gates file exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=20
+EXPECTED_CHECKS=22
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

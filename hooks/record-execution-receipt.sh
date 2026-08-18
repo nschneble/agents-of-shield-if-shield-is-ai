@@ -55,11 +55,21 @@ mkdir -p "$dir" || exit 0
 cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // ""')
 [ -n "$cmd" ] || exit 0
 
+# The command is TRUNCATED, and its digest carries the identity. Nothing
+# in scripts/loop-receipts.sh reads this field — the check uses the
+# receipt's existence and `interrupted`, nothing else — so the full text
+# buys a human some context and costs a verbatim transcript of every
+# shell command run in the repo. On one branch, one day, command text was
+# 123KB of a 158KB log, one entry being an 8695-character heredoc.
+CMD_KEEP="${RECEIPT_CMD_KEEP:-200}"
+
 # absent reads as false rather than null: the payload omits the key on
 # some shapes, and "not interrupted" is what absence means here
 interrupted=$(printf '%s' "$payload" | jq -r '(.tool_response.interrupted // false) | tostring')
 case "$interrupted" in true|false) : ;; *) interrupted=false ;; esac
 
+cmd_sha=""
+cmd_len=${#cmd}
 sha_of() {
   if command -v shasum >/dev/null; then
     printf '%s' "$1" | shasum -a 256 | cut -d" " -f1
@@ -67,16 +77,24 @@ sha_of() {
     printf ''
   fi
 }
+cmd_sha=$(sha_of "$cmd")
+if [ "$cmd_len" -gt "$CMD_KEEP" ]; then
+  cmd=$(printf '%s' "$cmd" | cut -c "1-$CMD_KEEP")
+fi
+
 out=$(printf '%s' "$payload" | jq -r '(.tool_response.stdout // "") | tostring')
 err=$(printf '%s' "$payload" | jq -r '(.tool_response.stderr // "") | tostring')
 
 jq -cn \
   --arg cmd "$cmd" \
+  --arg cmdsha "$cmd_sha" \
+  --argjson cmdlen "$cmd_len" \
   --arg sha "$(sha_of "$out")" \
   --arg errsha "$(sha_of "$err")" \
   --argjson interrupted "$interrupted" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{command: $cmd, interrupted: $interrupted, stdout_sha: $sha, stderr_sha: $errsha, ts: $ts}' \
+  '{command: $cmd, command_sha: $cmdsha, command_len: $cmdlen,
+    interrupted: $interrupted, stdout_sha: $sha, stderr_sha: $errsha, ts: $ts}' \
   >> "$dir/receipts.jsonl" || exit 0
 
 exit 0
