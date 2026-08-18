@@ -8,6 +8,16 @@
 # itself. This asks the receipts log instead, which hooks/record-execution-
 # receipt.sh writes and no agent authors.
 #
+# WHAT A RECEIPT PROVES, EXACTLY. The runtime exposes no exit code to a
+# PostToolUse hook (`tool_response` carries interrupted/isImage/
+# noOutputExpected/stderr/stdout, nothing more). The event fires on tool
+# SUCCESS — a failure routes to PostToolUseFailure, which nothing
+# subscribes to — so a receipt's EXISTENCE is the success signal and
+# `interrupted` is the one qualifier. This check asserts exactly that and
+# no more. An earlier version counted `exit_code == 0`, a key no receipt
+# ever carries, which made this arm unreachable and fired a false
+# VIOLATION on every real branch.
+#
 # WHY THIS IS A SEPARATE CHECK AND NOT A REWRITE OF G3. Receipts start
 # the day the hook is installed; every archived run predates them.
 # Swapping G3's predicate would turn 419 historical `executable` lines
@@ -35,6 +45,7 @@ while [ $# -gt 0 ]; do
     --strict) STRICT=1; shift;;
     -h|--help)
       echo "usage: $0 --dir local/loops/<branch> [--strict]" >&2
+      echo "  checks a wave's executable claim against the runtime's receipts" >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   echo "unexpected arg: $1" >&2; exit 2;;
@@ -48,7 +59,19 @@ gates="$DIR/gates.jsonl"
 receipts="$DIR/receipts.jsonl"
 [ -s "$gates" ] || { echo "no gate lines at $gates" >&2; exit 2; }
 
-claims=$(jq -c 'select((.verified_by // "") == "executable")' "$gates" 2>/dev/null | grep -c . || true)
+# raw input with `fromjson?` so one malformed line cannot abort the
+# sweep and silently retire every claim behind it — the shape
+# custodian-log-recall.sh already uses
+count_matching() { # file, jq predicate
+  jq -Rn "[inputs | fromjson? // empty | select($2)] | length" "$1" 2>/dev/null || printf '0'
+}
+
+claims=$(count_matching "$gates" '(.verified_by // "") == "executable"')
+readable=$(count_matching "$gates" 'true')
+if [ "${readable:-0}" -eq 0 ]; then
+  echo "no parseable gate line in $gates" >&2
+  exit 2
+fi
 
 echo "loop-receipts — executable claims vs the runtime's own record"
 echo "  dir:      $DIR"
@@ -63,17 +86,17 @@ if [ ! -s "$receipts" ]; then
   exit 1
 fi
 
-# One exit-0 receipt is the bar. Matching a specific claim to a specific
-# command would need the wave to name the command it ran, which no gate
-# line does today; asserting more than the data supports is the failure
-# mode this file was written against.
-passing=$(jq -c 'select(.exit_code == 0)' "$receipts" 2>/dev/null | grep -c . || true)
-total=$(grep -c . "$receipts" 2>/dev/null || true)
-echo "  receipts: $total recorded, $passing with exit 0"
+# One uninterrupted receipt is the bar. Matching a specific claim to a
+# specific command would need the wave to name the command it ran, which
+# no gate line does today; asserting more than the data supports is the
+# failure mode this file was written against.
+passing=$(count_matching "$receipts" '(.interrupted // false) != true')
+total=$(count_matching "$receipts" 'true')
+echo "  receipts: $total recorded, $passing uninterrupted"
 
 if [ "$claims" -gt 0 ] && [ "$passing" -eq 0 ]; then
   echo "  VIOLATION  $claims line(s) claim executable verification and the runtime"
-  echo "             recorded no successful command on this branch at all."
+  echo "             recorded no uninterrupted command on this branch at all."
   exit 1
 fi
 

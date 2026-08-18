@@ -6,10 +6,18 @@
 # writes nothing makes every branch NOT EVALUABLE, which is a clean exit
 # forever. So the writer is exercised against real payload shapes, not
 # assumed.
+#
+# THE FIXTURES BELOW ARE THE PAYLOAD THE RUNTIME ACTUALLY SENDS, dumped
+# from a live PostToolUse call: tool_response carries interrupted,
+# isImage, noOutputExpected, stderr, stdout — and no exit code, under any
+# spelling. An earlier version of this file hand-wrote `exit_code: 0`,
+# asserted on it, and passed green while the check it covers could not
+# reach its own clean arm on a single real branch. A fixture that
+# manufactures the schema it validates proves nothing.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-check="$here/loop-receipts.sh"
+check_sh="$here/loop-receipts.sh"
 hook="$here/../hooks/record-execution-receipt.sh"
 
 die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
@@ -21,7 +29,7 @@ trap 'rm -rf "$temp_dir"' EXIT
 
 results="$temp_dir/results.log"
 : > "$results" || die_temp "cannot open the results log at $results"
-check_that() {
+check() {
   if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"; printf 'ok\n' >> "$results"
   else printf 'FAIL  %s\n' "$1"; printf 'FAIL\n' >> "$results"; fi
 }
@@ -36,51 +44,51 @@ claim='{"wave":1,"kind":"crew","ran":true,"verified_by":"executable","verdict":"
 # --- NOT EVALUABLE: a branch older than the hook is never a violation ---
 printf '%s\n' "$claim" > "$gates"
 rm -f "$receipts"
-out=$("$check" --dir "$dir" 2>&1); rc=$?
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'NOT EVALUABLE'
-check_that "no receipts log = NOT EVALUABLE, exit 0 (got $rc)" $?
+check "no receipts log = NOT EVALUABLE, exit 0 (got $rc)" $?
 
 # and it must not read as a pass — the class has to be printed
 ! printf '%s\n' "$out" | grep -q 'every executable claim has runtime evidence'
-check_that "an unevaluable branch is not reported as verified" $?
+check "an unevaluable branch is not reported as verified" $?
 
 # --strict turns the same state into a failure
-out=$("$check" --dir "$dir" --strict 2>&1); rc=$?
+out=$("$check_sh" --dir "$dir" --strict 2>&1); rc=$?
 [ "$rc" -eq 1 ]
-check_that "--strict makes a missing receipts log a failure (got $rc)" $?
+check "--strict makes a missing receipts log a failure (got $rc)" $?
 
 # --- VIOLATION: claims executable, runtime recorded no success ----------
-printf '{"command":"false","exit_code":1,"stdout_sha":"x","ts":"t"}\n' > "$receipts"
-out=$("$check" --dir "$dir" 2>&1); rc=$?
+printf '{"command":"false","interrupted":true,"stdout_sha":"x","stderr_sha":"z","ts":"t"}\n' > "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'VIOLATION'
-check_that "an executable claim with no successful command = exit 1 (got $rc)" $?
+check "an executable claim with only interrupted receipts = exit 1 (got $rc)" $?
 
 # --- clean: a successful command backs the claim ------------------------
-printf '{"command":"npm test","exit_code":0,"stdout_sha":"y","ts":"t"}\n' >> "$receipts"
-out=$("$check" --dir "$dir" 2>&1); rc=$?
+printf '{"command":"npm test","interrupted":false,"stdout_sha":"y","stderr_sha":"z","ts":"t"}\n' >> "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'runtime evidence'
-check_that "an executable claim with an exit-0 receipt passes (got $rc)" $?
+check "an executable claim with an uninterrupted receipt passes (got $rc)" $?
 
 # --- no claim, no obligation -------------------------------------------
 printf '{"wave":1,"kind":"crew","ran":true,"verified_by":"llm","verdict":"x"}\n' > "$gates"
-printf '{"command":"false","exit_code":1,"stdout_sha":"x","ts":"t"}\n' > "$receipts"
-out=$("$check" --dir "$dir" 2>&1); rc=$?
+printf '{"command":"false","interrupted":true,"stdout_sha":"x","stderr_sha":"z","ts":"t"}\n' > "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'nothing claimed'
-check_that "a wave claiming nothing executable is not a violation (got $rc)" $?
+check "a wave claiming nothing executable is not a violation (got $rc)" $?
 
 # --- unusable inputs ----------------------------------------------------
-out=$("$check" --dir "$temp_dir/absent" 2>&1); rc=$?
+out=$("$check_sh" --dir "$temp_dir/absent" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
-check_that "a missing dir exits 2 (got $rc)" $?
+check "a missing dir exits 2 (got $rc)" $?
 
 mkdir -p "$temp_dir/empty"
-out=$("$check" --dir "$temp_dir/empty" 2>&1); rc=$?
+out=$("$check_sh" --dir "$temp_dir/empty" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
-check_that "a dir with no gate lines exits 2 (got $rc)" $?
+check "a dir with no gate lines exits 2 (got $rc)" $?
 
-out=$("$check" --dir 2>&1); rc=$?
+out=$("$check_sh" --dir 2>&1); rc=$?
 [ "$rc" -eq 2 ]
-check_that "a value-taking flag with no value exits 2 (got $rc)" $?
+check "a value-taking flag with no value exits 2 (got $rc)" $?
 
 # --- the writer: real payload shapes ------------------------------------
 repo="$temp_dir/repo"
@@ -94,12 +102,13 @@ mkdir -p "$repo"
 payload="$temp_dir/payload.json"
 
 cat > "$payload" <<JSON
-{"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"echo hi"},"tool_response":{"exit_code":0,"stdout":"hi"}}
+{"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"echo hi"},"tool_response":{"interrupted":false,"isImage":false,"noOutputExpected":false,"stdout":"hi","stderr":""}}
 JSON
 bash "$hook" < "$payload"
 written="$repo/local/loops/testbranch/receipts.jsonl"
-[ -s "$written" ] && [ "$(jq -r '.exit_code' "$written")" = "0" ]
-check_that "the hook records a Bash call with its exit code" $?
+[ -s "$written" ] && [ "$(jq -r '.interrupted' "$written")" = "false" ] \
+  && [ -n "$(jq -r '.stdout_sha' "$written")" ]
+check "the hook records a Bash call from a real-shaped payload" $?
 
 cat > "$payload" <<JSON
 {"tool_name":"Read","cwd":"$repo","tool_input":{"file_path":"x"}}
@@ -107,16 +116,50 @@ JSON
 before=$(grep -c . "$written")
 bash "$hook" < "$payload"
 [ "$(grep -c . "$written")" -eq "$before" ]
-check_that "a non-Bash call writes no receipt" $?
+check "a non-Bash call writes no receipt" $?
 
-# an absent exit code must stay absent: a receipt asserting a success it
-# never saw is the fabrication this mechanism removes
+# no exit code is recorded at all, in either direction: the runtime does
+# not expose one, so a field claiming to carry it could only ever be a
+# fabrication or a permanent null
+[ "$(tail -1 "$written" | jq -r 'has("exit_code")')" = "false" ]
+check "no exit_code field is invented" $?
+
+# an absent `interrupted` reads as false, not null — absence means the
+# call was not interrupted, and null would make the check's own
+# `!= true` test pass for the wrong reason
 cat > "$payload" <<JSON
 {"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"true"},"tool_response":{"stdout":""}}
 JSON
 bash "$hook" < "$payload"
-[ "$(tail -1 "$written" | jq -r '.exit_code')" = "null" ]
-check_that "a missing exit code is recorded null, never coerced to 0" $?
+[ "$(tail -1 "$written" | jq -r '.interrupted')" = "false" ]
+check "an absent interrupted flag records false, never null" $?
+
+# an interrupted call is recorded as such, and the check counts it out
+cat > "$payload" <<JSON
+{"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"sleep 99"},"tool_response":{"interrupted":true,"stdout":""}}
+JSON
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.interrupted')" = "true" ]
+check "an interrupted call is recorded interrupted" $?
+
+# the non-Bash gate must hold ALONE: a tool whose input also carries a
+# `command` (a slash command, say) must not mint a receipt naming it as
+# an executed shell command
+cat > "$payload" <<JSON
+{"tool_name":"SlashCommand","cwd":"$repo","tool_input":{"command":"/looper go"},"tool_response":{"stdout":""}}
+JSON
+before=$(grep -c . "$written")
+bash "$hook" < "$payload"
+[ "$(grep -c . "$written")" -eq "$before" ]
+check "a non-Bash tool carrying a command writes no receipt" $?
+
+# a cwd outside any git repo has nowhere to write and must stay silent
+cat > "$payload" <<JSON
+{"tool_name":"Bash","cwd":"$temp_dir","tool_input":{"command":"echo x"},"tool_response":{"stdout":"x"}}
+JSON
+bash "$hook" < "$payload"
+[ ! -e "$temp_dir/local/loops" ]
+check "a cwd outside any git repo writes nothing" $?
 
 # the hook must never break the call it observes
 cat > "$payload" <<'JSON'
@@ -124,9 +167,24 @@ not json at all
 JSON
 bash "$hook" < "$payload"; rc=$?
 [ "$rc" -eq 0 ]
-check_that "a malformed payload still exits 0 (got $rc)" $?
+check "a malformed payload still exits 0 (got $rc)" $?
 
-EXPECTED_CHECKS=13
+# one bad line at the head of gates.jsonl must not retire every claim
+# behind it — the abort-on-first-error shape this check used to have
+printf 'not json at all\n' > "$gates"
+printf '%s\n' "$claim" >> "$gates"
+printf '{"command":"x","interrupted":true,"ts":"t"}\n' > "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
+[ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'claims:   1'
+check "a malformed gate line does not hide the claims behind it (got $rc)" $?
+
+# a gates file with nothing parseable at all is unusable input, not clean
+printf 'not json\nstill not json\n' > "$gates"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
+[ "$rc" -eq 2 ]
+check "a wholly unparseable gates file exits 2 (got $rc)" $?
+
+EXPECTED_CHECKS=19
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

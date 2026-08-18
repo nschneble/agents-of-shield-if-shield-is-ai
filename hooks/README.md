@@ -55,6 +55,32 @@ GitHub never auto-applies), a body on stdin, an unreadable path, or
 git guard's plain-`git push` carve-out: a guard that blocks on its own
 blind spots is one people route around.
 
+## record-execution-receipt.sh
+
+`PostToolUse`, matcher `Bash`. Appends one receipt per shell execution to
+`local/loops/<branch>/receipts.jsonl` — the command, whether it was
+interrupted, digests of stdout and stderr, and a timestamp.
+
+It exists because `verified_by` on a gate line is free text the audited
+agent types, so a rule reading it asks that agent to grade itself. A
+receipt is written by the runtime and no agent authors it.
+
+There is no exit code in it, and that is not an omission: the PostToolUse
+payload's `tool_response` carries only `interrupted`, `isImage`,
+`noOutputExpected`, `stderr`, `stdout`. The event fires on tool SUCCESS —
+failures route to `PostToolUseFailure`, which nothing here subscribes to
+— so a receipt's existence is the success signal. An earlier version read
+`.tool_response.exit_code`, recorded null on all 159 real receipts, and
+made `scripts/loop-receipts.sh`'s clean arm unreachable.
+
+Unlike the two guards it never blocks and never fails a call: every arm
+exits 0, and nothing is written for a non-Bash tool or a cwd outside a
+git repo. `local/` is gitignored, so receipts are scratch.
+
+Read by `scripts/loop-receipts.sh`; tested by
+`scripts/loop-receipts.test.sh`, which covers both the writer and the
+check (this hook has no sibling `*.test.sh` of its own).
+
 ## Deployment
 
 Claude Code reads hooks from `~/.claude/`, so each hook is symlinked out
@@ -63,18 +89,28 @@ of this directory, the same arrangement `~/.claude/scripts` uses:
 ```
 ln -sfn "$PWD/hooks/guard-destructive-git.sh" ~/.claude/hooks/guard-destructive-git.sh
 ln -sfn "$PWD/hooks/guard-pr-template.sh" ~/.claude/hooks/guard-pr-template.sh
+ln -sfn "$PWD/hooks/record-execution-receipt.sh" ~/.claude/hooks/record-execution-receipt.sh
 ```
 
 The wiring itself lives in `~/.claude/settings.json`, which is not
-versioned here. Both guards sit under the one `Bash` matcher and run in
-order:
+versioned here. Both guards sit under the one `PreToolUse` `Bash` matcher
+and run in order; the receipt writer sits under `PostToolUse`:
 
 ```json
-{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [
-  { "type": "command", "command": "~/.claude/hooks/guard-destructive-git.sh" },
-  { "type": "command", "command": "~/.claude/hooks/guard-pr-template.sh" }
-] } ] } }
+{ "hooks": {
+  "PreToolUse": [ { "matcher": "Bash", "hooks": [
+    { "type": "command", "command": "~/.claude/hooks/guard-destructive-git.sh" },
+    { "type": "command", "command": "~/.claude/hooks/guard-pr-template.sh" }
+  ] } ],
+  "PostToolUse": [ { "matcher": "Bash", "hooks": [
+    { "type": "command", "command": "~/.claude/hooks/record-execution-receipt.sh" }
+  ] } ]
+} }
 ```
+
+A newly added hook does not take effect in a session that was already
+running when it was wired: the settings watcher only picks up files it
+was watching at startup. Open `/hooks` once, or restart.
 
 Editing the file in this repo changes the live hook immediately through
 the symlink. There is no deploy step, and equally no staging: a broken
