@@ -20,6 +20,18 @@ jobs:
         run: ./scripts/custodian-skill-lint.test.sh
       - name: Custodian phase-order log check (both directions)
         run: ./scripts/custodian-phase-order.test.sh
+      - name: Custodian log recall check (both directions)
+        run: ./scripts/custodian-log-recall.test.sh
+      - name: Mutation-kill harness (both directions)
+        run: ./scripts/custodian-mutation-kill.test.sh
+      - name: Every declared mutant is killed by its suite
+        run: ./scripts/custodian-mutation-kill.sh
+      - name: Skill body ceilings (both directions)
+        run: ./scripts/skill-body-ceiling.test.sh
+      - name: No skill body past its recorded ceiling
+        run: ./scripts/skill-body-ceiling.sh
+      - name: Execution receipts + writer hook (both directions)
+        run: ./scripts/loop-receipts.test.sh
       - name: Loop run-state drift audit (both directions)
         run: ./scripts/loop-state-audit.test.sh
       - name: Loop finding admissibility audit (both directions)

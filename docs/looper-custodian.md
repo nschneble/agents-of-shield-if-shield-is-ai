@@ -688,3 +688,156 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     2026-07-27 and the 2026-08-03 orderings sat unread until this decision
     was written: not one incident missed, but two consecutive weekly runs
     logging the same shape in plain text with nobody reading it.
+
+25. **A check gated on passing is not gated on being able to fail.** Every
+    suite in this repo asserts that its check goes green on a clean fixture
+    and red on a dirty one. None asked the other question: if the rule it
+    guards were broken, would the suite notice? `scripts/custodian-mutation-kill.sh`
+    asks it, by planting declared mutants in a check and requiring the paired
+    suite to go red on each. The first run found four fixture gaps in the
+    guardrail replay: three mutations of G1's predicate (`or` to `and`, and
+    dropping either side) and one of G2's second arm all left an
+    18-assertion suite green, because a single fixture tripped every
+    condition of a multi-condition `or` at once and so could not distinguish
+    a working predicate from a broken one. G1 is the guardrail for
+    loop-de-looper's hardest rule: no verdict without a run. Fixing it meant
+    adding fixtures that separate the conditions, one at a time — and
+    repeating that later for the recall check's six-alternative exclusion
+    list and for G3's `committed_line`, both of which had the identical
+    shape once a mutant looked.
+
+    Mutants are DECLARED, never generated. A generator needs an
+    equivalence oracle to know which mutants change behaviour at all, and an
+    LLM standing in for that oracle is the say-so this framework refuses
+    everywhere else; a hand-written operator mutant on a `jq` predicate
+    needs no oracle, because the author asserts the change of meaning and a
+    survivor is a fixture gap either way. **Not every survivor is a gap,
+    though, and that had to be learned by shipping one.** Flipping `>` to
+    `>=` on the phase-order line comparison survives and always will: line
+    numbers are unique per record, so no input distinguishes the two forms.
+    That mutant was dropped rather than left as a permanent red — a
+    survivor is a finding only when some input can tell the forms apart.
+
+    The harness's own false-green path is the one it guards hardest. A
+    mutation whose pattern matches nothing leaves the file untouched, the
+    suite passes, and a naive runner scores that as a kill. A first pass
+    reported three such kills after its tree copy silently failed, so the
+    harness now asserts the copy landed, requires the unmutated baseline to
+    pass, reports DID NOT APPLY as a failure rather than a kill, and exits 2
+    when no mutant ran at all. Two `perl` traps cost real time and are
+    recorded beside the table: `\Q` suppresses metacharacters but not
+    interpolation (and quotes a backslash, so escaping the sigil does not
+    help), and `s///` without `/g` takes the first match in a slurped file,
+    which in `custodian-guardrails.sh` is the comment quoting the predicate
+    rather than the predicate.
+
+26. **The order check can only interrogate lines that exist.**
+    `scripts/custodian-phase-order.sh` asks whether the phase lines a run
+    logged came in the order the run was meant to execute. A line the spec
+    requires and nobody ever writes leaves no trace, so the log reads clean
+    precisely because the obligation was skipped.
+    `scripts/custodian-log-recall.sh` asks the complementary question, and
+    found its own reason for existing on the first run: `## Phase E`
+    requires a re-probe after `deep-research` returns, calls that logged
+    line what turns the candidate cap "from a conservative guess into a
+    calibrated number", and across nine archived runs the string appears
+    zero times while five of them recorded deep-research returning. The
+    number decision 23 calls calibrated has never had a measurement behind
+    it.
+
+    Two design choices carry the check. Triggers are declared in the script,
+    not mined from the spec, because a regex inferring "when is this line
+    due" would be a second spec rotting against the first — so a prescribed
+    action string with no declared trigger exits 2, failing loudly at the
+    moment the requirement is written rather than under-reporting forever.
+    And the verdict vocabulary keeps three ways of not asserting a
+    violation: SATISFIED, NOT EVALUABLE (never observed, but its trigger
+    never fired either — a rule whose precondition never arose owes
+    nothing), and UNDECLARED. Silence is not conformance, the same reason
+    the order check spells `NOTHING CHECKED`.
+
+    The spec is now a load-bearing input to a check that reads it, which
+    bites in a way worth recording: writing the reference file for this
+    check tripped it, because the prose quoted the prescribed-action form as
+    an example and the harvest read the example as a real requirement.
+
+27. **`verified_by` is written by the agent whose work it describes.** G3
+    asserts that a committed wave carries a gate line whose `verified_by`
+    equals `"executable"`, so the rule asks the audited agent to grade
+    itself — and the field has drifted accordingly: across the cross-repo
+    index it holds 17 distinct values, 419 `executable`, 156 `llm`, and 14
+    one-off prose strings like `orchestrator, ran seed 555 twice`. Those 14
+    counted as no-evidence, and a wave that simply types `executable` clears
+    G3 whether a command ran or not. `hooks/record-execution-receipt.sh`
+    records each shell execution to `local/loops/<branch>/receipts.jsonl`,
+    which no agent authors, and `scripts/loop-receipts.sh` checks the claim
+    against it from Phase A's kept-dir sweep.
+
+    **What a receipt proves had to be corrected after review.** The first
+    version read `.tool_response.exit_code`, a key the PostToolUse payload
+    does not carry under any spelling — the real shape is `interrupted`,
+    `isImage`, `noOutputExpected`, `stderr`, `stdout`, confirmed by dumping
+    a live payload. All 159 real receipts recorded null, the check's clean
+    arm was unreachable, and it fired a false VIOLATION on any branch with
+    an `executable` claim. Its test passed because the fixture hand-wrote
+    the key it then asserted on. That is decision 25's failure one layer up,
+    in code written to prevent it, and it is why the fixtures now carry the
+    payload the runtime actually sends and one asserts that no exit-code
+    field is invented at all. What IS observable: the event fires on tool
+    success — failures route to `PostToolUseFailure`, which nothing
+    subscribes to — so a receipt's existence is the success signal and
+    `interrupted` is the one qualifier.
+
+    **G3 was deliberately not rewritten to read receipts.** Receipts begin
+    when the hook is installed and every archived run predates them, so
+    swapping the predicate would turn 419 historical lines into violations
+    — the same flood the legacy `verified_by`-absent exemption exists to
+    prevent. The receipts check is era-gated the same way: a branch with no
+    receipts log is NOT EVALUABLE, never a violation, and the Phase A sweep
+    never passes `--strict`. When receipts cover a meaningful span, G3 can
+    retire into it.
+
+    The command text is truncated to 200 characters with a digest beside
+    it. Nothing reads the field — the check uses existence and `interrupted`
+    — and storing it whole made the log a verbatim transcript of every shell
+    command in the repo: 123KB of a 158KB log on one branch in one day.
+
+28. **An advisory nobody can satisfy is not a guard.** The skill lint reports
+    the published ~5000-token body budget as INFO. `looper-custodian` cannot
+    reach it — a five-phase unattended cron spec is not a 5000-token
+    document — so the finding was permanently present and permanently
+    ignored, which is the recall-is-not-enforcement gap
+    `scripts/correction-gates/README.md` names. The extraction in decision 27's
+    branch proved both halves: `the-turncoat` took the body from 16451 to
+    12430 tokens, and it drifted back to 13076 within the same session, one
+    paragraph at a time, with every check green throughout.
+
+    `scripts/skill-body-ceiling.sh` guards the property that was actually
+    violated. Not "is this file small enough" — nobody believes it is — but
+    "is it the size somebody last agreed to", recorded per skill in
+    `scripts/skill-body-ceilings.tsv`. **Deliberately not a one-way ratchet.**
+    The 646 tokens the Phase A receipts sweep added were worth adding, and a
+    check that forbade them would be wrong; raising the ceiling in the same
+    commit that grows the file is the mechanism, because the number then moves
+    where a reviewer can see what it bought. The failure names both remedies —
+    extract, or raise — so it cannot be read as an instruction to shrink.
+
+    **The margin is derived, not round.** A ceiling set to the file's exact
+    size fails on the next sentence anyone writes, which trains people to
+    raise the number reflexively and turns the deliberate decision back into
+    a formality. So the recorded ceiling carries roughly one mechanism's
+    worth of slack, priced off the last real one — the Phase A receipts
+    sweep cost 646 tokens across its paragraph, report line, roster entry and
+    does-NOT line. One ordinary addition fits without ceremony; a second
+    forces the extract-or-raise call, which is where the decision belongs.
+    The slack note stays quiet at that size (it fires above a fifth of the
+    ceiling), so a margin this size does not read as a ceiling that has
+    stopped constraining anything.
+
+    Two shapes it refuses to call clean, both learned from the checks written
+    beside it: a ceilings file it cannot read (`-s` tests size, not
+    readability, and a mode-000 file passes it while yielding no rows), and a
+    file whose every line is a comment, which measures nothing and reports
+    `NOTHING CHECKED` rather than success. Opt-in by design: a skill with no
+    recorded row is not checked, so this governs the one spec that earned it
+    rather than silently binding all eighteen.

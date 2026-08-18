@@ -298,11 +298,33 @@ deploy_fixture "$dep"
 [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'alpha.md is not deployed\|alpha.md resolves to'
 check "a fully linked tree is silent (exit $rc)" $?
 
+# --- Doc mirror: a verb a skill declares must reach the family doc ------
+# Both directions on the same fixture verb, because the miss this check
+# exists for is silent in the tree it ships in: the skill is valid, the
+# doc is valid, and only their disagreement is the defect. Asserts on the
+# warning text, not the exit status — doc rot is a WARN here, so a
+# verdict keyed on rc would pass in both directions.
+mkdir -p "$fix/docs"
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\nRun `/beta apply #<id>` to apply it.\n' \
+  > "$fix/skills/beta/SKILL.md"
+
+printf '# Skills\n\nStructured invocations: `/beta apply #<id>`.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+! printf '%s\n' "$out" | grep -q 'omits `/beta apply`'
+check "a verb the family doc carries does not warn" $?
+
+printf '# Skills\n\nNo structured invocations listed.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+printf '%s\n' "$out" | grep -q 'omits `/beta apply`'
+check "a declared verb absent from the family doc warns by name" $?
+
 # --- the tally, derived from the log rather than from a counter ---------
 # EXPECTED_CHECKS is the floor. Add or remove a fixture block and this
 # number moves with it — that is the point: a block deleted on its own
 # reads as silence, and silence is what this file exists to stop.
-EXPECTED_CHECKS=21
+EXPECTED_CHECKS=23
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

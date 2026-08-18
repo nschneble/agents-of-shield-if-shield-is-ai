@@ -67,9 +67,9 @@ modal shape can never match it and stays flagged.
 When a prior phase-B line DOES exist, the segment is the documented resume shape
 rather than a violation. SKILL.md `## Two modes` defines a resume as replaying
 "only the unlogged tail (Phase E → report issue), reusing the C/A/B already in
-`custodian-log.jsonl`", and the rule binds a tail only conditionally — SKILL.md
-`## Resume`: "If the unlogged tail contains both B and E, B runs to completion
-before the resume's pre-E probe is taken". An E-only tail breaks no obligation,
+`custodian-log.jsonl`", and the rule binds a tail only conditionally — the resume rule stated under
+SKILL.md `## Resume`: "If the unlogged tail contains both B and E, B runs to
+completion before the resume's pre-E probe is taken". An E-only tail breaks no obligation,
 so it is reported as `RESUME TAIL` and never counted. Without the discriminator
 P2 flagged every conforming resume against the rule it cites — the defect
 decision 24 records.

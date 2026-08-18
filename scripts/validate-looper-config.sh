@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Validates the looper config surface: every agent and skill spec has the
 # frontmatter the harness needs, the declared name matches its path,
-# backtick'd repo-relative path references resolve to real files, and every
+# backtick'd repo-relative path references resolve to real files, every
+# subcommand verb a skill declares reaches docs/looper-skills.md, and every
 # test suite in the repo is wired into the CI workflow.
 #
 # Frontmatter problems are ERRORS (exit 1) — a malformed name/description can
@@ -11,15 +12,16 @@
 # ONLY the command text CI executes, so it errs toward calling a suite
 # UNWIRED — the cheap direction: a false error costs a minute, a false
 # "wired" reproduces that silent week. Dangling path references are
-# WARNINGS (printed, non-fatal) — they catch doc rot without blocking on a
-# clever false-positive. `[[memory-links]]` are intentionally NOT checked:
+# WARNINGS (printed, non-fatal), as is a subcommand verb missing from the
+# family doc — both catch doc rot without blocking on a clever
+# false-positive. `[[memory-links]]` are intentionally NOT checked:
 # a dangling one is a valid forward-reference per the memory convention.
 #
 # Run from anywhere; resolves the repo root itself. Wire into CI (see
 # .github/workflows/validate.yml) and run locally before committing spec edits.
 #
 # Deliberately over the ~100-line refactor bar, same waiver
-# scripts/temp-dir-guard.test.sh carries. The three checks share one
+# scripts/temp-dir-guard.test.sh carries. The four checks share one
 # `errors` verdict and one repo-root resolution, and the wiring check has
 # already been wrong in both directions — splitting it into a file that
 # cannot see the frontmatter walk's file list is how a fourth spelling
@@ -127,6 +129,28 @@ for d in skills/*/; do
   fi
   validate_spec "$f" "$skill"
 done
+
+# --- Doc mirror: every declared subcommand verb reaches the family doc ---
+# A skill and the doc that enumerates the family drift apart silently: the
+# skill grows a verb, the doc keeps the old shape, and every existing check
+# passes because both files are internally valid. Matches anywhere in the
+# doc, not just its invocation table — the cheap direction, since a verb
+# discussed in prose is documented and a false WARN costs more than a miss
+# here. Verb-set membership only: the doc's `**Trigger:**` lines are
+# deliberate abridgements of the descriptions, so comparing those would
+# fire on nearly every skill.
+family_doc="docs/looper-skills.md"
+if [ -e "$family_doc" ]; then
+  for d in skills/*/; do
+    [ -d "$d" ] || continue
+    skill=$(basename "$d")
+    [ -e "${d}SKILL.md" ] || continue
+    while IFS= read -r invocation; do
+      grep -qF -- "$invocation" "$family_doc" \
+        || warn "$family_doc omits \`$invocation\`, declared in ${d}SKILL.md"
+    done < <(grep -ohE "/$skill [a-z][a-z-]*" "${d}SKILL.md" | sort -u)
+  done
+fi
 
 # --- CI wiring: every *.test.sh needs a step in the validate workflow ---
 # Derived from the tree, never a hand-kept roster: a roster is what rotted.
