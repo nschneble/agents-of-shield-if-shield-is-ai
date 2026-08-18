@@ -32,6 +32,12 @@
 # LOG, not the runtime. "Never observed" means the spec's claim is
 # unevidenced, not that the step never ran.
 #
+# Exit 0 every prescribed line was observed, or nothing was evaluable ·
+# 1 a prescribed line whose trigger fired was never logged · 2 unusable
+# input: a missing spec, a spec prescribing nothing, no log at all, a
+# corpus carrying no parseable record, or an action string with no
+# declared trigger.
+#
 # Pure bash + jq, no third-party tool, no external store.
 #
 # Usage: custodian-log-recall.sh [--spec PATH] [--logs-root PATH] [--log PATH]
@@ -119,6 +125,17 @@ $logs
 EOF
   printf '%s' "$hits"
 }
+
+# A corpus with no parseable record cannot evidence anything, and
+# scoring it 0 reports silence as conformance. custodian-phase-order.sh
+# refuses the same shape with NOTHING CHECKED; callers read the exit
+# code, not the prose, so this has to be an exit and not a printed line.
+records=$(logs_matching 'true')
+if [ "${records:-0}" -eq 0 ]; then
+  echo "NOTHING CHECKED  no parseable phase record in any of $log_count log(s), so"
+  echo "                 nothing was asserted — schema drift or the wrong files."
+  exit 2
+fi
 
 echo "custodian-log-recall — prescribed-vs-observed over $log_count log(s)"
 echo "  spec: $SPEC"

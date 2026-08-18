@@ -266,7 +266,7 @@ check "CLAIM: the report cites the reference that defines the classes it prints"
 #     E-only resume tail is the resume verb's definition (`## Two
 #     modes`: "replays only the unlogged tail (Phase E → report issue),
 #     reusing the C/A/B already in custodian-log.jsonl"), and the rule
-#     binds a tail only conditionally — SKILL.md `## Resume`: "If the
+#     binds a tail only conditionally — references/resume.md: "If the
 #     unlogged tail contains both B and E, B runs to completion before
 #     the resume's pre-E probe is taken". So a conforming run must exit
 #     0. Delete the two phase-B lines and nothing else, and the same

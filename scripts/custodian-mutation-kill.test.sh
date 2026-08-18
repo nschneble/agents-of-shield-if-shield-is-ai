@@ -22,7 +22,7 @@ trap 'rm -rf "$temp_dir"' EXIT
 
 results="$temp_dir/results.log"
 : > "$results" || die_temp "cannot open the results log at $results"
-check_that() { # desc, condition-already-evaluated ($?)
+check() { # desc, condition-already-evaluated ($?)
   if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"; printf 'ok\n' >> "$results"
   else printf 'FAIL  %s\n' "$1"; printf 'FAIL\n' >> "$results"; fi
 }
@@ -72,25 +72,25 @@ printf 'drop-second|subject.sh|subject.test.sh|%s\n' \
   's/\Qbad:*|*:bad\E/bad:*/' > "$table"
 run
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q '  killed          drop-second'
-check_that "a suite that separates the conditions kills the mutant, exit 0 (got $rc)" $?
+check "a suite that separates the conditions kills the mutant, exit 0 (got $rc)" $?
 
 # --- SURVIVED: the blind suite cannot ----------------------------------
 printf 'drop-second|subject.sh|blind.test.sh|%s\n' \
   's/\Qbad:*|*:bad\E/bad:*/' > "$table"
 run
 [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'SURVIVED        drop-second'
-check_that "a blind suite lets the mutant survive, exit 1 (got $rc)" $?
+check "a blind suite lets the mutant survive, exit 1 (got $rc)" $?
 
 # --- DID NOT APPLY: a pattern matching nothing is never a kill ----------
 printf 'ghost|subject.sh|subject.test.sh|%s\n' \
   's/\Qthis text is not in the file\E/replacement/' > "$table"
 run
 [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'DID NOT APPLY   ghost'
-check_that "a non-matching pattern reports DID NOT APPLY, exit 1 (got $rc)" $?
+check "a non-matching pattern reports DID NOT APPLY, exit 1 (got $rc)" $?
 
 # the false-green this file exists to prevent, asserted directly
 ! printf '%s\n' "$out" | grep -q '  killed          ghost'
-check_that "a mutant that never applied is not scored as killed" $?
+check "a mutant that never applied is not scored as killed" $?
 
 # --- a red baseline stops the run rather than scoring against it --------
 cat > "$root/scripts/broken.test.sh" <<'SH'
@@ -102,27 +102,27 @@ printf 'x|subject.sh|broken.test.sh|%s\n' \
   's/\Qbad:*|*:bad\E/bad:*/' > "$table"
 run
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'BASELINE RED'
-check_that "a suite already failing exits 2 before any mutant (got $rc)" $?
+check "a suite already failing exits 2 before any mutant (got $rc)" $?
 
 # --- unusable inputs ----------------------------------------------------
 out=$("$harness" --root "$root" --table "$temp_dir/absent" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
-check_that "a missing table exits 2 (got $rc)" $?
+check "a missing table exits 2 (got $rc)" $?
 
 printf 'x|nosuch.sh|subject.test.sh|s/a/b/\n' > "$table"
 run
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'MISSING'
-check_that "a mutant naming an absent script exits 2 (got $rc)" $?
+check "a mutant naming an absent script exits 2 (got $rc)" $?
 
 out=$("$harness" --target 2>&1); rc=$?
 [ "$rc" -eq 2 ]
-check_that "a value-taking flag with no value exits 2 (got $rc)" $?
+check "a value-taking flag with no value exits 2 (got $rc)" $?
 
 # --- --list names every declared mutant without running anything --------
 out=$("$harness" --list 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'g1-or-to-and' \
   && ! printf '%s\n' "$out" | grep -q 'killed'
-check_that "--list prints the real table and runs nothing (got $rc)" $?
+check "--list prints the real table and runs nothing (got $rc)" $?
 
 EXPECTED_CHECKS=9
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")

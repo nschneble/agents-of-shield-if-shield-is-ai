@@ -68,6 +68,16 @@ red="$temp_dir/red.jsonl"
   echo '{"repo":"r","branch":"g2-outcome","wave":1,"kind":"crew","agent":"the-diamantaire","task_tool_available":true,"ran":true,"verdict":"promote","outcome":null,"verified_by":"executable","blockers":0,"summary":"promoted without an outcome","cite":"r/local/loops/g2-outcome/gates.jsonl:1"}'
   # G3 violation: a committed (crew) modern wave with no executable line.
   echo '{"repo":"r","branch":"g3","wave":1,"kind":"crew","agent":"the-stickler","task_tool_available":true,"ran":true,"verdict":"Minor Issues","outcome":null,"verified_by":"llm","blockers":0,"summary":"convention pass","cite":"r/local/loops/g3/gates.jsonl:1"}'
+  # G3's committed_line is a two-arm `or` too, and every fixture above
+  # reaches it through the kind arm. This wave is committed ONLY by a sha
+  # in its summary. kind must NOT contain crew/ship/review — `wave-ship`
+  # matches the kind arm on the substring `ship`, which is what silently
+  # neutered a first attempt at this fixture — so it is `build`. Deleting
+  # the sha arm, breaking its digit-length range, or dropping the
+  # lookahead that rejects all-digit tokens each changes the verdict.
+  # Wave 2 on the same branch also makes the wave grouping key bite.
+  echo '{"repo":"r","branch":"g3sha","wave":2,"kind":"build","agent":"the-looper","task_tool_available":true,"ran":true,"verdict":"shipped","outcome":null,"verified_by":"llm","blockers":0,"summary":"shipped as 4d2f1ac","cite":"r/local/loops/g3sha/gates.jsonl:1"}'
+  echo '{"repo":"r","branch":"g3sha","wave":1,"kind":"build","agent":"the-looper","task_tool_available":true,"ran":true,"verdict":"shipped","outcome":null,"verified_by":"executable","blockers":0,"summary":"no sha here","cite":"r/local/loops/g3sha/gates.jsonl:2"}'
   # LEGACY line (no verified_by key): a ran==true crew line that the raw G2 lint
   # would flag — MUST be exempt, never a violation.
   echo '{"repo":"r","branch":"legacy","wave":1,"kind":"crew","agent":"the-auditor","task_tool_available":true,"ran":true,"verdict":"clean","blockers":0,"summary":"old run","cite":"r/local/loops/legacy/gates.jsonl:1"}'
@@ -84,13 +94,14 @@ printf '%s\n' "$out" | grep -q 'r/local/loops/g3/gates.jsonl:1'; check "RED: G3 
 printf '%s\n' "$out" | grep -q 'r/local/loops/g1-ran/gates.jsonl:1'; check "RED: G1 ran-only cite reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g1-tool/gates.jsonl:1'; check "RED: G1 tool-only cite reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g2-outcome/gates.jsonl:1'; check "RED: G2 outcome-arm cite reported" $?
-printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 6'; check "RED: total is 6 (G1x3+G2x2+G3)" $?
+printf '%s\n' "$out" | grep -q 'r/local/loops/g3sha/gates.jsonl:1'; check "RED: G3 sha-only wave cite reported" $?
+printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 7'; check "RED: total is 7 (G1x3+G2x2+G3x2)" $?
 # The legacy line's cite must appear on NO VIOLATION line.
 ! printf '%s\n' "$out" | grep 'VIOLATION' | grep -q 'legacy'; check "RED: legacy line NOT a violation" $?
 # Per-guardrail counts, which the separating fixtures above moved off one.
 printf '%s\n' "$out" | grep -q 'G1 3 lines'; check "RED: G1 count in summary" $?
 printf '%s\n' "$out" | grep -q 'G2 2 lines'; check "RED: G2 count in summary" $?
-printf '%s\n' "$out" | grep -q 'G3 1 waves'; check "RED: G3 count in summary" $?
+printf '%s\n' "$out" | grep -q 'G3 2 waves'; check "RED: G3 count in summary" $?
 
 # --- GREEN fixture: every line satisfies every guardrail. ---
 green="$temp_dir/green.jsonl"

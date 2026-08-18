@@ -17,7 +17,7 @@
 # predicate needs no oracle: the author asserts it changes meaning, and
 # a surviving mutant is a fixture gap either way.
 #
-# THE NO-OP ARM IS LOad-BEARING. A mutation whose pattern does not match
+# THE NO-OP ARM IS LOAD-BEARING. A mutation whose pattern does not match
 # leaves the file untouched, the suite passes, and a naive harness scores
 # that as "killed" — a green that means the opposite of what it says. A
 # first pass at this check reported three such false kills after its own
@@ -25,7 +25,9 @@
 # the unmutated baseline must pass, before any verdict is taken.
 #
 # Exit 0 every declared mutant was killed · 1 a mutant SURVIVED or did
-# not apply · 2 unusable input (missing target, baseline already red).
+# not apply · 2 unusable input: a missing/unreadable table, a mutant
+# naming an absent script, a baseline already red, or a run in which no
+# declared mutant executed at all.
 #
 # Usage: custodian-mutation-kill.sh [--target NAME] [--list]
 set -uo pipefail
@@ -70,12 +72,15 @@ done
 # them. A pattern matching both mutated the comment and left the rule
 # intact — a mutant that applies, changes a byte, and challenges nothing.
 # Anchor on the `def` so the predicate is the only candidate.
-# Validated HERE, not inside mutants(): that runs in a command
+
+# GOTCHA: validated here, not inside mutants() — that runs in a command
 # substitution, where `exit 2` ends only the subshell and leaves the
-# caller iterating an empty table — zero mutants, zero survivors, exit 0.
-# An unreadable table would have read as a clean sweep.
-if [ -n "$TABLE" ] && [ ! -s "$TABLE" ]; then
-  echo "empty or missing table: $TABLE" >&2; exit 2
+# caller iterating an empty table. `-s` alone tests size, not
+# readability, so a mode-000 table passed it and swept clean.
+if [ -n "$TABLE" ]; then
+  if [ ! -s "$TABLE" ] || ! head -c 1 "$TABLE" >/dev/null 2>&1; then
+    echo "empty or unreadable table: $TABLE" >&2; exit 2
+  fi
 fi
 
 mutants() {
@@ -92,6 +97,14 @@ g3-drop-kind-evidence|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Qt
 legacy-era-inverted|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Qdef legacy: (has("verified_by") | not);\E/def legacy: (has("verified_by"));/
 recall-drop-trigger-exclusions|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Qtest("not run|NOT RUN|not invokable|not installed|not nestable|bars deep-research")\E/test("zzznomatch")/
 recall-downgrade-violation-label|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\QVIOLATION      action\E/noticed        action/
+recall-drop-excl-notinstalled|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Qnot invokable|not installed|\E/not invokable|/
+recall-drop-excl-notnestable|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Q|not nestable|\E/|/
+recall-drop-excl-lowercase-notrun|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Qtest("not run|NOT RUN|\E/test("NOT RUN|/
+recall-drop-phase-gate|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Q(.phase == "E")\E/(.phase != "zzz")/
+recall-drop-references-harvest|custodian-log-recall.sh|custodian-log-recall.test.sh|s/-d "\$spec_dir\/references"/-d "\/nonexistent"/
+g3-drop-sha-arm|custodian-guardrails.sh|custodian-guardrails.test.sh|s/or \(\(\.summary .. ""\) \| test\("[^"]+"\)\)\);/or false);/
+g3-sha-regex-dead|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[0-9a-f]{7,40}\E/[0-9a-f]{70,80}/
+g3-group-drop-wave|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[.repo, .branch, (.wave | tostring)]\E/[.repo, .branch]/
 TABLE
 }
 
@@ -122,6 +135,16 @@ copied=$(find "$pristine/scripts" -name '*.sh' -type f 2>/dev/null | grep -c . |
   || { echo "FATAL: sandbox copy landed no scripts; refusing to score" >&2; exit 2; }
 /bin/cp -a "$repo_root/skills" "$pristine/skills" 2>/dev/null || true
 [ -d "$repo_root/local" ] && /bin/cp -a "$repo_root/local" "$pristine/local" 2>/dev/null
+# hooks/ and a git root: without them loop-receipts.test.sh and
+# loop-state-audit.test.sh baseline RED in here (one resolves
+# ../hooks/, the other runs `git -C ..`), so no mutant could ever be
+# declared for those scripts — a whole area silently unscoreable.
+[ -d "$repo_root/hooks" ] && /bin/cp -a "$repo_root/hooks" "$pristine/hooks" 2>/dev/null
+if [ ! -d "$pristine/.git" ] && command -v git >/dev/null; then
+  ( cd "$pristine" && git init -q . \
+      && git -c user.email=mutkill@local -c user.name=mutkill \
+             commit -q --allow-empty -m sandbox ) 2>/dev/null || true
+fi
 
 run_suite() { # suite name, tree root — returns the suite's status
   ( cd "$2" && bash "scripts/$1" >/dev/null 2>&1 )
@@ -179,5 +202,14 @@ $(mutants)
 EOF
 
 echo
+# A run that exercised nothing is not a pass. Three shapes reached the
+# tally with every counter at zero — a --target naming no mutant, a
+# whitespace-only table, an unreadable one — and each printed a clean
+# sweep. The suites are only scored if at least one mutant actually ran.
+if [ $((killed + survived + noop)) -eq 0 ]; then
+  echo "NOTHING MUTATED  no declared mutant ran, so no suite was scored."
+  [ -n "$ONLY" ] && echo "                 --target '$ONLY' matches no declared mutant."
+  exit 2
+fi
 echo "killed $killed · SURVIVED $survived · did not apply $noop"
 [ "$survived" -eq 0 ] && [ "$noop" -eq 0 ]
