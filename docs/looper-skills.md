@@ -19,12 +19,12 @@ convention so the grammar is predictable across the family:
 
 Structured invocations today:
 
-| Skill              | Invocation                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------ |
-| `loop-de-looper`   | `/loop-de-looper resume`                                                             |
-| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`, `/looper-custodian resume [<date>]`, `/looper-custodian history <query> [--agent\|--verdict\|--kind\|--file\|--repo …]` |
-| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>`    |
-| `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>` |
+| Skill              | Invocation                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `loop-de-looper`   | `/loop-de-looper resume`                                                                                                                                     |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`, `/looper-custodian resume [<date>]`, `/looper-custodian history <query> [--flags]` |
+| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>`                                                                            |
+| `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>`                                                                         |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
 explicitly** — a new operation is a new named verb, never folded into a

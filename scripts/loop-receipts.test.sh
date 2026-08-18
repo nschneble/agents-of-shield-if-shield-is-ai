@@ -134,6 +134,16 @@ bash "$hook" < "$payload"
 [ "$(tail -1 "$written" | jq -r '.interrupted')" = "false" ]
 check "an absent interrupted flag records false, never null" $?
 
+# a non-boolean value must normalize to false rather than reach the log
+# as-is: the check tests `!= true`, so a string or null would pass it for
+# the wrong reason
+cat > "$payload" <<JSON
+{"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"true"},"tool_response":{"interrupted":"maybe","stdout":""}}
+JSON
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.interrupted')" = "false" ]
+check "a non-boolean interrupted value normalizes to false" $?
+
 # an interrupted call is recorded as such, and the check counts it out
 cat > "$payload" <<JSON
 {"tool_name":"Bash","cwd":"$repo","tool_input":{"command":"sleep 99"},"tool_response":{"interrupted":true,"stdout":""}}
@@ -184,7 +194,7 @@ out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "a wholly unparseable gates file exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=19
+EXPECTED_CHECKS=20
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

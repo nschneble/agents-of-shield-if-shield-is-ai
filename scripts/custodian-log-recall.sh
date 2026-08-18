@@ -15,28 +15,10 @@
 # appears zero times while five runs recorded deep-research returning.
 # The calibrated number never had a measurement behind it.
 #
-# THE VERDICT VOCABULARY IS THE POINT. A prescribed line whose own
-# trigger never fired is NOT EVALUABLE, never clean — silence is not
-# conformance, the same reason the order check spells NOTHING CHECKED
-# rather than passing an empty log.
-#
-# Triggers are DECLARED HERE, not inferred from prose. A regex mining the
-# spec for "when is this line due" would be a second spec that rots
-# against the first. So each prescribed string needs an entry in
-# `trigger_for` below, and a string harvested from the spec with no entry
-# exits 2 — adding a requirement to the spec without saying when it comes
-# due breaks this check loudly instead of passing quietly.
-#
-# LIMIT, inherited verbatim from
-# skills/looper-custodian/references/phase-order-check.md: this reads the
-# LOG, not the runtime. "Never observed" means the spec's claim is
-# unevidenced, not that the step never ran.
-#
-# Exit 0 every prescribed line was observed, or nothing was evaluable ·
-# 1 a prescribed line whose trigger fired was never logged · 2 unusable
-# input: a missing spec, a spec prescribing nothing, no log at all, a
-# corpus carrying no parseable record, or an action string with no
-# declared trigger.
+# The four verdicts, the exit contract, why triggers are declared rather
+# than mined from the spec, and the three limits a clean result does NOT
+# buy all live in one place:
+# skills/looper-custodian/references/log-recall-check.md
 #
 # Pure bash + jq, no third-party tool, no external store.
 #

@@ -57,7 +57,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Each mutant is: label | script under scripts/ | paired suite | perl expr.
+# Each mutant is: label | target | paired suite | perl expr. A target with
+# no slash is taken as `scripts/<name>`; one with a slash is repo-relative,
+# which is how hooks/ is reached.
 # The perl expr runs with -0pi, so \Q..\E fixed strings are the norm and
 # the pattern must be unique in the file.
 #
@@ -72,6 +74,13 @@ done
 # them. A pattern matching both mutated the comment and left the rule
 # intact — a mutant that applies, changes a byte, and challenges nothing.
 # Anchor on the `def` so the predicate is the only candidate.
+#
+# NOT EVERY SURVIVOR IS A GAP. `select(.lineno > $e.lineno)` → `>=` in
+# custodian-phase-order.sh survives, and no fixture can kill it: line
+# numbers are unique per record, so the two forms select identically.
+# That is an equivalent mutant, and declaring it would park a permanent
+# red on a suite with nothing to fix. Dropped deliberately — a survivor
+# is a fixture gap only when some input can tell the two apart.
 
 # GOTCHA: validated here, not inside mutants() — that runs in a command
 # substitution, where `exit 2` ends only the subshell and leaves the
@@ -104,6 +113,15 @@ recall-drop-phase-gate|custodian-log-recall.sh|custodian-log-recall.test.sh|s/\Q
 recall-drop-references-harvest|custodian-log-recall.sh|custodian-log-recall.test.sh|s/-d "\$spec_dir\/references"/-d "\/nonexistent"/
 g3-drop-sha-arm|custodian-guardrails.sh|custodian-guardrails.test.sh|s/or \(\(\.summary .. ""\) \| test\("[^"]+"\)\)\);/or false);/
 g3-sha-regex-dead|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[0-9a-f]{7,40}\E/[0-9a-f]{70,80}/
+receipts-interrupted-ignored|loop-receipts.sh|loop-receipts.test.sh|s/\Q(.interrupted \/\/ false) != true\E/true/
+docmirror-never-warns|validate-looper-config.sh|validate-looper-config.test.sh|s/grep -qF -- "\$invocation" "\$family_doc"/true/
+docmirror-always-warns|validate-looper-config.sh|validate-looper-config.test.sh|s/grep -qF -- "\$invocation" "\$family_doc"/false/
+ciwiring-accept-any-mention|validate-looper-config.sh|validate-looper-config.test.sh|s/run_cmds=\$\(run_commands "\$workflow"\)/run_cmds=\$\(cat "\$workflow"\)/
+po-tail-counted-as-p2|custodian-phase-order.sh|custodian-phase-order.test.sh|s/\(\$nob \| map\(select\(\.priorb == 0\)\)\)/(\$nob)/
+po-segment-marker-dead|custodian-phase-order.sh|custodian-phase-order.test.sh|s/if \$l\.obj\.phase == "resume" then \.seg \+= 1/if false then .seg += 1/
+receipts-era-gate-off|loop-receipts.sh|loop-receipts.test.sh|s/if \[ ! -s "\$receipts" \]; then/if false; then/
+hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ "\$tool" = "Bash" \] \|\| exit 0/: /
+hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
 g3-group-drop-wave|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[.repo, .branch, (.wave | tostring)]\E/[.repo, .branch]/
 TABLE
 }
@@ -179,11 +197,12 @@ while IFS='|' read -r label script suite expr; do
 
   work="$temp_root/work"
   rm -rf "$work"; /bin/cp -a "$pristine" "$work"
-  target="$work/scripts/$script"
-  [ -e "$target" ] || { echo "  MISSING         $label: no scripts/$script" >&2; exit 2; }
+  case "$script" in */*) rel="$script" ;; *) rel="scripts/$script" ;; esac
+  target="$work/$rel"
+  [ -e "$target" ] || { echo "  MISSING         $label: no $rel" >&2; exit 2; }
 
   perl -0pi -e "$expr" "$target" 2>/dev/null
-  if cmp -s "$pristine/scripts/$script" "$target"; then
+  if cmp -s "$pristine/$rel" "$target"; then
     echo "  DID NOT APPLY   $label — pattern matched nothing, so the suite was never"
     echo "                  challenged. Scoring this as killed is the false green."
     noop=$((noop + 1))

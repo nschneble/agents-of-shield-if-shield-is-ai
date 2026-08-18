@@ -42,6 +42,33 @@ The `verified_by` check spans both verdict-bearing kinds (matching the field's c
 
 Admissibility is checked separately by `scripts/loop-finding-audit.sh` over five arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, and the interim crew size. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other three read the log alone.
 
+### Receipts: the half `verified_by` cannot prove
+
+`verified_by` is written by the same agent whose work it describes, so a
+rule reading it asks that agent to grade itself. Across the custodian's
+cross-repo index the field holds 17 distinct values — `executable`,
+`llm`, and fourteen one-off prose strings — so a rule comparing it to one
+string both misses real evidence and accepts a typed claim.
+
+`hooks/record-execution-receipt.sh` records each shell execution to
+`local/loops/<branch>/receipts.jsonl`, and no agent authors it.
+`scripts/loop-receipts.sh` checks a wave's `executable` claim against it,
+run over each kept dir by the custodian's Phase A.
+
+A receipt carries no exit code, and that is not an omission: the
+PostToolUse payload exposes none. The event fires on tool SUCCESS —
+failures route to `PostToolUseFailure` — so a receipt's EXISTENCE is the
+success signal, and `interrupted` is the one recorded qualifier.
+
+**G3 was deliberately NOT rewritten to read receipts.** Receipts begin
+when the hook is installed and every archived run predates them, so
+swapping G3's predicate would turn hundreds of historical `executable`
+lines into violations — the same flood the legacy `verified_by`-absent
+exemption above exists to prevent. The receipts check is era-gated the
+same way: a branch with no receipts log is NOT EVALUABLE, never a
+violation. When receipts cover a meaningful span, G3 can retire into it.
+
+
 ## run-state.json shape
 
 ```json
