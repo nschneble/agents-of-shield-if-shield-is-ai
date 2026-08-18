@@ -141,15 +141,14 @@ temp_root=$(mktemp -d "${TMPDIR:-/tmp}/looper-mutkill.XXXXXX") \
 trap 'rm -rf "$temp_root"' EXIT
 
 # One pristine copy, made once and verified. `cp -R` and `cp -a` differ
-# across shells and aliases; a copy that silently fails is the false-kill
-# generator this check was written to avoid, so the result is asserted.
+# across shells and aliases, and a failed copy is silent, so assert it.
 pristine="$temp_root/pristine"
 mkdir -p "$pristine"
 /bin/cp -a "$repo_root/scripts" "$pristine/scripts" 2>/dev/null \
   || { echo "FATAL: could not copy scripts/ into the sandbox" >&2; exit 2; }
 # Assert the copy actually landed, without naming a specific file: a
 # silently-empty sandbox makes every suite "pass" and every mutant read
-# as killed, which is the false green this whole check is against.
+# as killed.
 copied=$(find "$pristine/scripts" -name '*.sh' -type f 2>/dev/null | grep -c . || true)
 [ -d "$pristine/scripts" ] && [ "$copied" -gt 0 ] \
   || { echo "FATAL: sandbox copy landed no scripts; refusing to score" >&2; exit 2; }

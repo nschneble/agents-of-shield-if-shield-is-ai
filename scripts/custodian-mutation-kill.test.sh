@@ -88,7 +88,6 @@ run
 [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'DID NOT APPLY   ghost'
 check "a non-matching pattern reports DID NOT APPLY, exit 1 (got $rc)" $?
 
-# the false-green this file exists to prevent, asserted directly
 ! printf '%s\n' "$out" | grep -q '  killed          ghost'
 check "a mutant that never applied is not scored as killed" $?
 
