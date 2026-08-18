@@ -22,7 +22,7 @@ Structured invocations today:
 | Skill              | Invocation                                                                           |
 | ------------------ | ------------------------------------------------------------------------------------ |
 | `loop-de-looper`   | `/loop-de-looper resume`                                                             |
-| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`             |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`, `/looper-custodian resume [<date>]`, `/looper-custodian history <query> [--agent\|--verdict\|--kind\|--file\|--repo …]` |
 | `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>`    |
 | `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>` |
 

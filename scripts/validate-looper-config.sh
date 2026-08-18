@@ -128,6 +128,28 @@ for d in skills/*/; do
   validate_spec "$f" "$skill"
 done
 
+# --- Doc mirror: every declared subcommand verb reaches the family doc ---
+# A skill and the doc that enumerates the family drift apart silently: the
+# skill grows a verb, the doc keeps the old shape, and every existing check
+# passes because both files are internally valid. Matches anywhere in the
+# doc, not just its invocation table — the cheap direction, since a verb
+# discussed in prose is documented and a false WARN costs more than a miss
+# here. Verb-set membership only: the doc's `**Trigger:**` lines are
+# deliberate abridgements of the descriptions, so comparing those would
+# fire on nearly every skill.
+family_doc="docs/looper-skills.md"
+if [ -e "$family_doc" ]; then
+  for d in skills/*/; do
+    [ -d "$d" ] || continue
+    skill=$(basename "$d")
+    [ -e "${d}SKILL.md" ] || continue
+    while IFS= read -r invocation; do
+      grep -qF -- "$invocation" "$family_doc" \
+        || warn "$family_doc omits \`$invocation\`, declared in ${d}SKILL.md"
+    done < <(grep -ohE "/$skill [a-z][a-z-]*" "${d}SKILL.md" | sort -u)
+  done
+fi
+
 # --- CI wiring: every *.test.sh needs a step in the validate workflow ---
 # Derived from the tree, never a hand-kept roster: a roster is what rotted.
 # `local/` is gitignored scratch, not CI's business. Process substitution
