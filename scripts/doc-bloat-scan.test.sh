@@ -25,8 +25,12 @@
 # false opener; the `.ts` one adds an over-75 CODE line that must NOT
 # fire, since that hit came from inside the phantom block. Only
 # `//`-family candidates can follow one — anything carrying a `*/` would
-# have closed it instead. The reverse direction is the tally: a block
-# that CLOSES emits none, and three is the whole tree's count.
+# have closed it instead. On `.ts` that second opener puts its candidate
+# on opener+1, which is what pins the restart boundary — everywhere else
+# the first post-opener candidate sits further down, so an off-by-one
+# there swallowed a real hit and stayed green. The reverse direction is
+# the tally: a block that CLOSES emits none, and four is the whole
+# tree's count.
 # Exit is always 0 — the scanner reports, it never gates. Pure bash,
 # jq-free.
 set -uo pipefail
@@ -181,6 +185,9 @@ export const b = 2
 // First stacked line
 // second stacked line
 export const longIdentifierRunningWellPastTheSeventyFiveCharacterCeiling = 2
+
+/*
+// Restarted on the line directly after the opener
 EOF
 
 cat > "$temp_dir/unterminated.tsx" <<'EOF'
@@ -309,6 +316,10 @@ check "a candidate after an unterminated /* still emits" "$([ $? -eq 0 ] && echo
 echo "$out" | grep -q 'unterminated\.ts".*"kind":"over-75"'
 check "a code line after an unterminated /* fires no over-75" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 
+# at `block_line + 2` this candidate vanishes and nothing else moves
+echo "$out" | grep -q '"file":"[^"]*unterminated.ts","line":11,"kind":"capitalized-slash"'
+check "a candidate on the line right after a false opener still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
 echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":2,"kind":"unterminated-block","text":"{/\*"'
 check "an unterminated {/* reports at its opener" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
@@ -322,8 +333,8 @@ check "a candidate after the second false opener still emits" "$([ $? -eq 0 ] &&
 # the other direction: a block that CLOSES must stay silent here, as must
 # a one-line `/* … */` and the non-abutting `{ /*` block scope
 unterminated=$(echo "$out" | grep -c '"kind":"unterminated-block"')
-check "only the three false openers report unterminated (got $unterminated)" \
-  "$([ "$unterminated" -eq 3 ] && echo 0 || echo 1)"
+check "only the four false openers report unterminated (got $unterminated)" \
+  "$([ "$unterminated" -eq 4 ] && echo 0 || echo 1)"
 
 # ── --help ───────────────────────────────────────────────────────────────
 # usage() prints the file header back, ranged to `set -` rather than to a

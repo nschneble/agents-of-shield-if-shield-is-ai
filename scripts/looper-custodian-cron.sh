@@ -63,10 +63,11 @@
 # INCOMPLETE" issue), because the original sin these alert paths exist for
 # is a Monday that quietly did nothing.
 #
-# Exit codes: 0 ran (or resumed) cleanly; 3 bg-wait ceiling cut the run
-# short, resumable; 4 session limit hit and the post-reset resume also
-# failed; 5 the run-start usage-window gate deferred the run before any
-# phase ran; anything else is claude's own exit from the last attempt.
+# Exit codes: 0 ran (or resumed) cleanly; 2 REPO could not be entered, so
+# nothing ran; 3 bg-wait ceiling cut the run short, resumable; 4 session
+# limit hit and the post-reset resume also failed; 5 the run-start
+# usage-window gate deferred the run before any phase ran; anything else
+# is claude's own exit from the last attempt.
 set -uo pipefail
 
 # overridable because a prepend beats any stub dir handed in via PATH
@@ -81,7 +82,8 @@ export PATH="${CUSTODIAN_PATH_PREFIX:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=1800000
 
 REPO="${REPO:-$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai}"
-cd "$REPO"
+# guard here, not below: LOGDIR sits under REPO and mkdir -p would make it
+cd "$REPO" || { echo "FATAL: cannot enter REPO=$REPO; refusing to run" >&2; exit 2; }
 
 # ~/.claude transcript slug: the repo path with every "/" turned into "-".
 SLUG="${REPO//\//-}"
@@ -212,7 +214,7 @@ EOF
 # `parse_failed` would name that empty read rather than the seam.
 window_state() {
   command -v python3 >/dev/null 2>&1 || { echo "unread no_python3"; return; }
-  [ -x "$WINDOW_PROBE" ] || { echo "unread no_probe"; return; }
+  [ -x "$WINDOW_PROBE" ] || { echo "unread no_probe=$WINDOW_PROBE"; return; }
   "$WINDOW_PROBE" 2>/dev/null \
     | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
 import json, os, sys

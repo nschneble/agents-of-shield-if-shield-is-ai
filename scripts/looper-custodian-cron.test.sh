@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # looper-custodian-cron.test.sh — end-to-end test for the run-start
-# usage-window gate in scripts/looper-custodian-cron.sh.
+# usage-window gate in scripts/looper-custodian-cron.sh, and for the
+# launch that gate guards.
 #
 # Drives every arm of the wrapper's `case "$gate_state"` through a stub
 # probe, with claude, gh, osascript and sleep stubbed on PATH — a run here
@@ -27,7 +28,15 @@
 # case: a clear window LAUNCHES and a hot one DEFERS; a hot weekly defers
 # with NO wait while a hot 5-hour one waits first; a `rejected` status is
 # narrated as a hard stop, never as a threshold trip; and every way the
-# window goes UNREAD is named as the reason it was, never as a reading.
+# window goes UNREAD is named as the reason it was — with the offending
+# value, where an operator supplied one — never as a reading.
+#
+# Past the gate, a launch is checked for WHAT it launches, not just that
+# it happened: every launching case matches the whole argv, so neither
+# the `/looper-custodian` payload nor `--dangerously-skip-permissions`
+# can go missing while the suite stays green. The REPO seam is checked
+# the same way in both directions — it decides the cwd claude runs in,
+# and an unenterable one must refuse the run, not launch somewhere else.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -59,6 +68,7 @@ command -v perl >/dev/null 2>&1 \
   || die_setup "perl is not installed and it is what bounds each wrapper run"
 
 fails=0
+# r holds $?: a $(...) in a check desc is expanded first and clobbers it
 check() { # desc, condition-already-evaluated ($?)
   if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"
   else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
@@ -97,10 +107,11 @@ EOF
   chmod +x "$bin/$tool"
 done
 # the wrapper builds a transcript path out of this, so it must look like one
-cat > "$bin/uuidgen" <<'EOF'
+STUB_UUID='00000000-0000-4000-8000-000000000000'
+cat > "$bin/uuidgen" <<EOF
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$CRON_CALLS/uuidgen"
-printf '00000000-0000-4000-8000-000000000000\n'
+printf '%s\n' "\$*" >> "\$CRON_CALLS/uuidgen"
+printf '%s\n' '$STUB_UUID'
 EOF
 chmod +x "$bin/uuidgen"
 # the body arrives as one argument holding newlines, so it cannot also
@@ -157,6 +168,9 @@ setup_case() { # queue-line... — one probe reading per line, in order
 # live `gh issue create` sit
 RUN_CAP=30
 bounded() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+# alarm 0 CANCELS the alarm, leaving every run below silently unbounded
+[ "$RUN_CAP" -ge 1 ] 2>/dev/null \
+  || die_setup "RUN_CAP=$RUN_CAP cancels the alarm and unbounds every run"
 
 run_cron() { # VAR=VAL... — extra env for this run
   bounded "$RUN_CAP" \
@@ -189,6 +203,11 @@ calls() { # tool — how many times it was invoked
 logged() { grep -qF "$1" "$log"; }
 issue()  { grep -qF "$1" "$case_dir/calls/gh-args" 2>/dev/null; }
 
+# the stubbed uuid makes the argv deterministic, so -x pins flag order too
+LAUNCH_ARGV="-p /looper-custodian --session-id $STUB_UUID --dangerously-skip-permissions --output-format text"
+# `--`: the argv starts with `-p`, which grep would read as its own flags
+launched() { grep -qxF -- "$LAUNCH_ARGV" "$case_dir/calls/claude" 2>/dev/null; }
+
 # --- the bound itself, both directions, before any case leans on it ------
 bounded 1 sleep 5 >/dev/null 2>&1
 [ "$?" -eq 142 ] && r=0 || r=1
@@ -205,6 +224,7 @@ check "CLEAR: exits 0 (got $rc)" "$r"
 logged 'run-start gate: usage window ok — launching'; check "CLEAR: logs the clear reading" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "CLEAR: launched claude once (got $(calls claude))" "$r"
+launched; check "CLEAR: launched the custodian skill, headless" $?
 [ "$(calls sleep)" = 0 ] && r=0 || r=1
 check "CLEAR: waited for nothing (sleep called $(calls sleep)x)" "$r"
 [ "$(calls gh)" = 0 ] && r=0 || r=1
@@ -215,6 +235,15 @@ cwd=$(cat "$case_dir/calls/claude-cwd" 2>/dev/null)
 want=$(cd "$case_dir/repo" && pwd -P)
 [ "$cwd" = "$want" ] && r=0 || r=1
 check "CLEAR: REPO override ran it in the fixture repo (cwd $cwd, want $want)" "$r"
+
+# --- BAD REPO: the other direction of CLEAR's cwd assertion ---------------
+# an unchecked `cd` left the wrapper launching in whatever cwd cron had
+setup_case "$OK_LINE"
+run_cron REPO="$temp_dir/no-such-repo"
+[ "$rc" -eq 2 ] && r=0 || r=1
+check "BAD-REPO: refuses to run (want rc 2, got $rc)" "$r"
+[ "$(calls claude)" = 0 ] && r=0 || r=1
+check "BAD-REPO: spends no session (claude called $(calls claude)x)" "$r"
 
 # --- HOT WEEKLY: defers immediately, without the wait --------------------
 setup_case "$HOT_WEEKLY"
@@ -253,6 +282,7 @@ logged 'waiting for reset before launching'; check "HOT-5H-CLEARS: logs the wait
 logged 'window cleared (ok) — launching'; check "HOT-5H-CLEARS: logs the re-probe clearing" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "HOT-5H-CLEARS: launched claude once after the wait (got $(calls claude))" "$r"
+launched; check "HOT-5H-CLEARS: launched the custodian skill, headless" $?
 [ "$(calls gh)" = 0 ] && r=0 || r=1
 check "HOT-5H-CLEARS: opened no issue (gh called $(calls gh)x)" "$r"
 
@@ -316,6 +346,7 @@ logged 'usage window unread no_credentials — launching unguarded'
 check "UNREAD: logs the reason the probe gave, not a 0% it never read" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "UNREAD: launches anyway (claude called $(calls claude)x)" "$r"
+launched; check "UNREAD: launched the custodian skill, headless" $?
 
 # --- THRESHOLD override: the same captured reading, a lower bar ---------
 # no field touched, so the arm tracks the threshold and not the fixture
@@ -336,6 +367,7 @@ logged 'run-start gate: usage window ok — launching'
 check "ALLOWED-WARNING: reads as ok, not as a rejection" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "ALLOWED-WARNING: launches (claude called $(calls claude)x)" "$r"
+launched; check "ALLOWED-WARNING: launched the custodian skill, headless" $?
 [ "$(calls gh)" = 0 ] && r=0 || r=1
 check "ALLOWED-WARNING: opens no issue (gh called $(calls gh)x)" "$r"
 
@@ -359,6 +391,7 @@ logged 'usage window unread no_utilization — launching unguarded'
 check "NO-UTILIZATION: calls it unread rather than fabricating 0%" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "NO-UTILIZATION: launches (claude called $(calls claude)x)" "$r"
+launched; check "NO-UTILIZATION: launched the custodian skill, headless" $?
 
 # --- probe output that is not JSON at all -------------------------------
 setup_case 'not json at all'
@@ -369,6 +402,7 @@ logged 'usage window unread parse_failed — launching unguarded'
 check "PARSE-FAILED: names the parse as the reason" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "PARSE-FAILED: launches (claude called $(calls claude)x)" "$r"
+launched; check "PARSE-FAILED: launched the custodian skill, headless" $?
 
 # --- a WINDOW_THRESHOLD that is not a number ----------------------------
 # the env override is the only way to reach this arm at all
@@ -380,17 +414,20 @@ logged "usage window unread bad_threshold='abc' — launching unguarded"
 check "BAD-THRESHOLD: quotes the value it could not read" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "BAD-THRESHOLD: launches (claude called $(calls claude)x)" "$r"
+launched; check "BAD-THRESHOLD: launched the custodian skill, headless" $?
 
 # --- WINDOW_PROBE pointing at nothing -----------------------------------
 # WINDOW_PROBE derives from REPO: a REPO-only override aims it at nothing
+missing_probe="$temp_dir/no-such-probe.sh"
 setup_case "$OK_LINE"
-run_cron WINDOW_PROBE="$temp_dir/no-such-probe.sh"
+run_cron WINDOW_PROBE="$missing_probe"
 [ "$rc" -eq 0 ] && r=0 || r=1
 check "NO-PROBE: exits 0 (got $rc)" "$r"
-logged 'usage window unread no_probe — launching unguarded'
-check "NO-PROBE: names the missing probe, not a parse failure" $?
+logged "usage window unread no_probe=$missing_probe — launching unguarded"
+check "NO-PROBE: names the path it could not read, as bad_threshold does" $?
 [ "$(calls probe)" = 0 ] && r=0 || r=1
 check "NO-PROBE: never ran a probe (probe called $(calls probe)x)" "$r"
+launched; check "NO-PROBE: launched the custodian skill, headless" $?
 
 # --- a 5-hour reset the probe cannot give: the bounded fallback ---------
 setup_case "$HOT_5H_NO_RESET" "$HOT_5H_NO_RESET" "$OK_LINE"
@@ -419,6 +456,7 @@ logged "usage window unread (unrecognized probe output: '')"
 check "CATCH-ALL: calls an empty state unread, never ok" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "CATCH-ALL: launches unguarded (claude called $(calls claude)x)" "$r"
+launched; check "CATCH-ALL: launched the custodian skill, headless" $?
 
 # --- no interpreter at all ----------------------------------------------
 # absence, not a misbehaving stub: PATH is sealed to what the wrapper needs
@@ -431,6 +469,7 @@ logged 'usage window unread no_python3 — launching unguarded'
 check "NO-PYTHON3: names the absent interpreter" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "NO-PYTHON3: launches unguarded (claude called $(calls claude)x)" "$r"
+launched; check "NO-PYTHON3: launched the custodian skill, headless" $?
 
 # --- the seams themselves: nothing was written outside the case dirs ----
 [ -f "$temp_dir/case-1/logs/cron.log" ]
