@@ -2,15 +2,15 @@
 
 Status: **built.** Operational spec (phases, artifacts, scheduling, the full
 "what it does") lives in `skills/looper-custodian/SKILL.md` — that is the source
-of truth. This doc holds only what the skill doesn't: *why* it exists, *why* the
-choices are what they are, and the *decision record*. Don't duplicate mechanics
+of truth. This doc holds only what the skill doesn't: _why_ it exists, _why_ the
+choices are what they are, and the _decision record_. Don't duplicate mechanics
 here — if a phase's behavior changes, it changes in `SKILL.md`.
 
 ## Why it exists
 
-The looper system learns and tidies *per run*: `looper-learn` writes lessons at
+The looper system learns and tidies _per run_: `looper-learn` writes lessons at
 the end of each wave and orchestration; `the-turncoat` streamlines an agent or
-skill when asked. Nothing runs *across* runs and *across* repos on a cadence.
+skill when asked. Nothing runs _across_ runs and _across_ repos on a cadence.
 Over weeks that leaves three rots no per-run step can see:
 
 - **Memory rot** — `MEMORY.md` + memory files accumulate duplicates and
@@ -94,7 +94,7 @@ Greenlit 2026-06-27 (open questions resolved before build):
 Refined 2026-06-27 by the first supervised run (commit `2d8d767`):
 
 7. **Phase A: merged overrides a lingering local branch.** Original rule was
-   ambiguous on whether a leftover *local* branch blocks reaping. It doesn't — a
+   ambiguous on whether a leftover _local_ branch blocks reaping. It doesn't — a
    merged local branch is cruft, not a resumable run. "Merged" is tested by
    ancestry OR a merged PR (squash-safe); only an open PR or genuinely-unmerged
    work blocks GC. Backstopped by enabling `delete_branch_on_merge` on all five
@@ -110,8 +110,8 @@ Refined 2026-06-29 from an external-research review (this pass):
 9. **Phase D is previewable + reversible.** `apply` snapshots every target to a
    `backup-*/` dir before its first write; `apply … --dry-run` prints the exact
    before/after and writes nothing; `undo` restores the last snapshot. The
-   propose/dispose split already gated *commitment*; this makes the committed
-   step approve a *previewed* diff and a regretted one revert in one command.
+   propose/dispose split already gated _commitment_; this makes the committed
+   step approve a _previewed_ diff and a regretted one revert in one command.
    Convergent signal — brianlovin's `sync.sh` (timestamped backup + `undo` +
    `--dry-run`), clig.dev (preview before consent), and the "most-capable-agent"
    prompt (checkpoint-before-destructive) all pointed the same way.
@@ -129,21 +129,21 @@ Refined 2026-07-03 from a tool-scan (`ctx` / `deptrust` / Safari MCP):
 
 12. **Phase C gains a cited, incremental history index (the `ctx` graft).**
     `ctxrs/ctx` indexes agent-session logs into a searchable local store and
-    returns ranked *cited* matches (~50× token-efficient vs a raw scan) with a
+    returns ranked _cited_ matches (~50× token-efficient vs a raw scan) with a
     `--file` filter. `gates.jsonl` is already our structured session log, so the
-    graft is *retrieval, not a new store*: Phase C now maintains
+    graft is _retrieval, not a new store_: Phase C now maintains
     `local/custodian/history-index.jsonl` (append-only, one record per gate line
-    + `repo`/`branch`/`files`/`cite`), ingests only new runs each week instead of
-    re-scanning all history, and a read-only `history <query>` verb serves ranked
-    cited lookups (incl. `--file`, re-created from git). Faithful to ctx's
-    *pattern*; rejects its *substrate* — no Rust binary, no SQLite. That is the
-    `no-third-party-hosted-tool-reliance` directive in practice: mine the pattern,
-    not the tool. The index is a derived cache, `--rebuild`-able, gitignored scratch.
-    `deptrust` (dep-CVE guard) and the Safari MCP were scanned in the same pass and
-    left un-adopted: deptrust is a universal-Claude-Code concern with near-zero
-    surface in this markdown-only repo (revisit if a code repo in the list churns
-    deps), and the Safari browser-drive pattern is already covered by `/verify` +
-    the playwright accessibility agents.
+    - `repo`/`branch`/`files`/`cite`), ingests only new runs each week instead of
+      re-scanning all history, and a read-only `history <query>` verb serves ranked
+      cited lookups (incl. `--file`, re-created from git). Faithful to ctx's
+      _pattern_; rejects its _substrate_ — no Rust binary, no SQLite. That is the
+      `no-third-party-hosted-tool-reliance` directive in practice: mine the pattern,
+      not the tool. The index is a derived cache, `--rebuild`-able, gitignored scratch.
+      `deptrust` (dep-CVE guard) and the Safari MCP were scanned in the same pass and
+      left un-adopted: deptrust is a universal-Claude-Code concern with near-zero
+      surface in this markdown-only repo (revisit if a code repo in the list churns
+      deps), and the Safari browser-drive pattern is already covered by `/verify` +
+      the playwright accessibility agents.
 
 Refined 2026-07-13 from the reap-before-ingest incident:
 
@@ -174,15 +174,15 @@ LangChain, Ambiance, wakamoleguy, Hobday, Elliot Smith, capn-hook):
     resolves is flagged. Two dispositions, split into two verb tags so Phase D's
     one-tag-one-write apply stays unambiguous: `B-repoint-<n>` (target MOVED —
     non-destructive in-place cite edit) and the existing `B-retire-<n>` (target
-    GONE). Resolution is existence-plus-`grep` against the *right* root
+    GONE). Resolution is existence-plus-`grep` against the _right_ root
     (user-global vs repo), never exact-line — line drift (`:42`→`:47`) is not a
     dead reference, and a moved target is a re-point, not a retire (the same
     "provably gone, not merely moved" line `loop-de-looper`'s stale-candidate
     pre-check draws). A retire on a dead cite carries the failed relocation
-    search quoted verbatim, so the human verifies *gone* not merely *moved* — a
+    search quoted verbatim, so the human verifies _gone_ not merely _moved_ — a
     sibling of the "no delete on contradiction alone" rail. Faithful to
-    capn-hook's *pattern* (hash-invalidation of code-citing recalls); rejects its
-    *substrate* — no `.capn/` store, no SQLite, just a path check over the memory
+    capn-hook's _pattern_ (hash-invalidation of code-citing recalls); rejects its
+    _substrate_ — no `.capn/` store, no SQLite, just a path check over the memory
     dir Phase B already reads. `no-third-party-hosted-tool-reliance` in practice.
     Local eval at adoption found 0 current stale hits (preventive, not urgent)
     but surfaced the root-ambiguity failure mode, which is why right-root
@@ -202,12 +202,12 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` default while the fan-out was still
     running. That run's `cron.log` line 2 is the whole of what is on disk
     about it: `Background tasks still running after 600s; terminating. Set
-    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.` The
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.` The
     harness terminated the workflow — but a ceiling-kill still exits 0, so the
     wrapper counted it a clean success: no `Custodian report` issue was ever
     opened and ~1.4M tokens of already-completed research were thrown away with
     no trace but a drained session limit. Sibling failure mode to decision 13's
-    silent-on-failure wrapper — a half-done run that *looks* done is as bad as a
+    silent-on-failure wrapper — a half-done run that _looks_ done is as bad as a
     dead one that looks alive. Three fixes: (a) the wrapper raises the ceiling to
     30 min, to give a normal Phase E room to finish within the end-of-turn wait
     so Phase F runs — **how much room that is was never measured**, and the
@@ -269,11 +269,11 @@ Refined 2026-07-20 from the bg-wait-ceiling incident:
     nothing published. The fix moves the discipline into the spec rather than
     relying on a human to trim each week. The full per-line detail already lives in
     `custodian-log.jsonl` (gitignored, local), so the issue body is written to carry
-    only what a human needs to *approve a checkbox*: Phase A/C give counts + a
+    only what a human needs to _approve a checkbox_: Phase A/C give counts + a
     repo-agnostic gloss (exact `repo/branch:line` cites stay in the log), crew
     agents are named by role not code name, and memories/skills are named by bare
     slug not filesystem path. What stays verbatim is Phase B's quoted memory
-    *evidence* — that's this repo's own memory, it's the thing the human checks the
+    _evidence_ — that's this repo's own memory, it's the thing the human checks the
     proposal against, and it carries none of the flagged cross-repo/agent/abs-path
     detail, so the verbatim-citation rail (decision 8) is untouched. A body that
     still trips the classifier is trimmed further, never worked around — same
@@ -301,9 +301,9 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopte
     being genuine modern built-and-shipped waves whose gate lines recorded only
     `llm`/`null` verification, no `executable` — real findings, not false alarms).
     Get the exemption's provenance straight: `state-schemas.md`'s legacy note
-    prescribes a *temporal, per-file* exemption (a whole pre-schema `gates.jsonl`
+    prescribes a _temporal, per-file_ exemption (a whole pre-schema `gates.jsonl`
     predates the fields and is exempt). This replay runs over the cross-repo
-    `history-index.jsonl`, which *mixes eras line by line*, so it needs a per-*line*
+    `history-index.jsonl`, which _mixes eras line by line_, so it needs a per-_line_
     era test — this repo's own extension of that note, NOT something state-schemas.md
     prescribes; the script comment and the skill say exactly that rather than claiming
     prescription. Three design choices the replay forced: (a) G3's "committed wave" is
@@ -312,7 +312,7 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopte
     run, so it is branch-uniform and cannot tell which wave committed; keying G3 on it
     flagged pre-build-only gate waves that never shipped. (b) The replay is read-only
     digest signal, on the auto side of the propose/dispose line — it never edits, same
-    as the rest of Phase C. (c) The era test keys on key-*absence*, so the ingest
+    as the rest of Phase C. (c) The era test keys on key-_absence_, so the ingest
     writer (`custodian-history.sh`) must copy `verified_by`/`outcome` into a record
     ONLY when the source line carried them. The original writer defaulted the key to
     `null` on every line, which silently erased the exemption on the next
@@ -320,7 +320,7 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopte
     reclassifying all 387 modern and flooding false G2/G3 violations against an index
     the docs call "safe anytime" to rebuild. The writer now emits the two keys
     conditionally, so key-absence in the index mirrors key-absence in source and the
-    exemption survives a rebuild. Faithful to Sefz's *pattern* (trace-as-query);
+    exemption survives a rebuild. Faithful to Sefz's _pattern_ (trace-as-query);
     rejects a tool/store — pure `jq`, `[[no-third-party-hosted-tool-reliance]]`.
     Tested both directions: `scripts/custodian-guardrails.test.sh` proves each
     guardrail goes RED on a one-violation-per-guardrail fixture (exit 1 + the cite
@@ -344,21 +344,21 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopte
     over-length description, broken intra-skill links, reference nesting past one
     level, a narrow secret-leak scan) exits 1 and can route a concrete finding to a
     `D-turncoat-<n>`; **advisory** (the token/line budgets) is INFO-only, never a
-    violation, and informs *extraction* (split a fat body into `references/`), never
+    violation, and informs _extraction_ (split a fat body into `references/`), never
     prose smoothing — the war-story prose is deliberate
     (`[[project-skill-slimming-yields]]`). Token counting is approximate (chars/4,
     the standard rough BPE proxy) and
     conservative in the flag direction: markdown/code-ish text tokenizes hotter than
     chars/4, so the proxy under-reports and anything it flags as over-budget is over
     for real — it only risks missing a marginal case, acceptable for an advisory that
-    never gates. Two scoping choices keep it false-positive-averse: a *bare* subdir
+    never gates. Two scoping choices keep it false-positive-averse: a _bare_ subdir
     path token in prose (`scripts/foo.sh`) is intra-skill only when the skill
-    actually *bundles* that subdir, else it's a repo-relative reference (out of
+    actually _bundles_ that subdir, else it's a repo-relative reference (out of
     scope, already covered by `validate-looper-config.sh`) — but an explicit
     markdown `](references/foo.md)` link is always validated, so a dangling target
     is a violation whether or not the subdir exists; and a `[[wiki-link]]` is validated only when the
     skill uses local wiki-links at all (≥1 slug resolves in-dir), so cross-scope
-    memory `[[links]]` are never flagged. Description *edits* are out of scope —
+    memory `[[links]]` are never flagged. Description _edits_ are out of scope —
     findings only, human disposes. Validated E-1's `validate-by` by running it over
     all 13 skills today: **0 structural violations, 3 body-budget advisories**
     (`loop-de-looper`, `looper-custodian`, `looper-defend` over the ~5000-token soft
@@ -380,8 +380,8 @@ Refined 2026-07-28 by the custodian's own Phase E (issue #29, E-3 adopted):
     INDEPENDENCE from the build's own visible tests, PRE-REGISTERED from the plan
     brief before build begins, parked verbatim, and run UNMODIFIED at verify —
     authoring it after the build, or editing it to pass, voids it. Blindness is named
-    in two strengths: *procedural* in a single executor context (same agent authored
-    both, independence rests on pre-registration alone) and *structural* in an
+    in two strengths: _procedural_ in a single executor context (same agent authored
+    both, independence rests on pre-registration alone) and _structural_ in an
     orchestrated run (the orchestrator or a fresh dispatch authors it from the brief
     alone). Scoped to the same line the oracle rule draws — runtime-code waves with an
     executable oracle; doc/trivial waves exempt; ONE scenario per wave, not a parallel
@@ -483,7 +483,7 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       same 95% default now run before Phase C. On the cron, the wrapper
       probes before it spends a headless session at all and waits out the
       reset (reusing the `wait_for_window_reset` the session-limit path
-      already had) — except on a hot *weekly* window, which cannot roll
+      already had) — except on a hot _weekly_ window, which cannot roll
       inside that helper's 6h cap and so defers immediately rather than
       burning the morning first. **Every unattended defer takes the loud
       path — notification plus a `Custodian INCOMPLETE <date>` issue —
@@ -549,9 +549,9 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     produced decision 23 also records the order that run LOGGED, and it is not
     the order the spec asserted. Its lines, in sequence: Phase B's
     skill-spec lint; then the pre-E usage-window probe, reading `five_hour
-    util 0.36 allowed, weekly util 0.11 allowed`; then `deep-research
-    dispatched (window healthy)`; and only THEN Phase B's `memory audit
-    fan-out dispatched (8 Read-only subagents)` over `files_total=484`, which
+util 0.36 allowed, weekly util 0.11 allowed`; then `deep-research
+dispatched (window healthy)`; and only THEN Phase B's `memory audit
+fan-out dispatched (8 Read-only subagents)` over `files_total=484`, which
     logs full coverage afterwards. So the 36% that selected E's fan-out tier
     was read with an 8-subagent, 484-file fan-out still ahead of it. The order
     decision 16 leaned on as a substitute for a wave boundary was being
@@ -604,7 +604,7 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       `scripts/custodian-phase-order.sh --date <date>` prints them for any log
       in `local/custodian/` on the machine that produced it — that dir is
       gitignored, so anywhere else the command exits 2 with `empty or missing
-      log` rather than a count. What prose owes is the shapes, since the check
+log` rather than a count. What prose owes is the shapes, since the check
       prints line numbers rather than a diagnosis. 2026-08-03 is the
       interleave twice over — once in its first segment,
       `E "usage-window probe (pre-E gate)"` and
@@ -614,7 +614,7 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
       up in this entry. 2026-07-27's first segment is the starkest case in
       the archive: an `E` probe, an `E` dispatch, and then a resume marker
       whose own line reads `session-limit kill at 09:29 left B unlogged + E
-      digest lost` — E dispatched, B never logged at all. Its second segment
+digest lost` — E dispatched, B never logged at all. Its second segment
       then does it again on the resume: `B "memory audit dispatched"`, then
       `E "deep-research re-dispatched from main session (run wf_6ef308bc-0c1)"`,
       and only then `B "audit complete — full coverage 36/36, 7 proposals"` —
@@ -648,7 +648,7 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     - **The check runs at Phase F, which is past where both incidents died.**
       2026-08-03 hit the session limit at 09:49 before Phase F; 2026-07-27's
       log records a `session-limit kill at 09:29 left B unlogged + E digest
-      lost`. A run killed before F produces no verdict at all — the check's
+lost`. A run killed before F produces no verdict at all — the check's
       own output is one of the things the kill takes with it — and gets one
       only once a resume carries it to F. Both of these did reach F
       eventually, but on the far side of a resume: 2026-07-27's took a
