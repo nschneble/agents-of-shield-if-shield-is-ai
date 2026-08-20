@@ -68,10 +68,17 @@ command -v perl >/dev/null 2>&1 \
   || die_setup "perl is not installed and it is what bounds each wrapper run"
 
 fails=0
+# what the gate actually logged, kept by logged() for a failing check to
+# print: a bare grep reports only that the wanted string was missing
+observed=""
 # r holds $?: a $(...) in a check desc is expanded first and clobbers it
 check() { # desc, condition-already-evaluated ($?)
   if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"
-  else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
+  else
+    printf 'FAIL  %s\n' "$1"; fails=$((fails + 1))
+    [ -n "$observed" ] && printf '%s\n' "$observed" | sed 's/^/      got: /'
+  fi
+  observed=""
 }
 
 # --- captured probe output ----------------------------------------------
@@ -200,7 +207,15 @@ calls() { # tool — how many times it was invoked
   if [ -f "$f" ]; then wc -l < "$f" | tr -d ' '; else echo 0; fi
 }
 
-logged() { grep -qF "$1" "$log"; }
+# on a miss, hand check() the gate line the run DID write — a run that
+# reports a DIFFERENT reason and one that never reached the gate are
+# different bugs, and a bare "not found" tells them apart for neither
+logged() {
+  grep -qF -- "$1" "$log" 2>/dev/null && return 0
+  observed=$(grep -F -- 'run-start gate:' "$log" 2>/dev/null) \
+    || observed="(no run-start gate line in $log)"
+  return 1
+}
 issue()  { grep -qF "$1" "$case_dir/calls/gh-args" 2>/dev/null; }
 
 # the stubbed uuid makes the argv deterministic, so -x pins flag order too
@@ -470,6 +485,12 @@ check "NO-PYTHON3: names the absent interpreter" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "NO-PYTHON3: launches unguarded (claude called $(calls claude)x)" "$r"
 launched; check "NO-PYTHON3: launched the custodian skill, headless" $?
+
+echo "DEBUG-1 zsh startup files:"; ls -la /etc/zshenv /etc/zsh 2>&1
+echo "DEBUG-2 /etc/zsh/zshenv:"; cat /etc/zsh/zshenv 2>&1
+echo "DEBUG-3 sealed zsh sees:"; env PATH= "$(command -v zsh)" -c \
+  'echo "PATH=[$PATH]"; command -v python3 || echo ABSENT' 2>&1
+echo "DEBUG-4 gate log:"; cat "$log" 2>&1
 
 # --- the seams themselves: nothing was written outside the case dirs ----
 [ -f "$temp_dir/case-1/logs/cron.log" ]
