@@ -31,6 +31,13 @@
 # there swallowed a real hit and stayed green. The reverse direction is
 # the tally: a block that CLOSES emits none, and four is the whole
 # tree's count.
+# Four fixtures answer to the lexer rather than to the line shapes: a
+# `/*` inside a `//` comment, a comment inside a multi-line `${…}`
+# substitution, two lone backticks bracketing a Java text block's opener,
+# and an ordered PAIR scanned on its own, since one awk run reads many
+# files and the walk's order is find's. Each is the only input in the
+# tree that separates the lexer from a plausible mutant of it, and a
+# mutant in `scripts/custodian-mutation-kill.sh` survives losing any one.
 # Exit is always 0 — the scanner reports, it never gates. Pure bash,
 # jq-free.
 set -uo pipefail
@@ -222,7 +229,17 @@ const doc = `
 // Capitalized tail below the real block
 EOF
 
+# ── RED fixture: a `//` comment's own body is not lexed ───────────────────────
+cat > "$temp_dir/slashnote.ts" <<'EOF'
+// The /* form is comment TEXT here, not a lexer opener
+/* the real block a lexed comment body would swallow
+   one body line
+*/
+export const a = 1
+EOF
+
 # ── RED fixture: `${ … }` is code again, and the braces inside it nest ────────
+# the second substitution is APPENDED: the checks below cite line numbers
 cat > "$temp_dir/nest.ts" <<'EOF'
 const nest = `a ${ fn({ k: 1 }) + "`" } b
   {/* still inside the outer template
@@ -231,6 +248,10 @@ const nest = `a ${ fn({ k: 1 }) + "`" } b
    one body line
 */
 export const a = 1
+const spread = `head ${
+  // Comments inside a substitution are code, not template text
+  render()
+} tail`
 EOF
 
 # ── RED fixture: quoted-string state, entered and left ────────────────────────
@@ -289,12 +310,15 @@ func main() {}
 EOF
 
 # ── the stated limits, pinned as EXPECTED so each is a contract ───────────────
+# the two lone backticks are load-bearing — see the text-block check below
 cat > "$temp_dir/limit-textblock.java" <<'EOF'
 class Limits {
   String note = """
+      the ` character is ordinary text outside the delimiter family
       /* a text block is not a modelled string form, so this opener
          is still judged by line shape
       */
+      and a second ` opened nothing either
       """;
 }
 EOF
@@ -314,6 +338,13 @@ const pair = /`/
 */
 const shut = /`/
 export const b = 2
+EOF
+
+# ── RED fixture: lexer state is per FILE, and files share one awk run ────────
+# scanned as an ordered PAIR below, not through the walk
+cat > "$temp_dir/leaky-tail.ts" <<'EOF'
+// Leaked template state from the file before would swallow this
+const tail = `
 EOF
 
 out=$("$scanner" "$temp_dir")
@@ -472,6 +503,17 @@ check "a mis-pairing false opener reports no unterminated-block" "$([ $? -ne 0 ]
 echo "$out" | grep -q '"file":"[^"]*mispair.tsx","line":15,"kind":"capitalized-slash"'
 check "the tail below the real block still scans" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
+# ── a `//` comment's body is comment TEXT ─────────────────────────────────────
+# Lex that body and the `/*` in the sentence opens comment state, vetoing
+# the real opener below — then closes at the real `*/`, so the EOF rail
+# never fires and the loss is silent. Both directions: the `//` line is
+# still judged, and so is the block under it.
+echo "$out" | grep -q '"file":"[^"]*slashnote.ts","line":1,"kind":"capitalized-slash"'
+check "a // line carrying a /* is still judged as a comment" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*slashnote.ts","line":2,"kind":"block-overexplained"'
+check "a /* inside a // comment opens no lexer block" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
 # ── `${ … }` returns to code state, and its braces nest ───────────────────────
 # The substitution holds `fn({ k: 1 })`, so the FIRST `}` must not end it.
 # An ungated exit hands the rest of the line back as template text, where
@@ -481,6 +523,11 @@ check "a braced substitution does not end at its first inner }" "$([ $? -ne 0 ] 
 
 echo "$out" | grep -q '"file":"[^"]*nest.ts","line":4,"kind":"block-overexplained"'
 check "the block after a nested substitution is judged" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# the other direction: a substitution is code, so a comment inside one is a
+# real comment. Nothing else pins the `lx_expr` arm of the formula
+echo "$out" | grep -q '"file":"[^"]*nest.ts","line":9,"kind":"capitalized-slash"'
+check "a comment inside a multi-line substitution is a candidate" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 # ── quoted-string state, entered AND left ─────────────────────────────────────
 # Entered: the `/*` inside each decoy string must not open a lexer block
@@ -529,8 +576,10 @@ check "a {/* inside a Go raw string is not an opener" "$([ $? -ne 0 ] && echo 0 
 # ── the stated limits, as contracts rather than surprises ─────────────────────
 # A `"""` text block is NOT a modelled string form. Its body is judged by
 # line shape, exactly as before the lexer landed. Pinned so the limit is
-# read off a fixture instead of discovered in a report.
-echo "$out" | grep -q '"file":"[^"]*limit-textblock.java","line":3,"kind":"block-overexplained"'
+# read off a fixture instead of discovered in a report. The lone backticks
+# around it say the delimiter family is exclusive: widen it to `.java` and
+# the first opens a template that swallows this block whole.
+echo "$out" | grep -q '"file":"[^"]*limit-textblock.java","line":4,"kind":"block-overexplained"'
 check "LIMIT: a Java text block body is still judged by line shape" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 # A regex literal is NOT a modelled state, so its backtick reads as a
@@ -538,6 +587,15 @@ check "LIMIT: a Java text block body is still judged by line shape" "$([ $? -eq 
 # rail discards the whole file's lexer verdict and line shapes decide.
 echo "$out" | grep -q '"file":"[^"]*limit-regex-rail.ts","line":2,"kind":"block-overexplained"'
 check "LIMIT: an unpaired regex backtick trips the fall-back rail" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# ── one awk run, many files: the lexer resets at every file ──────────────────
+# The pair is ordered by argument, not by the walk. File one ends with a
+# construct open; drop the per-file reset and that state opens file two,
+# whose own backtick then CLOSES it — so the rail never fires and its
+# candidate is lost with nothing to say so.
+leak=$("$scanner" "$temp_dir/limit-regex-rail.ts" "$temp_dir/leaky-tail.ts")
+printf '%s\n' "$leak" | grep -q '"file":"[^"]*leaky-tail.ts","line":1,"kind":"capitalized-slash"'
+check "lexer state does not leak into the next file of a batch" $?
 
 # and the blind spot the rail cannot see: an EVEN number of stray regex
 # backticks closes cleanly, so the block between them is lost. This is the

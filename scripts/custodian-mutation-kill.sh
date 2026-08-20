@@ -10,6 +10,9 @@
 # fixtures never separate the two conditions. The rule G1 guards is
 # loop-de-looper's hardest one: no verdict without a run.
 #
+# A target need not itself gate: doc-bloat-scan.sh always exits 0, so a
+# broken lexer costs a silent report and its suite is the only red left.
+#
 # Mutants are DECLARED, never generated. A generator needs an
 # equivalence oracle to know which mutants change behaviour at all, and
 # an LLM standing in for that oracle is exactly the say-so this repo
@@ -75,6 +78,10 @@ done
 # intact — a mutant that applies, changes a byte, and challenges nothing.
 # Anchor on the `def` so the predicate is the only candidate.
 #
+# GOTCHA: the replacement side interpolates, so a `\{` carried over from
+# the pattern collapses and yields broken awk — a kill by syntax error,
+# green for the wrong reason. Anchor short of the first backslash.
+#
 # NOT EVERY SURVIVOR IS A GAP. `select(.lineno > $e.lineno)` → `>=` in
 # custodian-phase-order.sh survives, and no fixture can kill it: line
 # numbers are unique per record, so the two forms select identically.
@@ -128,6 +135,26 @@ ceiling-comparison-never-fires|skill-body-ceiling.sh|skill-body-ceiling.test.sh|
 ceiling-slack-note-off|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/\$slack" -gt \$\(\(ceiling \/ 5\)\)/\$slack" -gt 999999/
 ceiling-comment-skip-eats-rows|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/case "\$\{skill:-\}" in ''\|\\#\*\) continue ;; esac/continue/
 g3-group-drop-wave|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q[.repo, .branch, (.wave | tostring)]\E/[.repo, .branch]/
+lexer-opener-gate-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (codestart[ln] && t ~ /^\{\E!if (t ~ /^\\{!
+lexer-slash-gate-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (codestart[ln] && t ~ /^\/\E!if (t ~ /^\\/!
+lexer-rail-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (lx_cmt || lx_sp > 0) for (i = 1; i <= nlines; i++) codestart[i] = 1\E!if (0) for (i = 1; i <= nlines; i++) codestart[i] = 1!
+lexer-codestart-after-line|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s%\Qcodestart[i] = (!lx_cmt && (lx_sp == 0 || lx_expr[lx_sp] == 1))\E\n((?:[^\n]*#[^\n]*\n)?[ ]*if \(lx_cmt[^\n]*)%$1\n    codestart[i] = (!lx_cmt && (lx_sp == 0 || lx_expr[lx_sp] == 1))%
+lexer-hole-not-code|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s%\Qcodestart[i] = (!lx_cmt && (lx_sp == 0 || lx_expr[lx_sp] == 1))\E%codestart[i] = (!lx_cmt && (lx_sp == 0))%
+lexer-comment-never-opens|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (d == "*") { lx_cmt = 1\E!if (0) { lx_cmt = 1!
+lexer-comment-never-closes|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (c == "*" && substr(line, i + 1, 1) == "/") { lx_cmt = 0\E!if (0) { lx_cmt = 0!
+lexer-quote-never-opens|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qi = skip_quoted(line, i, c); continue\E!i++; continue!
+lexer-quote-never-closes|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (c == q) return i + 1\E!if (0) return i + 1!
+lexer-quote-escape-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (c == "\\") { i += 2; continue }\E!if (0) { i += 2; continue }!
+lexer-template-never-closes|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (c == "`") { lx_sp--; i++; continue }\E!if (c == "`") { i++; continue }!
+lexer-template-escape-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s%\Qif (!lx_raw && c == "\\") { i += 2; continue }\E%if (0) { i += 2; continue }%
+lexer-go-raw-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qlx_raw = (f ~ \E!lx_raw = (0 && f ~ !
+lexer-go-raw-always|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qlx_raw = (f ~ \E!lx_raw = (1 || f ~ !
+lexer-tick-drop-tsx|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Q(ts|tsx|js|jsx|mjs|cjs|go)\E!(ts|js|jsx|mjs|cjs|go)!
+lexer-tick-always|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qlx_tick = (f ~ \E!lx_tick = (1 || f ~ !
+lexer-subst-enter-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qlx_expr[lx_sp] = 1; lx_brace[lx_sp] = 0; i += 2; continue\E!i += 2; continue!
+lexer-subst-nesting-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (lx_brace[lx_sp] == 0) lx_expr[lx_sp] = 0; else lx_brace[lx_sp]--\E!lx_expr[lx_sp] = 0!
+lexer-slash-body-lexed|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (d == "/") return\E!if (d == "/") { i += 2; continue }!
+lexer-per-file-reset-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s%\Qlx_cmt = 0; lx_sp = 0\E%lx_cmt = lx_cmt; lx_sp = lx_sp%
 TABLE
 }
 
