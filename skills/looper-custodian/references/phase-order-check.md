@@ -1,13 +1,13 @@
 # Phase-order check
 
 Why the phase-order check's P2 discriminator is decidable, what each class
-it prints means, what a clean result does not buy, and why Phase E's
-concurrency is removed rather than estimated. The governing rules live
-elsewhere — SKILL.md `## Maintenance run` states the one-at-a-time rule the
-check compiles, and `docs/looper-custodian.md` decision 24 records the
-incidents that produced it. `scripts/custodian-phase-order.sh` is the
-implementation. Consult this file when reading, changing, or arguing about
-the check.
+it prints means, what a clean result does not buy, why Phase E's
+concurrency is removed rather than estimated, and what that removal costs.
+The governing rules live elsewhere — SKILL.md `## Maintenance run` states
+the one-at-a-time rule the check compiles, and `docs/looper-custodian.md`
+decision 24 records the incidents that produced it.
+`scripts/custodian-phase-order.sh` is the implementation. Consult this file
+when reading, changing, or arguing about the check.
 
 ## What it reads
 
@@ -128,3 +128,7 @@ Subtracting it means inventing it, which is precisely the fake gauge
 `loop-de-looper`'s `## Budget governor` bans, and the mirror image of what
 the `read_ok:false` rule refuses: an unread window is unread, never 0%. So
 the concurrency is removed rather than estimated.
+
+## What the removal costs
+
+**What the rule costs is wall clock, and that cost is real.** Phase E's `deep-research` runs as a harness-backgrounded workflow that the CLI blocks for at end-of-turn, capped by `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (`references/scheduling.md`). Dispatching E early overlaps its runtime with Phase B's work, so less of it is left to wait out when the turn ends — very likely what the 2026-08-03 run was buying. Serializing gives that overlap up and pushes E later in the session, with more of its runtime falling inside the end-of-turn wait. Accepted, on one ground: a reading is only worth taking if nothing invalidates it between the reading and its use, and a ceiling-kill is a detected, resumable state (`references/resume.md`), where a reading that was already wrong when it was used leaves nothing to detect.
