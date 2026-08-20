@@ -26,10 +26,15 @@
 # ── Two tiers ──────────────────────────────────────────────────────────────────
 # STRUCTURAL (violations, exit 1): frontmatter allowlist + required fields, name
 #   pattern/length/dir-match, empty/over-length description, broken internal links
-#   (relative file refs + intra-skill `[[wiki-links]]`), reference nesting deeper
-#   than one level, and a false-positive-averse secret-leak scan.
-# ADVISORY (INFO, exit stays 0): the token/line budgets above. Token counts are
-#   APPROXIMATE — chars/4, the standard rough BPE proxy (see `est_file_tokens`).
+#   (relative file refs + intra-skill `[[wiki-links]]`), a reference FILE nested
+#   deeper than one level (references/a/b/c.md), and a false-positive-averse
+#   secret-leak scan.
+# ADVISORY (INFO, exit stays 0): the token/line budgets above, plus one reference
+#   file CROSS-LINKING another (`adv-reference-chain`) — a prose mention, not a
+#   load path, so it is an extraction judgement like the budgets, while the
+#   depth check above measures a path fact (docs/looper-custodian.md decision 29).
+#   Token counts are APPROXIMATE — chars/4, the standard rough BPE proxy (see
+#   `est_file_tokens`).
 #   For markdown/code-ish prose the real BPE tokenizer runs slightly HOTTER than
 #   chars/4 (shorter sub-word tokens), so this proxy UNDER-reports — anything it
 #   flags as over-budget is over-budget for real (conservative in the flag
@@ -134,7 +139,8 @@ in_list() { # needle list...
   return 1
 }
 
-# --- Internal-link extraction: markdown `](target)` + bare subdir path tokens ---
+# --- Internal-link extraction: markdown `](target)`, bare subdir path tokens,
+#     and bare filenames ---
 # A bare token is only skill-relative when it STARTS a path. Three
 # spellings start one: line start, after a non-path character, and after
 # the token's own `./`. A fully qualified cite carries `references/…` as
@@ -147,6 +153,13 @@ in_list() { # needle list...
 # rejects a parent escape on its own terms — a visible rejection beats a
 # silent non-match.
 BARE_REF_RE='(^|[^A-Za-z0-9._/-])(skills/[A-Za-z0-9._-]+/)?(\.\.?/)?(references|scripts|assets|templates)/[A-Za-z0-9._/-]+'
+
+# A bare-filename cite names the same file as the qualified spelling, but
+# BARE_REF_RE keys on the path segment and cannot see it — one chain, two
+# answers, decided by typing. Same leading-delimiter guard, which is what keeps
+# the TAIL of `skills/other/references/x.md` from re-reading as a local cite.
+# No extension allowlist: resolve is the filter, so an `e.g` costs one lookup.
+BARE_FILE_RE='(^|[^A-Za-z0-9._/-])(\./)?[A-Za-z0-9_-][A-Za-z0-9._-]*\.[A-Za-z0-9]+'
 
 # Normalize raw BARE_REF_RE matches on stdin into skill-relative refs.
 # Dropping one leading delimiter is unambiguous because `.` `_` `-` `/`
@@ -165,12 +178,16 @@ skill_relative_refs() { # skill_name  (stdin: raw matches, stdout: refs)
   '
 }
 
-extract_refs() { # skill_dir file -> candidate relative refs, one per line
+# `sort -u` because `[b](b.md)` now matches two greps and would count twice.
+# The strip class keeps `.`, unlike skill_relative_refs': a line-start `./b.md`
+# match opens on the dot, and stripping it would leave `/b.md`.
+extract_refs() { # skill_dir file -> candidate relative refs, deduped, one per line
   local dir="${1%/}" file="$2" skill
   skill=$(basename "$dir")
   { grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//'
     grep -oE "$BARE_REF_RE" "$file" 2>/dev/null | skill_relative_refs "$skill"
-  } || true
+    grep -oE "$BARE_FILE_RE" "$file" 2>/dev/null | sed -E 's/^[^A-Za-z0-9._-]//; s/^\.\///'
+  } | sort -u || true
 }
 
 # --- In-scope refs for the broken-link check (deduped) ---
@@ -392,17 +409,18 @@ lint_skill() {
       case "$rel" in
         */*) viol "reference-nesting" "$rf" "reference file is nested at \`references/$rel\` — reference files must stay one level deep from SKILL.md" ;;
       esac
-      # Link-chain nesting: a reference file that itself links to another existing
-      # skill-local file is a second-level chain (deeper than one level too).
+      # Cross-links between reference files: ADVISORY (decision 29). Every
+      # spelling reaches ONE predicate — sibling-relative, then skill root — so
+      # `b.md` and `references/b.md` get the same answer. Confined to targets
+      # inside references/ because a cite resolving to SKILL.md points UP,
+      # which is depth zero; the old skill-root arm called those chains.
       while IFS= read -r r; do
         [ -n "$r" ] || continue
-        if target=$(resolve_ref "$(dirname "$rf")" "$dir" "$r"); then
-          [ "$target" = "$rf" ] && continue
-          viol "reference-nesting" "$rf" "references \`$r\` — reference chains must stay one level deep from SKILL.md"
-        elif target=$(resolve_ref "$dir" "$dir" "$r"); then
-          [ "$target" = "$rf" ] && continue
-          viol "reference-nesting" "$rf" "references \`$r\` — reference chains must stay one level deep from SKILL.md"
-        fi
+        target=$(resolve_ref "$(dirname "$rf")" "$dir" "$r") \
+          || target=$(resolve_ref "$dir" "$dir" "$r") || continue
+        [ "$target" = "$rf" ] && continue
+        case "$target" in "$dir"/references/*) ;; *) continue ;; esac
+        info "adv-reference-chain" "$rf" "cites sibling reference \`$r\` — a reader following it loads two files where one was expected"
       done < <(extract_refs "$dir" "$rf")
     done < <(find "$dir/references" -type f 2>/dev/null || true)
   fi

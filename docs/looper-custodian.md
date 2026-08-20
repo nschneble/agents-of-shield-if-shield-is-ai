@@ -342,8 +342,10 @@ Refined 2026-07-27 by the custodian's own Phase E (issue #29, E-2 and E-1 adopte
     Two tiers, deliberately split so the exit code carries only hard-spec breakage:
     **structural** (frontmatter allowlist, name pattern/length/dir-match, empty or
     over-length description, broken intra-skill links, reference nesting past one
-    level, a narrow secret-leak scan) exits 1 and can route a concrete finding to a
-    `D-turncoat-<n>`; **advisory** (the token/line budgets) is INFO-only, never a
+    level — the link-chain half of which moved to advisory in decision 29,
+    leaving the structural arm the FILE-depth half — a narrow secret-leak scan)
+    exits 1 and can route a concrete finding to a `D-turncoat-<n>`;
+    **advisory** (the token/line budgets) is INFO-only, never a
     violation, and informs _extraction_ (split a fat body into `references/`), never
     prose smoothing — the war-story prose is deliberate
     (`[[project-skill-slimming-yields]]`). Token counting is approximate (chars/4,
@@ -846,3 +848,66 @@ lost`. A run killed before F produces no verdict at all — the check's
     `NOTHING CHECKED` rather than success. Opt-in by design: a skill with no
     recorded row is not checked, so this governs the one spec that earned it
     rather than silently binding all eighteen.
+
+Refined 2026-08-20 from the lint's own reference-nesting arm:
+
+29. **A rule with two spellings and two answers is not a rule.** The skill
+    lint's `reference-nesting` arm carried two unrelated checks under one
+    name. One reads the filesystem: a reference file physically sitting at
+    `references/a/b/c.md` is deeper than one level, and that is a path fact.
+    The other read a cite inside a reference file and called it a chain —
+    but it fed on `BARE_REF_RE`, which keys on a
+    `references|scripts|assets|templates/` path SEGMENT. So the same chain
+    got a different verdict depending on how someone typed it:
+    `` `references/b.md` `` exited 1, `[b](b.md)` exited 1, and
+    `` `b.md` `` was invisible.
+
+    The evidence that it did not bind is `loop-de-looper`, the skill this
+    spec was told to imitate. Its four reference files cite each other in
+    eight places, every one spelled bare, and
+    `custodian-skill-lint.sh skills/loop-de-looper` reported `structural
+    violations: 0`. Meanwhile this spec's own extraction was shaped around
+    the rule as though it did bind — one paragraph stayed in `SKILL.md`
+    only because moving it into a reference would have made that reference
+    cite two siblings by qualified path.
+
+    **Widened AND demoted, because widening alone makes the docs worse.**
+    Fixing only the detection turns `loop-de-looper` red eight times, and
+    the only route back to green is deleting eight legitimate pointers —
+    `state-schemas.md` opens with "The governing rules live elsewhere",
+    which is the pointer doing its job. A rule whose remedy is worse
+    documentation is not measuring what it claims to.
+
+    So the tier line already drawn in the linter's header decides it.
+    Structural is what is decidable from the spec against the bytes; the
+    advisory tier is what informs an EXTRACTION judgement. Nothing LOADS a
+    reference file because a sibling names it, so a cross-link is a claim
+    about how much a reader is being asked to carry — the same register as
+    the token budgets. It becomes `adv-reference-chain`, INFO, exit 0. The
+    FILE-depth half stays structural and is untouched.
+
+    Detection widens so the tier means one thing. A new `BARE_FILE_RE`
+    matches a bare filename with the same leading-delimiter guard
+    `BARE_REF_RE` uses — the guard is what stops the TAIL of
+    `skills/other/references/x.md` being re-read as a bare cite of a
+    same-named local file — and both spellings resolve through one
+    predicate, sibling-relative first, then from the skill root. Every
+    spelling of one sibling cite now shares a verdict, and the shapes that
+    are not chains — an upward cite, a self-cite, another skill's file —
+    share silence. Both directions are pinned in
+    `custodian-skill-lint.test.sh` by comparing whole finding SIGNATURES
+    (exit code plus every finding as tier, check name and file) rather than
+    a grep per spelling, so a case added later cannot agree vacuously.
+
+    One narrowing rides along, and it is not incidental. A bare filename
+    includes `SKILL.md`, so the arm is confined to targets inside
+    `references/`: a cite pointing UP is depth zero. The old skill-root arm
+    reported `[the body](SKILL.md)` from a reference file as a chain, and
+    without the confinement the widening would have turned every reference
+    file that mentions its own body into a finding.
+
+    **What it costs, stated rather than buried.** Eight real cross-links in
+    `loop-de-looper` become visible as five findings — `sort -u` collapses
+    a cite repeated within one file — and nothing forces anyone to act on
+    them, which is what advisory means. That is the trade: the arm stops
+    being able to block, and starts being able to see.

@@ -84,7 +84,9 @@ See [the guide](references/MISSING.md) for details.
 Also runs scripts/custodian-history.sh (repo-relative, out of scope).
 EOF
 
-# reference nesting: references/a.md links to references/b.md (both exist).
+# reference cross-link: references/a.md links to references/b.md (both exist).
+# ADVISORY since decision 29 — it stays in the RED batch to prove an advisory
+# raises no violation while sitting beside twelve fixtures that do.
 d="$temp_dir/red-nesting"; mkdir -p "$d/references"
 cat > "$d/SKILL.md" <<'EOF'
 ---
@@ -194,7 +196,8 @@ printf '%s\n' "$out" | grep -q 'frontmatter-missing.*red-nofm';             chec
 printf '%s\n' "$out" | grep -q 'broken-link.*red-brokenlink.*MISSING';       check "RED: broken relative link flagged" $?
 # The repo-relative scripts/ ref in that same fixture must NOT be flagged.
 ! printf '%s\n' "$out" | grep -q 'broken-link.*custodian-history';           check "RED: repo-relative ref not flagged" $?
-printf '%s\n' "$out" | grep -q 'reference-nesting.*red-nesting';            check "RED: reference nesting flagged" $?
+printf '%s\n' "$out" | grep -q 'INFO.*adv-reference-chain.*red-nesting';    check "RED: reference cross-link flagged as advisory" $?
+! printf '%s\n' "$out" | grep -q 'VIOLATION.*red-nesting';                  check "RED: reference cross-link raises no violation" $?
 printf '%s\n' "$out" | grep -q 'secret-leak.*red-secret';                    check "RED: secret leak flagged" $?
 printf '%s\n' "$out" | grep -q 'broken-link.*ghost';                        check "RED: dangling wiki-link flagged" $?
 # The resolving wiki-link must NOT be flagged.
@@ -396,10 +399,10 @@ EOF
 printf 'x\n' > "$d/references/state-schemas.md"
 out=$("$linter" "$d"); rc=$?
 [ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-f: cross-skill cite from a reference file exits 0" "$result"
-! printf '%s\n' "$out" | grep -q 'reference-nesting';             check "G-f: cross-skill cite raises no reference-nesting" $?
+! printf '%s\n' "$out" | grep -q 'reference-nesting\|adv-reference-chain'; check "G-f: cross-skill cite raises neither nesting arm" $?
 
-# Red 1: the same shape, but the cite is this skill's OWN file by full
-# path — the prefix strips and the remainder is a real second-level chain.
+# Advisory 1: the same shape, but the cite is this skill's OWN file by full
+# path — the prefix strips and the remainder is a real sibling cross-link.
 d="$temp_dir/gf-own-fullpath"; mkdir -p "$d/references"
 cat > "$d/SKILL.md" <<'EOF'
 ---
@@ -413,10 +416,10 @@ Reuses the lint in `skills/gf-own-fullpath/references/state-schemas.md`.
 EOF
 printf 'x\n' > "$d/references/state-schemas.md"
 out=$("$linter" "$d"); rc=$?
-[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-f: own-skill full-path cite from a reference file exits 1" "$result"
-printf '%s\n' "$out" | grep -q 'reference-nesting.*note.md.*state-schemas.md'; check "G-f: own-skill full-path cite is a nesting violation" $?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-f: own-skill full-path cite from a reference file exits 0" "$result"
+printf '%s\n' "$out" | grep -q 'INFO.*adv-reference-chain.*note.md.*state-schemas.md'; check "G-f: own-skill full-path cite is a cross-link advisory" $?
 
-# Red 2: same, spelled `./` — pins the dot-slash arm of extract_refs'
+# Advisory 2: same, spelled `./` — pins the dot-slash arm of extract_refs'
 # own grep.
 d="$temp_dir/gf-own-dotslash"; mkdir -p "$d/references"
 cat > "$d/SKILL.md" <<'EOF'
@@ -431,8 +434,8 @@ Reuses the lint in `./references/state-schemas.md`.
 EOF
 printf 'x\n' > "$d/references/state-schemas.md"
 out=$("$linter" "$d"); rc=$?
-[ "$rc" -eq 1 ] && result=0 || result=1;                          check "G-f: dot-slash cite from a reference file exits 1" "$result"
-printf '%s\n' "$out" | grep -q 'reference-nesting.*note.md.*state-schemas.md'; check "G-f: dot-slash cite is a nesting violation" $?
+[ "$rc" -eq 0 ] && result=0 || result=1;                          check "G-f: dot-slash cite from a reference file exits 0" "$result"
+printf '%s\n' "$out" | grep -q 'INFO.*adv-reference-chain.*note.md.*state-schemas.md'; check "G-f: dot-slash cite is a cross-link advisory" $?
 
 # ── G-g: a skill's own fully qualified self-cite is still its own ─────────────
 # `skills/<this-skill>/references/x.md` names a file this skill owns, so
@@ -481,6 +484,81 @@ echo "leaf" > "$d/references/a/b/c.md"
 out=$("$linter" "$d"); rc=$?
 [ "$rc" -eq 1 ] && result=0 || result=1;                         check "G-b: two-level nested reference exits 1" "$result"
 printf '%s\n' "$out" | grep -q 'reference-nesting.*a/b/c.md';    check "G-b: nested reference file cited in nesting violation" $?
+# Depth is structural, cross-linking is advisory — the two arms share a fixture
+# shape, so pin that this one raises the violation and NOT the advisory name.
+! printf '%s\n' "$out" | grep -q 'adv-reference-chain';          check "G-b: depth violation is not demoted to the advisory" $?
+
+# ── G-h: one cite, every spelling, one verdict ────────────────────────────────
+# The defect decision 29 fixes: `b.md` and `references/b.md` name the same file
+# and got clean vs exit-1. A SIGNATURE is the exit code plus every finding as
+# `TIER check basename`, sorted — the cite TEXT may differ between spellings,
+# nothing else may, so equal signatures across spellings IS the invariant.
+chain_sig() { # skill_dir -> "<rc>|TIER check base;TIER check base;..."
+  local d="$1" out rc
+  out=$("$linter" "$d" 2>&1); rc=$?
+  printf '%s|%s\n' "$rc" "$(printf '%s\n' "$out" \
+    | awk '/^(VIOLATION|INFO)/ { n = split($3, p, "/"); sub(/:$/, "", p[n]); print $1, $2, p[n] }' \
+    | sort | tr '\n' ';')"
+}
+
+# Every fixture is byte-identical but for the one cite line, so any signature
+# difference is the spelling and nothing else.
+chain_fixture() { # name  cite-line -> skill dir
+  local d="$temp_dir/$1"
+  mkdir -p "$d/references"
+  cat > "$d/SKILL.md" <<EOF
+---
+name: $1
+description: Use this when one cite gets spelled more than one way.
+---
+See [a](references/a.md).
+EOF
+  printf '%s\n' "$2" > "$d/references/a.md"
+  printf 'leaf\n' > "$d/references/b.md"
+  printf '%s' "$d"
+}
+
+# Direction 1 — a sibling cite, five spellings. All must agree.
+sig_bare=$(chain_sig "$(chain_fixture gh-bare      'Now go read `b.md` for the rest.')")
+sig_pref=$(chain_sig "$(chain_fixture gh-prefixed  'Now go read `references/b.md` for the rest.')")
+sig_dot=$(chain_sig  "$(chain_fixture gh-dotslash  'Now go read `./b.md` for the rest.')")
+sig_mdb=$(chain_sig  "$(chain_fixture gh-mdbare    'Now go read [b](b.md) for the rest.')")
+sig_mdp=$(chain_sig  "$(chain_fixture gh-mdprefix  'Now go read [b](references/b.md) for the rest.')")
+# Line-START `./`, the one spelling whose leading char is inside the delimiter
+# class — a normalizer that strips it leaves `/b.md`, which resolve_ref rejects
+# as absolute, so the cite vanishes silently.
+sig_lead=$(chain_sig "$(chain_fixture gh-leadslash './b.md is where the rest lives.')")
+
+[ "$sig_bare" = "$sig_pref" ] && result=0 || result=1
+check "G-h: bare and prefixed sibling cites get the SAME verdict" "$result"
+[ "$sig_bare" = "$sig_dot" ] && result=0 || result=1
+check "G-h: dot-slash sibling cite gets that same verdict" "$result"
+[ "$sig_bare" = "$sig_mdb" ] && result=0 || result=1
+check "G-h: markdown-link sibling cite gets that same verdict" "$result"
+[ "$sig_bare" = "$sig_mdp" ] && result=0 || result=1
+check "G-h: prefixed markdown-link sibling cite gets that same verdict" "$result"
+[ "$sig_bare" = "$sig_lead" ] && result=0 || result=1
+check "G-h: line-start dot-slash cite gets that same verdict" "$result"
+# Pin what they agree ON, or five identical wrong answers would pass above.
+[ "$sig_bare" = "0|INFO adv-reference-chain a.md;" ] && result=0 || result=1
+check "G-h: and the shared verdict is one advisory, exit 0" "$result"
+
+# Direction 2 — the toggle's off side. A cite pointing UP to SKILL.md is depth
+# ZERO, so both spellings must stay silent; `[the body](SKILL.md)` used to fire.
+sig_upmd=$(chain_sig   "$(chain_fixture gh-upmdlink 'Back up to [the body](SKILL.md) for the rule.')")
+sig_upbare=$(chain_sig "$(chain_fixture gh-upbare   'Back up to `SKILL.md` for the rule.')")
+[ "$sig_upmd" = "$sig_upbare" ] && result=0 || result=1
+check "G-h: both spellings of an upward SKILL.md cite agree" "$result"
+[ "$sig_upmd" = "0|" ] && result=0 || result=1
+check "G-h: and they agree on silence — an upward cite is not a chain" "$result"
+# A file naming itself is not a chain either, in both spellings — and `./a.md`
+# only equals the file once the normalizer has taken the `./` off.
+sig_self=$(chain_sig    "$(chain_fixture gh-self    'This file, `a.md`, is the one you are reading.')")
+sig_selfdot=$(chain_sig "$(chain_fixture gh-selfdot 'This file, `./a.md`, is the one you are reading.')")
+[ "$sig_self" = "$sig_selfdot" ] && result=0 || result=1
+check "G-h: both spellings of a self-cite agree" "$result"
+[ "$sig_self" = "0|" ] && result=0 || result=1
+check "G-h: and they agree on silence — a file citing itself is not a chain" "$result"
 
 printf '\n%d failure(s)\n' "$fails"
 [ "$fails" -eq 0 ]
