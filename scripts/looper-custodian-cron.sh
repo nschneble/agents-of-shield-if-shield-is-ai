@@ -63,13 +63,15 @@
 # INCOMPLETE" issue), because the original sin these alert paths exist for
 # is a Monday that quietly did nothing.
 #
-# Exit codes: 0 ran (or resumed) cleanly; 3 bg-wait ceiling cut the run
-# short, resumable; 4 session limit hit and the post-reset resume also
-# failed; 5 the run-start usage-window gate deferred the run before any
-# phase ran; anything else is claude's own exit from the last attempt.
+# Exit codes: 0 ran (or resumed) cleanly; 2 REPO could not be entered, so
+# nothing ran; 3 bg-wait ceiling cut the run short, resumable; 4 session
+# limit hit and the post-reset resume also failed; 5 the run-start
+# usage-window gate deferred the run before any phase ran; anything else
+# is claude's own exit from the last attempt.
 set -uo pipefail
 
-export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+# overridable because a prepend beats any stub dir handed in via PATH
+export PATH="${CUSTODIAN_PATH_PREFIX:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}:${PATH:-}"
 
 # Give a backgrounded Phase E room before end-of-turn tears it down.
 # The one sourced figure is the 2026-07-20 cron.log's "still running
@@ -79,23 +81,27 @@ export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 # (resume), not retried.
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=1800000
 
-REPO="$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai"
-cd "$REPO"
+REPO="${REPO:-$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai}"
+# guard here, not below: LOGDIR sits under REPO and mkdir -p would make it
+cd "$REPO" || { echo "FATAL: cannot enter REPO=$REPO; refusing to run" >&2; exit 2; }
 
 # ~/.claude transcript slug: the repo path with every "/" turned into "-".
 SLUG="${REPO//\//-}"
 
 DATE="$(date +%Y-%m-%d)"
-LOGDIR="$REPO/local/custodian/$DATE"
+LOGDIR="${LOGDIR:-$REPO/local/custodian/$DATE}"
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/cron.log"
 
 MAX_ATTEMPTS=3
 BACKOFFS=(60 900)  # zsh arrays are 1-indexed: wait before attempt 2, attempt 3
 
+WINDOW_PROBE="${WINDOW_PROBE:-$REPO/scripts/usage-window-probe.sh}"
+
 # Usage-window threshold for the run-start gate. Deliberately the SAME
-# default as the Phase E gate in skills/looper-custodian/SKILL.md — one
-# rule checked at two points, not two policies. Move both or they drift.
+# default as the Phase E gate in
+# skills/looper-custodian/references/usage-window-gates.md — one rule
+# checked at two points, not two policies. Move both or they drift.
 # Overridable so the doc's word "tunable" is true of the code as well.
 WINDOW_THRESHOLD="${WINDOW_THRESHOLD:-0.95}"
 # Operator-facing copy says percent, because every doc surface and the
@@ -203,10 +209,13 @@ EOF
 # includes an absent python3: with no interpreter this echoed nothing, the
 # caller's `case ""` fell through to its catch-all, and the log said the
 # window was ok — a fabricated reading, the exact thing the unread arm
-# exists to prevent.
+# exists to prevent. It also includes an absent PROBE: WINDOW_PROBE is
+# derived from REPO, so a REPO-only override aims it at nothing, and
+# `parse_failed` would name that empty read rather than the seam.
 window_state() {
   command -v python3 >/dev/null 2>&1 || { echo "unread no_python3"; return; }
-  "$REPO/scripts/usage-window-probe.sh" 2>/dev/null \
+  [ -x "$WINDOW_PROBE" ] || { echo "unread no_probe=$WINDOW_PROBE"; return; }
+  "$WINDOW_PROBE" 2>/dev/null \
     | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
 import json, os, sys
 try:
@@ -262,7 +271,7 @@ print("ok")
 # at 6h so a bad epoch can't park the job forever.
 wait_for_window_reset() {
   local probe now reset wait
-  probe="$("$REPO/scripts/usage-window-probe.sh" 2>/dev/null || true)"
+  probe="$("$WINDOW_PROBE" 2>/dev/null || true)"
   now=$(date +%s)
   reset=$(printf '%s' "$probe" | python3 -c 'import json,sys
 try: print(int(json.load(sys.stdin)["five_hour"]["reset"]))

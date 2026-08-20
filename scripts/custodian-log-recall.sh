@@ -8,7 +8,8 @@
 # clean because the missing line leaves no trace. This is the other
 # direction — recall, not order.
 #
-# It found its own reason for existing. SKILL.md `## Phase E` requires a
+# It found its own reason for existing. The Phase E usage-window gate
+# (skills/looper-custodian/references/usage-window-gates.md) requires a
 # re-probe after deep-research returns, logged as `action "window cost"`,
 # and calls that line what turns the candidate cap "from a conservative
 # guess into a calibrated number". Across every archived run the string

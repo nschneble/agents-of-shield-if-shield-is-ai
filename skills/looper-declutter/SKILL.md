@@ -50,13 +50,13 @@ Run the detector over the target tree. It ships in the looper definitions repo a
 ~/.claude/scripts/doc-bloat-scan.sh [<path> ...]
 ```
 
-It emits one JSONL candidate per hit — `{file, line, kind, text}` — across six kinds: `block-overexplained`, `jsdoc-block`, `jsdoc-oneline`, `stacked-slashes`, `over-75`, `capitalized-slash`. What each one means and what disposes it: `references/candidate-kinds.md`.
+It emits one JSONL candidate per hit — `{file, line, kind, text}` — across seven kinds: `block-overexplained`, `jsdoc-block`, `jsdoc-oneline`, `stacked-slashes`, `over-75`, `capitalized-slash`, `unterminated-block`. What each one means and what disposes it: `references/candidate-kinds.md`. The last is the odd one out — a note on the scan rather than a comment, and the one kind that never routes to a snip.
 
 The detector is the ONLY mechanical scan; it never edits and never gates (exit 0 always). Candidates are suggestions, not verdicts.
 
 ### Triage — route + rank (read-only)
 
-For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md says the same. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip.
+For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md says the same. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip. An `unterminated-block` never enters triage at all — it cites a parse state, not a comment, and the candidates below it in that file are provisional.
 
 **What survives:**
 
@@ -136,7 +136,7 @@ Every phase logs to `local/declutter/<run-id>/findings.jsonl` before the report,
 
 ## Integration with existing pieces
 
-- `references/candidate-kinds.md` — the six detector kinds and the per-kind owner routing; `references/artifacts.md` — the `findings.jsonl` / `report.md` record shapes.
+- `references/candidate-kinds.md` — the seven detector kinds and the per-kind owner routing; `references/artifacts.md` — the `findings.jsonl` / `report.md` record shapes.
 - `scripts/doc-bloat-scan.sh` (deployed to `~/.claude/scripts/`, so it resolves from any target repo) — the mechanical detector; declutter's only scan engine.
 - `the-chronicler` / `the-ghostwriter` / `the-improver` — the comment-rule owners; declutter applies their rules, never duplicates them.
 - `looper-review` — the reactive, change-scoped crew pass that trims NEW comment bloat; declutter is the proactive whole-repo complement, the same way `looper-defend` complements `security-review`.
