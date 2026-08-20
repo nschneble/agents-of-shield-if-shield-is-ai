@@ -741,7 +741,8 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     requires and nobody ever writes leaves no trace, so the log reads clean
     precisely because the obligation was skipped.
     `scripts/custodian-log-recall.sh` asks the complementary question, and
-    found its own reason for existing on the first run: `## Phase E`
+    found its own reason for existing on the first run:
+    `skills/looper-custodian/references/usage-window-gates.md`
     requires a re-probe after `deep-research` returns, calls that logged
     line what turns the candidate cap "from a conservative guess into a
     calibrated number", and across nine archived runs the string appears

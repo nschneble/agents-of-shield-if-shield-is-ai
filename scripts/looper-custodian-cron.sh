@@ -97,8 +97,9 @@ BACKOFFS=(60 900)  # zsh arrays are 1-indexed: wait before attempt 2, attempt 3
 WINDOW_PROBE="${WINDOW_PROBE:-$REPO/scripts/usage-window-probe.sh}"
 
 # Usage-window threshold for the run-start gate. Deliberately the SAME
-# default as the Phase E gate in skills/looper-custodian/SKILL.md — one
-# rule checked at two points, not two policies. Move both or they drift.
+# default as the Phase E gate in
+# skills/looper-custodian/references/usage-window-gates.md — one rule
+# checked at two points, not two policies. Move both or they drift.
 # Overridable so the doc's word "tunable" is true of the code as well.
 WINDOW_THRESHOLD="${WINDOW_THRESHOLD:-0.95}"
 # Operator-facing copy says percent, because every doc surface and the

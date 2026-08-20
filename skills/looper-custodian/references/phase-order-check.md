@@ -74,6 +74,21 @@ so it is reported as `RESUME TAIL` and never counted. Without the discriminator
 P2 flagged every conforming resume against the rule it cites — the defect
 decision 24 records.
 
+## What a clean result buys
+
+Be exact about what a clean result buys: a broken Monday is visible the same
+week instead of whenever someone next reads a log by hand. What it does NOT
+buy is in `references/phase-order-check.md`, alongside the rest of the spec.
+**Know where it cannot reach: it runs at Phase F, so a run killed before F
+produces no verdict at all until a resume carries it to F.** That is the
+shape of both runs it was written for — 2026-08-03 hit the session limit at
+09:49 and 2026-07-27 logged a kill at 09:29, each before Phase F. Both
+reached F eventually, but only on the far side of a resume, and a run nobody
+resumes is never checked. The cron wrapper's INCOMPLETE path already renders
+`phases_summary()` over the partial log and is the obvious place a
+partial-log check could run; considered and deferred, not overlooked.
+`scripts/custodian-phase-order.test.sh` is its both-directions test.
+
 ## Three limits, stated rather than papered over
 
 1. **Log order only.** A clean result is evidence the log is well ordered, NOT
@@ -94,3 +109,20 @@ decision 24 records.
    named, not closed.
 3. **It cannot show the prior phase B RETURNED before the tail's phase E was
    probed**, only that its line precedes.
+
+## Why the concurrency is removed rather than estimated
+
+Documenting the interleave instead — letting E's sizing subtract the cost of
+work still in flight — is not a real option. Be exact about what is missing,
+because a per-phase instrument does exist: the re-probe after `deep-research`
+returns logs `utilization` before → after, and bracketing a phase that way
+yields an OBSERVED cost for it. What has no observable is the
+**not-yet-spent concurrent cost at probe time**. The fan-out width is fixed
+in the research brief before `deep-research` is invoked, and its internal
+execution cannot be batched, throttled, or interrupted mid-flight, so no
+later measurement can still change the ask — the sizing decision has to be
+made before the cost it would subtract exists. Subtracting it means
+inventing it, which is precisely the fake gauge `loop-de-looper`'s
+`## Budget governor` bans and the mirror image of what the `read_ok:false`
+rule below already refuses. So the concurrency is removed rather than
+estimated.
