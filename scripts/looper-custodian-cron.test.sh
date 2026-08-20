@@ -68,8 +68,6 @@ command -v perl >/dev/null 2>&1 \
   || die_setup "perl is not installed and it is what bounds each wrapper run"
 
 fails=0
-# what the gate actually logged, kept by logged() for a failing check to
-# print: a bare grep reports only that the wanted string was missing
 observed=""
 # r holds $?: a $(...) in a check desc is expanded first and clobbers it
 check() { # desc, condition-already-evaluated ($?)
@@ -189,7 +187,8 @@ run_cron() { # VAR=VAL... — extra env for this run
 }
 
 # the wrapper PREPENDS this dir, so a stub here SHADOWS a tool; sealing
-# PATH (run_cron PATH=) is what makes one ABSENT instead
+# PATH to this dir alone is what makes one ABSENT instead
+# not PATH=: ubuntu's /etc/zsh/zshenv repopulates an empty PATH
 case_path() { # system-tool... — sets case_bin
   local d="$case_dir/bin" t p
   mkdir -p "$d" || die_setup "cannot create $d"
@@ -207,9 +206,7 @@ calls() { # tool — how many times it was invoked
   if [ -f "$f" ]; then wc -l < "$f" | tr -d ' '; else echo 0; fi
 }
 
-# on a miss, hand check() the gate line the run DID write — a run that
-# reports a DIFFERENT reason and one that never reached the gate are
-# different bugs, and a bare "not found" tells them apart for neither
+# a bare grep reports only "no": keep the gate line the run DID write
 logged() {
   grep -qF -- "$1" "$log" 2>/dev/null && return 0
   observed=$(grep -F -- 'run-start gate:' "$log" 2>/dev/null) \
@@ -477,7 +474,7 @@ launched; check "CATCH-ALL: launched the custodian skill, headless" $?
 # absence, not a misbehaving stub: PATH is sealed to what the wrapper needs
 setup_case "$OK_LINE"
 case_path env bash date mkdir cat grep
-run_cron PATH=
+run_cron PATH="$case_bin"
 [ "$rc" -eq 0 ] && r=0 || r=1
 check "NO-PYTHON3: exits 0 (got $rc)" "$r"
 logged 'usage window unread no_python3 — launching unguarded'
@@ -485,12 +482,6 @@ check "NO-PYTHON3: names the absent interpreter" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "NO-PYTHON3: launches unguarded (claude called $(calls claude)x)" "$r"
 launched; check "NO-PYTHON3: launched the custodian skill, headless" $?
-
-echo "DEBUG-1 zsh startup files:"; ls -la /etc/zshenv /etc/zsh 2>&1
-echo "DEBUG-2 /etc/zsh/zshenv:"; cat /etc/zsh/zshenv 2>&1
-echo "DEBUG-3 sealed zsh sees:"; env PATH= "$(command -v zsh)" -c \
-  'echo "PATH=[$PATH]"; command -v python3 || echo ABSENT' 2>&1
-echo "DEBUG-4 gate log:"; cat "$log" 2>&1
 
 # --- the seams themselves: nothing was written outside the case dirs ----
 [ -f "$temp_dir/case-1/logs/cron.log" ]
