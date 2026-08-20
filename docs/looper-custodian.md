@@ -536,9 +536,13 @@ Refined 2026-08-09 from the 2026-08-03 run's window burn:
     reads — which is precisely why the post-E measurement and the
     no-bare-zero rule are part of the same decision. They are what make a
     bound that failed visible, instead of another quiet zero. Unverifiable
-    without a live cron run: nothing here can be exercised by CI (the
-    wrapper is unattended shell against a real rate-limit window), so the
-    first real Monday is the test.
+    without a live cron run: the cap is applied inside the headless claude
+    session and CI runs no session, so the first real Monday is the test.
+    Not because the wrapper is unreachable — it takes `REPO`, `LOGDIR`,
+    `WINDOW_PROBE` and `CUSTODIAN_PATH_PREFIX`, and
+    `scripts/looper-custodian-cron.test.sh` drives its run-start gate end
+    to end against a stubbed probe. What CI cannot stand up is the session
+    the cap lives in.
 
 24. **Phases run one at a time — a phase is done when its subagents have
     RETURNED, not when they were dispatched.** The same 2026-08-03 log that

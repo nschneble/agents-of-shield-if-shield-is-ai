@@ -69,7 +69,8 @@
 # phase ran; anything else is claude's own exit from the last attempt.
 set -uo pipefail
 
-export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+# overridable because a prepend beats any stub dir handed in via PATH
+export PATH="${CUSTODIAN_PATH_PREFIX:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}:${PATH:-}"
 
 # Give a backgrounded Phase E room before end-of-turn tears it down.
 # The one sourced figure is the 2026-07-20 cron.log's "still running
@@ -79,19 +80,21 @@ export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 # (resume), not retried.
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=1800000
 
-REPO="$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai"
+REPO="${REPO:-$HOME/Developer/Repos/agents-of-shield-if-shield-is-ai}"
 cd "$REPO"
 
 # ~/.claude transcript slug: the repo path with every "/" turned into "-".
 SLUG="${REPO//\//-}"
 
 DATE="$(date +%Y-%m-%d)"
-LOGDIR="$REPO/local/custodian/$DATE"
+LOGDIR="${LOGDIR:-$REPO/local/custodian/$DATE}"
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/cron.log"
 
 MAX_ATTEMPTS=3
 BACKOFFS=(60 900)  # zsh arrays are 1-indexed: wait before attempt 2, attempt 3
+
+WINDOW_PROBE="${WINDOW_PROBE:-$REPO/scripts/usage-window-probe.sh}"
 
 # Usage-window threshold for the run-start gate. Deliberately the SAME
 # default as the Phase E gate in skills/looper-custodian/SKILL.md — one
@@ -206,7 +209,7 @@ EOF
 # exists to prevent.
 window_state() {
   command -v python3 >/dev/null 2>&1 || { echo "unread no_python3"; return; }
-  "$REPO/scripts/usage-window-probe.sh" 2>/dev/null \
+  "$WINDOW_PROBE" 2>/dev/null \
     | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
 import json, os, sys
 try:
@@ -262,7 +265,7 @@ print("ok")
 # at 6h so a bad epoch can't park the job forever.
 wait_for_window_reset() {
   local probe now reset wait
-  probe="$("$REPO/scripts/usage-window-probe.sh" 2>/dev/null || true)"
+  probe="$("$WINDOW_PROBE" 2>/dev/null || true)"
   now=$(date +%s)
   reset=$(printf '%s' "$probe" | python3 -c 'import json,sys
 try: print(int(json.load(sys.stdin)["five_hour"]["reset"]))

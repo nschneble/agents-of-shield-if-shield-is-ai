@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # the cron wrapper is zsh, the runner image is not, and its suite
+      # refuses rather than skipping
+      - name: Install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - name: Validate agent + skill specs
         run: ./scripts/validate-looper-config.sh
       - name: Config validator itself (both directions)
@@ -48,5 +52,7 @@ jobs:
         run: ./hooks/guard-destructive-git.test.sh
       - name: PR-template guard hook (both directions)
         run: ./hooks/guard-pr-template.test.sh
+      - name: Custodian cron run-start usage-window gate (both directions)
+        run: ./scripts/looper-custodian-cron.test.sh
       - name: Temp-dir guard across suites (both directions)
         run: ./scripts/temp-dir-guard.test.sh
