@@ -2,11 +2,11 @@
 # doc-bloat-scan — self-contained comment-bloat detector for looper-declutter.
 #
 # The MECHANICAL finder behind `looper-declutter`: pure bash + awk + grep, no
-# third-party tools, no tokenizer deps (`[[no-third-party-hosted-tool-reliance]]`:
-# mine the check, don't adopt a linter). Read-only. It emits candidates; the
-# skill triages them and routes snips to their existing owners (the-chronicler
-# mechanics, the-ghostwriter voice). It NEVER edits a file and NEVER gates —
-# exit is always 0.
+# third-party tools and no linter dependency — the lexer below is mined, not
+# adopted (`[[no-third-party-hosted-tool-reliance]]`). Read-only. It emits
+# candidates; the skill triages them and routes snips to their existing owners
+# (the-chronicler mechanics, the-ghostwriter voice). It NEVER edits a file and
+# NEVER gates — exit is always 0.
 #
 # ── What it flags (JSONL, one candidate per line) ───────────────────────────────
 #   block-overexplained : a bare `/* … */` or `{/* … */}` block spanning
@@ -34,12 +34,14 @@
 #   capitalized-slash   : a single-line `//` whose first word is Capitalized
 #                         (`// Returns…` → `// returns…`). Conventional ALL-CAPS
 #                         markers (TODO, FIXME, GOTCHA, NOTE…) are exempt.
-#   unterminated-block  : an opener with no closer before end of file. Usually
-#                         a FALSE opener — a `{/*` inside a template literal,
-#                         which is not a comment at all — so the lines after it
-#                         are re-judged as code and still reported. Exit stays
-#                         0: the source is normally valid, and this is a
-#                         diagnostic about the scan, not a snip to route.
+#   unterminated-block  : an opener with no closer before end of file. A
+#                         string-borne `{/*` no longer reaches this kind — the
+#                         lexer vetoes it — so what lands here is a GENUINE
+#                         unterminated `/*` in code position, or a file whose
+#                         own lexer state never closed and was handed back to
+#                         line shapes. Either way the lines after it are
+#                         re-judged as code and still reported. Exit stays 0:
+#                         a diagnostic about the scan, not a snip to route.
 #
 # `text` quotes the line the candidate CITES. For a block that is the
 # opener line verbatim when it carries prose, and `/* ... <first body>`
@@ -63,6 +65,28 @@
 # never mis-read as a comment. A candidate is a suggestion, not a verdict: the
 # skill's human-disposes gate is where false positives die. Extending to
 # `#`-languages / trailing comments is future scope.
+#
+# ── Lexical state: what the tokenizer models, and what it does NOT ─────────────
+# A comment token counts only where it occurs in CODE state, so a `{/*` inside a
+# template literal is not an opener and cannot pair with a later real `*/` and
+# eat the block between them. A per-file character pre-pass exports one fact per
+# line: does this line START in code state?
+#   MODELLED: `/* */`, `//`, `'…'` and `"…"` (no ordinary quoted string spans a
+#   newline in any language here, so both reset at end of line), and backtick
+#   strings — the only multi-line form modelled. Backtick is a delimiter for
+#   `.ts .tsx .js .jsx .mjs .cjs .go` only; in `.go` it is raw (no `\` escape,
+#   no `${`), in the JS family it carries `${…}` with brace nesting.
+#   NOT MODELLED: regex literals, `"""…"""`, `@"…"`, `r#"…"#`, `R"(…)"`, nested
+#   block comments, backslash line continuation, and an unmatched `'` in code —
+#   a Rust lifetime, a C++ digit separator, a Scala symbol, JSX child text.
+#   Every one of those fails in the SAFE direction: the construct is either
+#   never entered, or (the lone `'`) swallows only to end of line, where the
+#   worst case is MISSING a string-open and judging by line shape as before.
+# The one unsafe direction is a JS regex literal carrying a stray backtick,
+# which opens a template that is not there. When that leaves any construct open
+# at end of file the fall-back rail discards the file's lexer verdict outright
+# and line shapes decide. An EVEN number of such backticks closes cleanly and is
+# the one blind spot; both halves are pinned in the suite as fixtures.
 #
 # Shares scripts/custodian-skill-lint.sh's portability rules: bash 3.2
 # safe (no mapfile / associative arrays), and grep/awk that may
@@ -122,6 +146,68 @@ function reset() {           # per-file state
   block_first = ""; block_kind = ""; block_open = ""; block_text = ""
   slash_run = 0; slash_line = 0; slash_text = ""
 }
+# --- lexer: reads characters in order, exports codestart[] and nothing else ---
+# a comment token counts only in code state, so `{/*` in a string is not one
+function skip_quoted(line, i, q,   n, c) {
+  n = length(line); i++
+  while (i <= n) {
+    c = substr(line, i, 1)
+    if (c == "\\") { i += 2; continue }
+    if (c == q) return i + 1
+    i++
+  }
+  return n + 1               # unterminated: no quoted string spans a newline
+}
+function lex_line(line,   n, i, c, d) {
+  n = length(line); i = 1
+  while (i <= n) {
+    c = substr(line, i, 1)
+    if (lx_cmt) {
+      if (c == "*" && substr(line, i + 1, 1) == "/") { lx_cmt = 0; i += 2; continue }
+      i++; continue
+    }
+    if (lx_sp > 0 && lx_expr[lx_sp] == 0) {          # backtick string body
+      if (!lx_raw && c == "\\") { i += 2; continue }
+      if (c == "`") { lx_sp--; i++; continue }
+      if (!lx_raw && c == "$" && substr(line, i + 1, 1) == "{") {
+        lx_expr[lx_sp] = 1; lx_brace[lx_sp] = 0; i += 2; continue
+      }
+      i++; continue
+    }
+    if (c == "/") {
+      d = substr(line, i + 1, 1)
+      if (d == "/") return                            # rest of line is comment
+      if (d == "*") { lx_cmt = 1; i += 2; continue }
+      i++; continue
+    }
+    if (c == "\"" || c == "'") { i = skip_quoted(line, i, c); continue }
+    if (lx_tick && c == "`") {
+      lx_sp++; lx_expr[lx_sp] = 0; lx_brace[lx_sp] = 0; i++; continue
+    }
+    if (lx_sp > 0) {         # inside `${ }`: a balanced `}` ends the hole
+      if (c == "{") { lx_brace[lx_sp]++; i++; continue }
+      if (c == "}") {
+        if (lx_brace[lx_sp] == 0) lx_expr[lx_sp] = 0; else lx_brace[lx_sp]--
+        i++; continue
+      }
+    }
+    i++
+  }
+}
+function lex_buffer(   i, f) {
+  lx_cmt = 0; lx_sp = 0
+  split("", lx_expr); split("", lx_brace); split("", codestart)
+  f = tolower(cur_file)
+  lx_tick = (f ~ /\.(ts|tsx|js|jsx|mjs|cjs|go)$/)
+  lx_raw = (f ~ /\.go$/)     # a Go raw string takes no `\` escape and no `${`
+  for (i = 1; i <= nlines; i++) {
+    codestart[i] = (!lx_cmt && (lx_sp == 0 || lx_expr[lx_sp] == 1))
+    # in plain code state only these four bytes can move the lexer
+    if (lx_cmt || lx_sp > 0 || L[i] ~ /[`'"\/]/) lex_line(L[i])
+  }
+  # still open at EOF = the lexer lost the thread; line shapes decide instead
+  if (lx_cmt || lx_sp > 0) for (i = 1; i <= nlines; i++) codestart[i] = 1
+}
 function scan_line(ln, line,   t, len, is_close, body, after, one, rest) {
   t = line
   sub(/^[ \t]+/, "", t)      # trimmed (leading whitespace removed)
@@ -153,7 +239,7 @@ function scan_line(ln, line,   t, len, is_close, body, after, one, rest) {
 
   # block opener? `{/*` is the JSX braced form of the same token, so it takes
   # the same path. The brace must abut: `{ /*` is a block or object literal.
-  if (t ~ /^\{?\/\*/) {
+  if (codestart[ln] && t ~ /^\{?\/\*/) {
     flush_slashes()
     if (len > 75) emit(cur_file, ln, "over-75", t)
     # a `/* … */` or `{/* … */}` that closes on its own line is not a block.
@@ -184,7 +270,7 @@ function scan_line(ln, line,   t, len, is_close, body, after, one, rest) {
   }
 
   # full-line `//` comment?
-  if (t ~ /^\/\//) {
+  if (codestart[ln] && t ~ /^\/\//) {
     if (len > 75) emit(cur_file, ln, "over-75", t)
     after = t
     sub(/^\/\/+[ \t]*/, "", after)
@@ -203,6 +289,7 @@ function scan_line(ln, line,   t, len, is_close, body, after, one, rest) {
 function finish_file(   i) {
   if (cur_file == "") return
   reset()
+  lex_buffer()
   i = 1
   while (i <= nlines) {
     scan_line(i, L[i])

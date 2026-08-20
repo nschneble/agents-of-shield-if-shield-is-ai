@@ -191,16 +191,129 @@ export const longIdentifierRunningWellPastTheSeventyFiveCharacterCeiling = 2
 EOF
 
 cat > "$temp_dir/unterminated.tsx" <<'EOF'
+export const Panel = () => (
+  <div>
+    {/*
+// Restarted on the line directly after the braced opener
+// second stacked line
+    {/*
+// Trailing note after the second unterminated opener
+  </div>
+)
+EOF
+
+# ── RED fixture: the mis-pairing case a tokenizer is what fixes ───────────────
+# The false `{/*` used to pair with the REAL block's `*/` and eat it whole.
+cat > "$temp_dir/mispair.tsx" <<'EOF'
 const sample = `
   {/*
 `
-// Panel renders the sample above
-// second stacked line
-const other = `
-  {/*
+export const A = () => <div />
+
+/*
+  the real block eaten before, holding a stray ` character
+*/
+export const B = 2
+
+const doc = `
+// Not a comment, just template text
+// nor is this one
 `
-// Trailing note after the second false opener
-export const Panel = () => <div />
+// Capitalized tail below the real block
+EOF
+
+# ── RED fixture: `${ … }` is code again, and the braces inside it nest ────────
+cat > "$temp_dir/nest.ts" <<'EOF'
+const nest = `a ${ fn({ k: 1 }) + "`" } b
+  {/* still inside the outer template
+`
+/* the real block after the substitution
+   one body line
+*/
+export const a = 1
+EOF
+
+# ── RED fixture: quoted-string state, entered and left ────────────────────────
+cat > "$temp_dir/strings.ts" <<'EOF'
+const dq = "a /* opener and a ` backtick, double-quoted"
+/* the real block a leaking double quote would have eaten
+   one body line
+*/
+export const a = 1
+
+const sq = 'a /* opener and a ` backtick, single-quoted'
+/* the real block a leaking single quote would have eaten
+   one body line
+*/
+export const b = 2
+
+const closedDq = "decoy" + `
+  {/* opened after that double quote closed
+`
+const closedSq = 'decoy' + `
+  {/* opened after that single quote closed
+`
+// Capitalized tail after every decoy
+EOF
+
+# ── RED fixture: a backslash escapes inside `"…"` and inside a template ──────
+cat > "$temp_dir/escapes.ts" <<'EOF'
+const q = "an escaped \" quote, then a ` backtick"
+/* the block a mis-read escaped quote would trap
+   one body line
+*/
+const r = "a plain string with a ` backtick"
+
+const t = `a template with an escaped \` backtick
+  {/* still inside: the escape kept the template open
+`
+/* the block a mis-read template escape would eat
+   one body line
+*/
+export const a = 1
+EOF
+
+# ── RED fixture: a Go raw string takes no backslash escape ────────────────────
+cat > "$temp_dir/raw.go" <<'EOF'
+package main
+
+var esc = `a raw string ending in a backslash \`
+var body = `
+  {/* a raw-string line, not an opener
+`
+
+/* the real block after both raw strings
+   one body line
+*/
+func main() {}
+EOF
+
+# ── the stated limits, pinned as EXPECTED so each is a contract ───────────────
+cat > "$temp_dir/limit-textblock.java" <<'EOF'
+class Limits {
+  String note = """
+      /* a text block is not a modelled string form, so this opener
+         is still judged by line shape
+      */
+      """;
+}
+EOF
+
+cat > "$temp_dir/limit-regex-rail.ts" <<'EOF'
+const open = /`/
+/* an UNPAIRED regex backtick never closes, so the rail fires
+   one body line
+*/
+export const a = 1
+EOF
+
+cat > "$temp_dir/limit-regex-blind.ts" <<'EOF'
+const pair = /`/
+/* a PAIRED regex backtick is the blind spot: this block is lost
+   one body line
+*/
+const shut = /`/
+export const b = 2
 EOF
 
 out=$("$scanner" "$temp_dir")
@@ -320,21 +433,117 @@ check "a code line after an unterminated /* fires no over-75" "$([ $? -ne 0 ] &&
 echo "$out" | grep -q '"file":"[^"]*unterminated.ts","line":11,"kind":"capitalized-slash"'
 check "a candidate on the line right after a false opener still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":2,"kind":"unterminated-block","text":"{/\*"'
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":3,"kind":"unterminated-block","text":"{/\*"'
 check "an unterminated {/* reports at its opener" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-# the scan restarts after each false opener, so a chain of them all report
-echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":7,"kind":"unterminated-block"'
-check "a second false opener in the same file also reports" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+# the scan restarts after each unterminated opener, so a chain all report
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":6,"kind":"unterminated-block"'
+check "a second unterminated opener in the same file also reports" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
-echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":9,"kind":"capitalized-slash"'
-check "a candidate after the second false opener still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":7,"kind":"capitalized-slash"'
+check "a candidate after the second unterminated opener still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 # the other direction: a block that CLOSES must stay silent here, as must
 # a one-line `/* … */` and the non-abutting `{ /*` block scope
 unterminated=$(echo "$out" | grep -c '"kind":"unterminated-block"')
-check "only the four false openers report unterminated (got $unterminated)" \
+check "only the four unterminated openers report (got $unterminated)" \
   "$([ "$unterminated" -eq 4 ] && echo 0 || echo 1)"
+
+# ── the mis-pairing case ──────────────────────────────────────────────────────
+# The defect a tokenizer is what fixes: the `{/*` on line 2 sits inside a
+# template literal, found the REAL block's `*/` on line 8, and consumed
+# lines 6-8 as its own body. The real block vanished at exit 0.
+echo "$out" | grep -q '"file":"[^"]*mispair.tsx","line":6,"kind":"block-overexplained","text":"/\* \.\.\. the real block eaten before, holding a stray '
+check "the real block after a false opener survives and is judged" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*mispair.tsx","line":2,'
+check "a {/* inside a template literal is not an opener" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# the OTHER token, and the lexer's own comment state: a full-line `//`
+# inside a template is template text, and the stray backtick on line 7 is
+# inside a real block comment, so it opens no template of its own
+echo "$out" | grep -q '"file":"[^"]*mispair.tsx","line":12,'
+check "a full-line // inside a template literal is not a comment" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# a false opener that mis-pairs is not unterminated either — it is nothing
+echo "$out" | grep -q 'mispair\.tsx".*"kind":"unterminated-block"'
+check "a mis-pairing false opener reports no unterminated-block" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*mispair.tsx","line":15,"kind":"capitalized-slash"'
+check "the tail below the real block still scans" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# ── `${ … }` returns to code state, and its braces nest ───────────────────────
+# The substitution holds `fn({ k: 1 })`, so the FIRST `}` must not end it.
+# An ungated exit hands the rest of the line back as template text, where
+# the backtick inside `"…"` closes the template and line 2 reads as an opener.
+echo "$out" | grep -q '"file":"[^"]*nest.ts","line":2,'
+check "a braced substitution does not end at its first inner }" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*nest.ts","line":4,"kind":"block-overexplained"'
+check "the block after a nested substitution is judged" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# ── quoted-string state, entered AND left ─────────────────────────────────────
+# Entered: the `/*` inside each decoy string must not open a lexer block
+# comment, or the real block below it reads as already-inside-a-comment
+# and is vetoed. Left: the backtick AFTER each closing quote must still
+# open a template, or the `{/*` under it is read as an opener.
+echo "$out" | grep -q '"file":"[^"]*strings.ts","line":2,"kind":"block-overexplained"'
+check "a /* inside a double-quoted string does not eat the block below" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*strings.ts","line":8,"kind":"block-overexplained"'
+check "a /* inside a single-quoted string does not eat the block below" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*strings.ts","line":14,'
+check "a double-quoted string ENDS, so the template after it opens" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*strings.ts","line":17,'
+check "a single-quoted string ENDS, so the template after it opens" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*strings.ts","line":19,"kind":"capitalized-slash"'
+check "the tail below every decoy string still scans" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# ── a backslash escape, in each state that honours one ───────────────────────
+# Drop it from `"…"` and the string ends at the escaped quote, so the
+# backtick after it opens a template that traps the block below. Drop it
+# from the template body and the escaped backtick CLOSES the template, so
+# line 8 lands in code state and eats the block at line 10 instead.
+echo "$out" | grep -q '"file":"[^"]*escapes.ts","line":2,"kind":"block-overexplained"'
+check "a \\\" inside a double-quoted string does not end it" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*escapes.ts","line":8,'
+check "an escaped backtick does not close its template literal" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*escapes.ts","line":10,"kind":"block-overexplained"'
+check "the block below an escaped-backtick template is judged" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# ── Go raw strings take no backslash escape ───────────────────────────────────
+# `\` before the closing backtick is a literal backslash in Go, not an
+# escape. Applying JS escape rules shifts every later backtick by one, so
+# the `{/*` on line 5 lands in code state and eats the real block below.
+echo "$out" | grep -q '"file":"[^"]*raw.go","line":8,"kind":"block-overexplained"'
+check "a Go raw string ending in a backslash closes where Go closes it" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*raw.go","line":5,'
+check "a {/* inside a Go raw string is not an opener" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# ── the stated limits, as contracts rather than surprises ─────────────────────
+# A `"""` text block is NOT a modelled string form. Its body is judged by
+# line shape, exactly as before the lexer landed. Pinned so the limit is
+# read off a fixture instead of discovered in a report.
+echo "$out" | grep -q '"file":"[^"]*limit-textblock.java","line":3,"kind":"block-overexplained"'
+check "LIMIT: a Java text block body is still judged by line shape" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# A regex literal is NOT a modelled state, so its backtick reads as a
+# template opener. When that leaves a construct open at EOF the fall-back
+# rail discards the whole file's lexer verdict and line shapes decide.
+echo "$out" | grep -q '"file":"[^"]*limit-regex-rail.ts","line":2,"kind":"block-overexplained"'
+check "LIMIT: an unpaired regex backtick trips the fall-back rail" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# and the blind spot the rail cannot see: an EVEN number of stray regex
+# backticks closes cleanly, so the block between them is lost. This is the
+# one case where the lexer is worse than the line matcher it replaced.
+echo "$out" | grep -q 'limit-regex-blind\.ts"'
+check "LIMIT: a PAIRED regex backtick loses the block between them" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 
 # ── --help ───────────────────────────────────────────────────────────────
 # usage() prints the file header back, ranged to `set -` rather than to a
