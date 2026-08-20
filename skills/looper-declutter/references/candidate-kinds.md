@@ -4,7 +4,7 @@ What `scripts/doc-bloat-scan.sh` emits, and which owner's rule disposes each kin
 
 Two rules govern this whole file. **The detector proposes, it never decides** — it emits candidates, never verdicts, never edits, and never gates (exit 0 always). **Declutter carries no comment-style constants of its own** — every disposition below cites an owner, and when an owner's rule changes declutter inherits it with no edit here.
 
-## The six kinds
+## The seven kinds
 
 The detector emits one JSONL candidate per hit — `{file, line, kind, text}`. Scope is v1: C-style `//` and `/* */` plus JSX's braced `{/* … */}` spelling of the latter, full-line comments only, so a `//` inside a string or an `https://` URL is never mis-read.
 
@@ -14,6 +14,7 @@ The detector emits one JSONL candidate per hit — `{file, line, kind, text}`. S
 - `stacked-slashes` — two or more consecutive `//` lines
 - `over-75` — a comment line longer than 75 chars (break belongs at column 76)
 - `capitalized-slash` — a single-line `//` whose first word is Capitalized
+- `unterminated-block` — an opener with no closer before end of file. The odd one out: it reports on the SCAN, not on a comment, and it is usually a FALSE opener — a `{/*` inside a template literal, which is not a comment at all. The detector reports it, then re-judges the lines after it as code so they can still produce candidates; before that it swallowed the rest of the file in silence at exit 0. Only `//`-family candidates can follow one, since anything carrying a `*/` would have closed the block instead.
 
 ## Snip routing — reuse owners, never duplicate them
 
@@ -27,6 +28,7 @@ The heart of the skill. Each kind maps to an existing rule; declutter applies th
 | `stacked-slashes`     | `the-chronicler` — collapse the wall to one WHY line, or delete if it only narrates the code                                                             |
 | `over-75`             | `the-chronicler` — wrap/tighten to ≤ 75 chars (break at column 76)                                                                                       |
 | `capitalized-slash`   | `the-chronicler` — lowercase the first word of a single-line `//`                                                                                        |
+| `unterminated-block`  | NO owner and NO snip — the only kind that never routes. Read it as a note on the scan: check whether the cited line is a real comment opener (a genuinely broken file) or a false one (a `{/*` in a template literal). Either way, treat this file's other candidates as provisional, since everything below the opener was re-judged as code. Never propose a snip from it. |
 | every surviving line  | `the-ghostwriter` `## Comment cleanup mandate` + `## AI-slop blocklist` — de-slop, kill commit/wave archaeology, no em-dash                              |
 
 The snip brief cites the owning rule per candidate. This is the anti-duplication contract — the agents explicitly guard against a second pass doing the same work (`the-chronicler.md`, `the-ghostwriter.md` cross-reference each other), and declutter honors it.

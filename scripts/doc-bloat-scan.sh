@@ -34,11 +34,19 @@
 #   capitalized-slash   : a single-line `//` whose first word is Capitalized
 #                         (`// Returns…` → `// returns…`). Conventional ALL-CAPS
 #                         markers (TODO, FIXME, GOTCHA, NOTE…) are exempt.
+#   unterminated-block  : an opener with no closer before end of file. Usually
+#                         a FALSE opener — a `{/*` inside a template literal,
+#                         which is not a comment at all — so the lines after it
+#                         are re-judged as code and still reported. Exit stays
+#                         0: the source is normally valid, and this is a
+#                         diagnostic about the scan, not a snip to route.
 #
 # `text` quotes the line the candidate CITES. For a block that is the
 # opener line verbatim when it carries prose, and `/* ... <first body>`
 # when the opener is bare — the elision mark says the words come from
-# the next line, so the quote is never read as the opener's own.
+# the next line, so the quote is never read as the opener's own. An
+# `unterminated-block` always quotes the opener line verbatim: it has no
+# validated body to borrow a word from.
 #
 # ── Scope (v1) ──────────────────────────────────────────────────────────────────
 # C-style `//` and `/* */` only, and only FULL-LINE comments (the trimmed line
@@ -82,9 +90,8 @@ EXT_RE='\.(ts|tsx|js|jsx|mjs|cjs|c|h|cc|cpp|hpp|hh|go|java|swift|rs|kt|kts|scala
 # Dirs pruned in the non-git fallback walk (git mode honors .gitignore instead).
 PRUNE='.git node_modules dist build out coverage vendor .next .nuxt .svelte-kit local'
 
-# --- awk finder: per-file state, reset on FNR==1, flushed at END ---
-# Filenames are captured per pending run so a candidate emitted at a file
-# boundary carries the RIGHT file, not the next one.
+# --- awk finder: each file buffered, scanned by index, flushed at file end ---
+# buffered, not streamed: an opener's fate is only known at end of file
 read -r -d '' AWK_PROG <<'AWK' || true
 function jesc(s) {           # minimal JSON string escaping
   gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\t/, " ", s)
@@ -97,24 +104,31 @@ function emit(f, ln, kind, text,   t) {
   printf "{\"file\":\"%s\",\"line\":%d,\"kind\":\"%s\",\"text\":\"%s\"}\n",
          jesc(f), ln, kind, jesc(t)
 }
+# held, not printed: a false opener gives its lines back to the scan
+function hold(ln, kind, text) {
+  held++; held_line[held] = ln; held_kind[held] = kind; held_text[held] = text
+}
+function release(   i) {
+  for (i = 1; i <= held; i++)
+    emit(cur_file, held_line[i], held_kind[i], held_text[i])
+  held = 0
+}
 function flush_slashes() {
-  if (slash_run >= 2) emit(slash_file, slash_line, "stacked-slashes", slash_text)
+  if (slash_run >= 2) emit(cur_file, slash_line, "stacked-slashes", slash_text)
   slash_run = 0
 }
 function reset() {           # per-file state
-  in_block = 0; block_body = 0; block_line = 0; block_file = ""
-  block_first = ""; block_kind = ""; block_open = ""; block_head = ""
-  slash_run = 0; slash_line = 0; slash_text = ""; slash_file = ""
+  in_block = 0; block_body = 0; block_line = 0; held = 0
+  block_first = ""; block_kind = ""; block_open = ""; block_text = ""
+  slash_run = 0; slash_line = 0; slash_text = ""
 }
-FNR == 1 { flush_slashes(); reset() }
-{
-  line = $0
+function scan_line(ln, line,   t, len, is_close, body, after, one, rest) {
   t = line
   sub(/^[ \t]+/, "", t)      # trimmed (leading whitespace removed)
   len = length(line)
 
   if (in_block) {
-    if (len > 75) emit(FILENAME, FNR, "over-75", t)
+    if (len > 75) hold(ln, "over-75", t)
     is_close = (index(line, "*/") > 0)
     body = t
     sub(/[ \t]*\*\/.*$/, "", body)  # drop the closer first, so a bare `*/`…
@@ -124,21 +138,24 @@ FNR == 1 { flush_slashes(); reset() }
     # strips to empty and does not count
     if (body != "") { block_body++; if (block_first == "") block_first = body }
     if (is_close) {
+      release()
       # >= 1 content line means a genuine multi-line block (opener, content,
       # closer) — the-chronicler bans any multi-line block mid-execution
-      if (block_body >= 1)
-        emit(block_file, block_line, block_kind,
-             (block_head != "") ? block_head : block_open " ... " block_first)
-      in_block = 0; block_body = 0; block_first = ""; block_head = ""
+      if (block_body >= 1) {
+        rest = block_text; sub(/^\{?\/\*+[ \t]*/, "", rest)
+        emit(cur_file, block_line, block_kind,
+             (rest != "") ? block_text : block_open " ... " block_first)
+      }
+      in_block = 0; block_body = 0; block_first = ""; block_text = ""
     }
-    next
+    return
   }
 
   # block opener? `{/*` is the JSX braced form of the same token, so it takes
   # the same path. The brace must abut: `{ /*` is a block or object literal.
   if (t ~ /^\{?\/\*/) {
     flush_slashes()
-    if (len > 75) emit(FILENAME, FNR, "over-75", t)
+    if (len > 75) emit(cur_file, ln, "over-75", t)
     # a `/* … */` or `{/* … */}` that closes on its own line is not a block.
     # The `/**` spelling still emits: it declares "this is documentation of a
     # symbol," which is the shape a per-prop doc takes, and props get no docs
@@ -150,40 +167,57 @@ FNR == 1 { flush_slashes(); reset() }
         sub(/^\{?\/\*+[ \t]*/, "", one)
         sub(/[ \t]*\*+\/\}?$/, "", one)
         # an alnum is what separates real prose from an empty `/**/` husk
-        if (one ~ /[A-Za-z0-9]/) emit(FILENAME, FNR, "jsdoc-oneline", t)
+        if (one ~ /[A-Za-z0-9]/) emit(cur_file, ln, "jsdoc-oneline", t)
       }
-      next
+      return
     }
     in_block = 1; block_body = 0; block_first = ""
-    block_line = FNR; block_file = FILENAME
+    block_line = ln
     # `/**` is a doc header (keep-leaning); a bare `/*` mid-code is the quarry
     block_kind = (t ~ /^\{?\/\*\*/) ? "jsdoc-block" : "block-overexplained"
     block_open = ((t ~ /^\{/) ? "{" : "") ((block_kind == "jsdoc-block") ? "/**" : "/*")
     # the emitted text has to quote the line it CITES. When the opener
     # carries prose, that trimmed line is the quote; splicing the next
     # line's words onto this line number misleads whoever ticks it
-    open_rest = t; sub(/^\{?\/\*+[ \t]*/, "", open_rest)
-    block_head = (open_rest != "") ? t : ""
-    next
+    block_text = t
+    return
   }
 
   # full-line `//` comment?
   if (t ~ /^\/\//) {
-    if (len > 75) emit(FILENAME, FNR, "over-75", t)
+    if (len > 75) emit(cur_file, ln, "over-75", t)
     after = t
     sub(/^\/\/+[ \t]*/, "", after)
     # Capitalized first word = Uppercase then lowercase. ALL-CAPS markers
     # (TODO/GOTCHA/…) are [A-Z][A-Z] and correctly skipped.
-    if (after ~ /^[A-Z][a-z]/) emit(FILENAME, FNR, "capitalized-slash", t)
-    if (slash_run == 0) { slash_line = FNR; slash_text = t; slash_file = FILENAME }
+    if (after ~ /^[A-Z][a-z]/) emit(cur_file, ln, "capitalized-slash", t)
+    if (slash_run == 0) { slash_line = ln; slash_text = t }
     slash_run++
-    next
+    return
   }
 
   # any non-comment line ends a `//` run
   flush_slashes()
 }
-END { flush_slashes() }
+# an opener still open at EOF was never a block: report it, rescan its tail
+function finish_file(   i) {
+  if (cur_file == "") return
+  reset()
+  i = 1
+  while (i <= nlines) {
+    scan_line(i, L[i])
+    i++
+    if (i > nlines && in_block) {
+      emit(cur_file, block_line, "unterminated-block", block_text)
+      held = 0; in_block = 0
+      i = block_line + 1
+    }
+  }
+  flush_slashes()
+}
+FNR == 1 { finish_file(); cur_file = FILENAME; nlines = 0; split("", L) }
+{ nlines++; L[nlines] = $0 }
+END { finish_file() }
 AWK
 
 scan_files() {  # scan the NUL-delimited file list on stdin

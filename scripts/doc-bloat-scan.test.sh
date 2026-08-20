@@ -18,6 +18,15 @@
 # zero-content form, whose `*/}` closer has to strip to empty like a plain
 # `*/` does; and a `{ /*` block scope, which is not a comment opener
 # because the brace does not abut — the one rule the scanner states twice.
+# The unterminated fixtures cover the swallow-to-EOF hole: an opener that
+# never closes used to leave block state set for the rest of the file, so
+# every later candidate vanished at exit 0. Both spellings appear, each
+# followed by a candidate that must still be found and a chained second
+# false opener; the `.ts` one adds an over-75 CODE line that must NOT
+# fire, since that hit came from inside the phantom block. Only
+# `//`-family candidates can follow one — anything carrying a `*/` would
+# have closed it instead. The reverse direction is the tally: a block
+# that CLOSES emits none, and three is the whole tree's count.
 # Exit is always 0 — the scanner reports, it never gates. Pure bash,
 # jq-free.
 set -uo pipefail
@@ -80,6 +89,11 @@ export const k = 7
 
 /** a one-line symbol doc */
 export const m = 8
+
+/*
+  an interior block line running well past the seventy-five character ceiling
+*/
+export const p = 9
 EOF
 
 # ── RED fixture: the JSX braced spelling of the same shapes ────────────────────
@@ -157,6 +171,31 @@ export const Ok = () => (
 )
 EOF
 
+# ── RED fixtures: an opener that never closes, both spellings ─────────────────
+cat > "$temp_dir/unterminated.ts" <<'EOF'
+export const a = 1
+
+/*
+export const b = 2
+
+// First stacked line
+// second stacked line
+export const longIdentifierRunningWellPastTheSeventyFiveCharacterCeiling = 2
+EOF
+
+cat > "$temp_dir/unterminated.tsx" <<'EOF'
+const sample = `
+  {/*
+`
+// Panel renders the sample above
+// second stacked line
+const other = `
+  {/*
+`
+// Trailing note after the second false opener
+export const Panel = () => <div />
+EOF
+
 out=$("$scanner" "$temp_dir")
 rc=$?
 
@@ -188,6 +227,11 @@ check "a 76-char comment fires over-75" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q 'clean\.ts".*"kind":"over-75"'
 check "a 75-char comment does not fire over-75" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# an in-block over-75 is held until the closer proves the block real, so
+# dropping the release would silently lose every one of them
+echo "$out" | grep -q '"file":"[^"]*bloat.ts","line":34,"kind":"over-75"'
+check "an over-75 line inside a closed block still fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q '"file":"[^"]*bloat.ts".*"kind":"capitalized-slash"'
 check "capitalized-slash fires" "$([ $? -eq 0 ] && echo 0 || echo 1)"
@@ -252,6 +296,34 @@ check "clean.ts produces no candidate" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 
 echo "$out" | grep -q 'clean\.tsx"'
 check "clean.tsx produces no candidate" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# ── an opener that never closes ───────────────────────────────────────────────
+# the hole: state survived to EOF, so nothing below the opener reported
+echo "$out" | grep -q '"file":"[^"]*unterminated.ts","line":3,"kind":"unterminated-block","text":"/\*"'
+check "an unterminated /* reports at its opener" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*unterminated.ts","line":6,"kind":"stacked-slashes"'
+check "a candidate after an unterminated /* still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# the tail is re-judged as CODE: this line is not a comment at all
+echo "$out" | grep -q 'unterminated\.ts".*"kind":"over-75"'
+check "a code line after an unterminated /* fires no over-75" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":2,"kind":"unterminated-block","text":"{/\*"'
+check "an unterminated {/* reports at its opener" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# the scan restarts after each false opener, so a chain of them all report
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":7,"kind":"unterminated-block"'
+check "a second false opener in the same file also reports" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+echo "$out" | grep -q '"file":"[^"]*unterminated.tsx","line":9,"kind":"capitalized-slash"'
+check "a candidate after the second false opener still emits" "$([ $? -eq 0 ] && echo 0 || echo 1)"
+
+# the other direction: a block that CLOSES must stay silent here, as must
+# a one-line `/* … */` and the non-abutting `{ /*` block scope
+unterminated=$(echo "$out" | grep -c '"kind":"unterminated-block"')
+check "only the three false openers report unterminated (got $unterminated)" \
+  "$([ "$unterminated" -eq 3 ] && echo 0 || echo 1)"
 
 # ── --help ───────────────────────────────────────────────────────────────
 # usage() prints the file header back, ranged to `set -` rather than to a
