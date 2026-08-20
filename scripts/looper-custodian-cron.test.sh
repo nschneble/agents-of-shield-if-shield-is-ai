@@ -23,10 +23,11 @@
 # observed live: the account was `allowed`, and the probe passes the
 # anthropic-ratelimit-unified-*-status header through verbatim.
 #
-# Both directions on every axis the gate branches on: a clear window
-# LAUNCHES and a hot one DEFERS; a hot weekly defers with NO wait while a
-# hot 5-hour one waits first; a `rejected` status is narrated as a hard
-# stop and never as a threshold trip.
+# Both directions on every axis the gate branches on, and every arm of its
+# case: a clear window LAUNCHES and a hot one DEFERS; a hot weekly defers
+# with NO wait while a hot 5-hour one waits first; a `rejected` status is
+# narrated as a hard stop, never as a threshold trip; and every way the
+# window goes UNREAD is named as the reason it was, never as a reading.
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -39,17 +40,23 @@ cron="$here/looper-custodian-cron.sh"
 # bare `mktemp -d` ignores TMPDIR on BSD and allocates under /var/folders.
 # one arm per shape: mktemp's own stderr explains a nonzero exit, but the
 # empty-yet-successful shape prints nothing, so "failed" would be a lie
-die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+die_setup() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
-  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+  || die_setup "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] \
-  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
-[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
+  || die_setup "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_setup "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 
 # a skipped suite is not a passing one, and CI's image ships no zsh
 command -v zsh >/dev/null 2>&1 \
-  || die_temp "zsh is not installed and $cron is a zsh script"
+  || die_setup "zsh is not installed and $cron is a zsh script"
+# without jq every fixture is empty and nine cases mismatch as unread
+command -v jq >/dev/null 2>&1 \
+  || die_setup "jq is not installed and every probe fixture is built with it"
+# the bound below is perl's alarm; macOS ships no timeout(1)
+command -v perl >/dev/null 2>&1 \
+  || die_setup "perl is not installed and it is what bounds each wrapper run"
 
 fails=0
 check() { # desc, condition-already-evaluated ($?)
@@ -70,9 +77,15 @@ HOT_WEEKLY=$(variant ".weekly.utilization = 0.96 | .five_hour.reset = $RESET_AHE
 HOT_BOTH=$(variant ".weekly.utilization = 0.96 | .five_hour.utilization = 0.97 | .five_hour.reset = $RESET_AHEAD")
 REJ_WEEKLY=$(variant '.weekly.status = "rejected"')
 REJ_5H=$(variant ".five_hour.status = \"rejected\" | .five_hour.reset = $RESET_AHEAD")
+# allowed_warning is live: a probe here read five_hour 0.90 allowed_warning
+ALLOWED_WARNING=$(variant '.weekly.status = "allowed_warning"')
+NO_UTIL=$(variant '.five_hour.utilization = null | .weekly.utilization = null')
+AT_THRESHOLD=$(variant '.weekly.utilization = 0.95')
+HOT_5H_NO_RESET=$(variant '.five_hour.utilization = 0.97 | .five_hour.reset = null')
+HOT_5H_FAR_RESET=$(variant '.five_hour.utilization = 0.97 | .five_hour.reset = 99999999999')
 
 # --- stubs: real executables, first on the wrapper's own PATH prefix -----
-bin="$temp_dir/bin"; mkdir -p "$bin" || die_temp "cannot create $bin"
+bin="$temp_dir/bin"; mkdir -p "$bin" || die_setup "cannot create $bin"
 
 # no stub writes stdout: the wrapper greps claude's output for the
 # ceiling and session-limit markers, and a stub line would forge one
@@ -130,18 +143,42 @@ case_n=0
 setup_case() { # queue-line... — one probe reading per line, in order
   case_n=$((case_n + 1))
   case_dir="$temp_dir/case-$case_n"
+  case_bin=""
   mkdir -p "$case_dir/logs" "$case_dir/calls" "$case_dir/repo" \
-    || die_temp "cannot create $case_dir"
+    || die_setup "cannot create $case_dir"
   printf '%s\n' "$@" > "$case_dir/queue"
   log="$case_dir/logs/cron.log"
 }
 
+# a hang here once launched the REAL agent, --dangerously-skip-permissions
+# and all; macOS has no timeout(1), and alarm survives exec. The cap kills
+# the wrapper, not a child it already spawned; what it buys is that no
+# LATER wrapper command runs, and that is where the 900s backoff and the
+# live `gh issue create` sit
+RUN_CAP=30
+bounded() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+
 run_cron() { # VAR=VAL... — extra env for this run
-  env REPO="$case_dir/repo" LOGDIR="$case_dir/logs" \
-      WINDOW_PROBE="$probe" CUSTODIAN_PATH_PREFIX="$bin" \
+  bounded "$RUN_CAP" \
+    env REPO="$case_dir/repo" LOGDIR="$case_dir/logs" \
+      WINDOW_PROBE="$probe" CUSTODIAN_PATH_PREFIX="${case_bin:-$bin}" \
       PROBE_QUEUE="$case_dir/queue" CRON_CALLS="$case_dir/calls" \
       "$@" "$cron" >/dev/null 2>&1
   rc=$?
+}
+
+# the wrapper PREPENDS this dir, so a stub here SHADOWS a tool; sealing
+# PATH (run_cron PATH=) is what makes one ABSENT instead
+case_path() { # system-tool... — sets case_bin
+  local d="$case_dir/bin" t p
+  mkdir -p "$d" || die_setup "cannot create $d"
+  for t in "$@"; do
+    p=$(command -v "$t") \
+      || die_setup "$t is not installed and a sealed-PATH case needs it"
+    ln -sf "$p" "$d/$t" || die_setup "cannot link $t into $d"
+  done
+  for p in "$bin"/*; do ln -sf "$p" "$d/$(basename "$p")"; done
+  case_bin="$d"
 }
 
 calls() { # tool — how many times it was invoked
@@ -151,6 +188,14 @@ calls() { # tool — how many times it was invoked
 
 logged() { grep -qF "$1" "$log"; }
 issue()  { grep -qF "$1" "$case_dir/calls/gh-args" 2>/dev/null; }
+
+# --- the bound itself, both directions, before any case leans on it ------
+bounded 1 sleep 5 >/dev/null 2>&1
+[ "$?" -eq 142 ] && r=0 || r=1
+check "CAP: a run that hangs is killed by the alarm (want rc 142)" "$r"
+bounded "$RUN_CAP" true >/dev/null 2>&1
+[ "$?" -eq 0 ] && r=0 || r=1
+check "CAP: a run that returns normally is not killed" "$r"
 
 # --- CLEAR: under threshold on both windows, on the captured reading ----
 setup_case "$OK_LINE"
@@ -243,16 +288,13 @@ issue 'hot weekly rejected@42%'
 check "REJECTED-WEEKLY: issue quotes the observed state verbatim" $?
 
 # --- REJECTED on the 5-hour window: same hard stop, but the WAIT arm -----
+# rc and the launch are HOT-5H-CLEARS's; the wait arm is this case's own
 setup_case "$REJ_5H" "$REJ_5H" "$OK_LINE"
 run_cron
-[ "$rc" -eq 0 ] && r=0 || r=1
-check "REJECTED-5H: exits 0 once the window clears (got $rc)" "$r"
 [ "$(calls sleep)" = 1 ] && r=0 || r=1
 check "REJECTED-5H: takes the wait arm, unlike weekly (sleep called $(calls sleep)x)" "$r"
 logged 'usage window hot five_hour rejected@58%'
 check "REJECTED-5H: logs the rejection on the 5-hour window" $?
-[ "$(calls claude)" = 1 ] && r=0 || r=1
-check "REJECTED-5H: launched after the wait (got $(calls claude))" "$r"
 
 # --- BOTH hot: the weekly reading must not be masked by the 5-hour one ---
 # scanning five_hour first hid a hot weekly one behind a 6h wait
@@ -283,6 +325,112 @@ run_cron WINDOW_THRESHOLD=0.5
 check "THRESHOLD: the unmodified capture defers at 0.5 (got $rc)" "$r"
 issue 'the five_hour window was at or over the 50% threshold'
 check "THRESHOLD: the issue renders the overridden threshold, not 95%" $?
+
+# --- ALLOWED_WARNING: a live third status that is NOT a hard stop --------
+# rails.md has it corroborate the threshold, never stand as a hard stop
+setup_case "$ALLOWED_WARNING"
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "ALLOWED-WARNING: exits 0 (got $rc)" "$r"
+logged 'run-start gate: usage window ok — launching'
+check "ALLOWED-WARNING: reads as ok, not as a rejection" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "ALLOWED-WARNING: launches (claude called $(calls claude)x)" "$r"
+[ "$(calls gh)" = 0 ] && r=0 || r=1
+check "ALLOWED-WARNING: opens no issue (gh called $(calls gh)x)" "$r"
+
+# --- AT the threshold exactly: `>=`, not `>` ----------------------------
+# only a fixture sitting ON the bar separates the two comparisons
+setup_case "$AT_THRESHOLD"
+run_cron
+[ "$rc" -eq 5 ] && r=0 || r=1
+check "AT-THRESHOLD: 95% against a 95% bar defers (got $rc)" "$r"
+issue 'hot weekly 95%'
+check "AT-THRESHOLD: issue quotes the reading that sat on the bar" $?
+issue 'the weekly window was at or over the 95% threshold'
+check "AT-THRESHOLD: issue says at or over, and means it" $?
+
+# --- read_ok with no utilization on either window: still no reading ------
+setup_case "$NO_UTIL"
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "NO-UTILIZATION: exits 0 (got $rc)" "$r"
+logged 'usage window unread no_utilization — launching unguarded'
+check "NO-UTILIZATION: calls it unread rather than fabricating 0%" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "NO-UTILIZATION: launches (claude called $(calls claude)x)" "$r"
+
+# --- probe output that is not JSON at all -------------------------------
+setup_case 'not json at all'
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "PARSE-FAILED: exits 0 (got $rc)" "$r"
+logged 'usage window unread parse_failed — launching unguarded'
+check "PARSE-FAILED: names the parse as the reason" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "PARSE-FAILED: launches (claude called $(calls claude)x)" "$r"
+
+# --- a WINDOW_THRESHOLD that is not a number ----------------------------
+# the env override is the only way to reach this arm at all
+setup_case "$OK_LINE"
+run_cron WINDOW_THRESHOLD=abc
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "BAD-THRESHOLD: exits 0 (got $rc)" "$r"
+logged "usage window unread bad_threshold='abc' — launching unguarded"
+check "BAD-THRESHOLD: quotes the value it could not read" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "BAD-THRESHOLD: launches (claude called $(calls claude)x)" "$r"
+
+# --- WINDOW_PROBE pointing at nothing -----------------------------------
+# WINDOW_PROBE derives from REPO: a REPO-only override aims it at nothing
+setup_case "$OK_LINE"
+run_cron WINDOW_PROBE="$temp_dir/no-such-probe.sh"
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "NO-PROBE: exits 0 (got $rc)" "$r"
+logged 'usage window unread no_probe — launching unguarded'
+check "NO-PROBE: names the missing probe, not a parse failure" $?
+[ "$(calls probe)" = 0 ] && r=0 || r=1
+check "NO-PROBE: never ran a probe (probe called $(calls probe)x)" "$r"
+
+# --- a 5-hour reset the probe cannot give: the bounded fallback ---------
+setup_case "$HOT_5H_NO_RESET" "$HOT_5H_NO_RESET" "$OK_LINE"
+run_cron
+waited=$(head -1 "$case_dir/calls/sleep" 2>/dev/null || echo 0)
+[ "${waited:-0}" = 3600 ] && r=0 || r=1
+check "RESET-UNREAD: falls back to 3600s (${waited}s)" "$r"
+
+# --- a 5-hour reset far enough out to park the job: the 6h cap ----------
+setup_case "$HOT_5H_FAR_RESET" "$HOT_5H_FAR_RESET" "$OK_LINE"
+run_cron
+waited=$(head -1 "$case_dir/calls/sleep" 2>/dev/null || echo 0)
+[ "${waited:-0}" = 21600 ] && r=0 || r=1
+check "RESET-ABSURD: capped at 21600s (${waited}s)" "$r"
+
+# --- an interpreter that runs and says nothing: the catch-all -----------
+# this arm used to log "usage window ok", recording a reading never taken
+setup_case "$OK_LINE"
+case_path
+printf '#!/usr/bin/env bash\nexit 0\n' > "$case_bin/python3"
+chmod +x "$case_bin/python3"
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "CATCH-ALL: exits 0 (got $rc)" "$r"
+logged "usage window unread (unrecognized probe output: '')"
+check "CATCH-ALL: calls an empty state unread, never ok" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "CATCH-ALL: launches unguarded (claude called $(calls claude)x)" "$r"
+
+# --- no interpreter at all ----------------------------------------------
+# absence, not a misbehaving stub: PATH is sealed to what the wrapper needs
+setup_case "$OK_LINE"
+case_path env bash date mkdir cat grep
+run_cron PATH=
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "NO-PYTHON3: exits 0 (got $rc)" "$r"
+logged 'usage window unread no_python3 — launching unguarded'
+check "NO-PYTHON3: names the absent interpreter" $?
+[ "$(calls claude)" = 1 ] && r=0 || r=1
+check "NO-PYTHON3: launches unguarded (claude called $(calls claude)x)" "$r"
 
 # --- the seams themselves: nothing was written outside the case dirs ----
 [ -f "$temp_dir/case-1/logs/cron.log" ]

@@ -1,11 +1,13 @@
 # Phase-order check
 
-Why the phase-order check's P2 discriminator is decidable, what each class it
-prints means, and what a clean result does not buy. The governing rules live
+Why the phase-order check's P2 discriminator is decidable, what each class
+it prints means, what a clean result does not buy, and why Phase E's
+concurrency is removed rather than estimated. The governing rules live
 elsewhere — SKILL.md `## Maintenance run` states the one-at-a-time rule the
-check compiles, and `docs/looper-custodian.md` decision 24 records the incidents
-that produced it. `scripts/custodian-phase-order.sh` is the implementation.
-Consult this file when reading, changing, or arguing about the check.
+check compiles, and `docs/looper-custodian.md` decision 24 records the
+incidents that produced it. `scripts/custodian-phase-order.sh` is the
+implementation. Consult this file when reading, changing, or arguing about
+the check.
 
 ## What it reads
 
@@ -76,9 +78,9 @@ decision 24 records.
 
 ## What a clean result buys
 
-Be exact about what a clean result buys: a broken Monday is visible the same
-week instead of whenever someone next reads a log by hand. What it does NOT
-buy is in `references/phase-order-check.md`, alongside the rest of the spec.
+A broken Monday is visible the same week instead of whenever someone next
+reads a log by hand. What it does NOT buy is `## Three limits, stated rather
+than papered over`, below.
 **Know where it cannot reach: it runs at Phase F, so a run killed before F
 produces no verdict at all until a resume carries it to F.** That is the
 shape of both runs it was written for — 2026-08-03 hit the session limit at
@@ -112,17 +114,17 @@ partial-log check could run; considered and deferred, not overlooked.
 
 ## Why the concurrency is removed rather than estimated
 
-Documenting the interleave instead — letting E's sizing subtract the cost of
-work still in flight — is not a real option. Be exact about what is missing,
-because a per-phase instrument does exist: the re-probe after `deep-research`
-returns logs `utilization` before → after, and bracketing a phase that way
-yields an OBSERVED cost for it. What has no observable is the
-**not-yet-spent concurrent cost at probe time**. The fan-out width is fixed
-in the research brief before `deep-research` is invoked, and its internal
-execution cannot be batched, throttled, or interrupted mid-flight, so no
-later measurement can still change the ask — the sizing decision has to be
-made before the cost it would subtract exists. Subtracting it means
-inventing it, which is precisely the fake gauge `loop-de-looper`'s
-`## Budget governor` bans and the mirror image of what the `read_ok:false`
-rule below already refuses. So the concurrency is removed rather than
-estimated.
+Documenting the interleave rather than removing the concurrency — letting
+E's sizing subtract the cost of work still in flight — is not a real option.
+Be exact about what is missing, because a per-phase instrument does exist:
+the re-probe after `deep-research` returns logs `utilization` before →
+after, and bracketing a phase that way yields an OBSERVED cost for it. What
+has no observable is the **not-yet-spent concurrent cost at probe time**.
+The fan-out width is fixed in the research brief before `deep-research` is
+invoked, and its internal execution cannot be batched, throttled, or
+interrupted mid-flight, so no later measurement can still change the ask —
+the sizing decision has to be made before the cost it would subtract exists.
+Subtracting it means inventing it, which is precisely the fake gauge
+`loop-de-looper`'s `## Budget governor` bans, and the mirror image of what
+the `read_ok:false` rule refuses: an unread window is unread, never 0%. So
+the concurrency is removed rather than estimated.

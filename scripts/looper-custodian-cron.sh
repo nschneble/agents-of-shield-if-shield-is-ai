@@ -207,9 +207,12 @@ EOF
 # includes an absent python3: with no interpreter this echoed nothing, the
 # caller's `case ""` fell through to its catch-all, and the log said the
 # window was ok — a fabricated reading, the exact thing the unread arm
-# exists to prevent.
+# exists to prevent. It also includes an absent PROBE: WINDOW_PROBE is
+# derived from REPO, so a REPO-only override aims it at nothing, and
+# `parse_failed` would name that empty read rather than the seam.
 window_state() {
   command -v python3 >/dev/null 2>&1 || { echo "unread no_python3"; return; }
+  [ -x "$WINDOW_PROBE" ] || { echo "unread no_probe"; return; }
   "$WINDOW_PROBE" 2>/dev/null \
     | THRESHOLD="$WINDOW_THRESHOLD" python3 -c '
 import json, os, sys
