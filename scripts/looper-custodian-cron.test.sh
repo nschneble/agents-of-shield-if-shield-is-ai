@@ -1,42 +1,10 @@
 #!/usr/bin/env bash
-# looper-custodian-cron.test.sh — end-to-end test for the run-start
-# usage-window gate in scripts/looper-custodian-cron.sh, and for the
-# launch that gate guards.
+# looper-custodian-cron.test.sh — end-to-end test for the wrapper's
+# run-start usage-window gate and the launch it guards.
 #
-# Drives every arm of the wrapper's `case "$gate_state"` through a stub
-# probe, with claude, gh, osascript and sleep stubbed on PATH — a run here
-# costs no session, opens no issue and waits no seconds. Reachable at all
-# only because the wrapper takes REPO / LOGDIR / WINDOW_PROBE /
-# CUSTODIAN_PATH_PREFIX; the last of those is what makes the stubs bite,
-# since the wrapper PREPENDS /opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:
-# /sbin and so shadows a stub dir handed in through PATH.
-#
-# PROBE FIXTURE PROVENANCE — both shapes were CAPTURED by running the real
-# scripts/usage-window-probe.sh on 2026-08-20, never hand-written:
-#   read_ok:true    one live probe; the account read `allowed` on both
-#                   windows, at 58% (5h) and 42% (weekly)
-#   read_ok:false   the same probe under HOME=<empty dir> and a
-#                   nonexistent USER, reaching its emit_unreadable arm
-# They differ in whitespace — json.dumps spacing against a bare printf —
-# and that asymmetry is the half a hand-written payload gets wrong. Hot
-# and rejected fixtures vary ONLY utilization, status and reset on the
-# captured line, through jq. `status: "rejected"` is the one value not
-# observed live: the account was `allowed`, and the probe passes the
-# anthropic-ratelimit-unified-*-status header through verbatim.
-#
-# Both directions on every axis the gate branches on, and every arm of its
-# case: a clear window LAUNCHES and a hot one DEFERS; a hot weekly defers
-# with NO wait while a hot 5-hour one waits first; a `rejected` status is
-# narrated as a hard stop, never as a threshold trip; and every way the
-# window goes UNREAD is named as the reason it was — with the offending
-# value, where an operator supplied one — never as a reading.
-#
-# Past the gate, a launch is checked for WHAT it launches, not just that
-# it happened: every launching case matches the whole argv, so neither
-# the `/looper-custodian` payload nor `--dangerously-skip-permissions`
-# can go missing while the suite stays green. The REPO seam is checked
-# the same way in both directions — it decides the cwd claude runs in,
-# and an unenterable one must refuse the run, not launch somewhere else.
+# Every arm of its case, on captured probe fixtures, with claude, gh,
+# osascript and sleep stubbed on PATH.
+# Background: docs/test-suites.md#looper-custodian-cron
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

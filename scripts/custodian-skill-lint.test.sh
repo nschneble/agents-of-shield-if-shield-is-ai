@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # custodian-skill-lint.test.sh — both-directions test for the skill linter.
 #
-# Standing rule: a new invariant is tested RED (fires on a violating fixture) AND
-# green (clean fixture passes). This proves each STRUCTURAL check flags its own
-# violation with the offending file cited, that exit is 1 on any structural
-# violation and 0 when clean, and — crucially for the two-tier design — that an
-# ADVISORY-only fixture (over the token budgets, nothing structurally wrong) still
-# exits 0. Pure bash + jq-free, self-contained fixtures under a temp dir.
+# Each STRUCTURAL check RED on its own violation, and an ADVISORY-only
+# fixture still exits 0. Self-contained fixtures under a temp dir.
+# Background: docs/test-suites.md#custodian-skill-lint
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

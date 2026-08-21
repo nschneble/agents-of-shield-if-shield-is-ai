@@ -1,21 +1,9 @@
 #!/usr/bin/env bash
 # custodian-guardrails.test.sh — both-directions test for the guardrail replay.
 #
-# Standing rule: a new invariant is tested RED (goes off on a violating fixture)
-# AND green (clean fixture passes). Proves each of G1/G2/G3 flags its own
-# violation with the record's verbatim cite, that exit is 1 on any violation and
-# 0 when clean, and that the legacy exemption keeps a pre-schema line that WOULD
-# trip G2 out of the violation set.
-#
-# Also covers two properties the legacy exemption depends on:
-#   - REBUILD-SIMULATION: a legacy source line pushed through the REAL ingest
-#     writer (`custodian-history.sh rebuild`) must still classify legacy/exempt, and
-#     a modern verified_by:null line must classify modern — so the exemption survives
-#     `history --rebuild` (the writer preserves source key-absence, not a `// null`).
-#   - G2 ⇔ state-schemas SYNC: G2 must select the SAME lines as the canonical
-#     provenance lint in state-schemas.md, so the "reused, not forked" claim holds.
-#
-# Pure bash + jq, self-contained fixtures.
+# G1/G2/G3 each RED on its own violation and green when clean, plus the two
+# properties the legacy exemption rests on. Pure bash + jq fixtures.
+# Background: docs/test-suites.md#custodian-guardrails
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

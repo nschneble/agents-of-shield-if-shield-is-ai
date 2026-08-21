@@ -2,32 +2,9 @@
 # loop-finding-audit.test.sh — both-directions test for the finding
 # admissibility audit.
 #
-# Standing rule: a new invariant is tested RED (goes off on a violating
-# fixture) AND green (clean fixture passes). An audit that silently
-# stopped checking an arm prints "0 violations" — the same words as a
-# clean run — so the arm COUNT in the headline is asserted too.
-#
-# Four properties the audit's honesty depends on:
-#   - A LEGACY LOG IS A VIOLATING LOG, not an exempt one. Runs that
-#     predate the justification fields spent correctives they cannot
-#     account for, and that is the finding, not a schema gap to wave
-#     through. Both real logs this check was written against exit 1 for
-#     exactly this reason, and a fixture here pins the same shape.
-#   - SPENDING IS COUNTED FROM BOTH RECORDS, JUSTIFICATION FROM THE LOG
-#     ALONE. Each spending source is blind where the other sees: only
-#     the snapshot's counter records a corrective numbered as an
-#     ordinary queue wave, and only the log's labels survive an
-#     under-reported counter. Taking either alone leaves a one-field
-#     way around the whole check, and both have a RED fixture.
-#   - AN UNRESOLVABLE ASK ID IS WORSE THAN A MISSING ONE. `contract_ref:
-#     "A7"` on a run whose contract has two asks reads as justified from
-#     every angle except the one that resolves it.
-#   - EXIT 0 MEANS FULLY CHECKED. A missing snapshot skips two arms, so
-#     the run exits 2 even with every surviving arm green — a caller
-#     gating on `$?` must never read a half-run audit as a clean one.
-#
-# Fixtures are written by this file — never read from gitignored
-# `local/`. Pure bash + jq, self-contained.
+# Every arm both ways, plus the arm count in the headline. Fixtures
+# written by this suite; pure bash + jq.
+# Background: docs/test-suites.md#loop-finding-audit
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

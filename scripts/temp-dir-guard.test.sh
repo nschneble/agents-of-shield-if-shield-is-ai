@@ -2,49 +2,9 @@
 # temp-dir-guard.test.sh — both-directions test for the temp-dir guard that
 # every self-contained suite carries.
 #
-# The defect this locks down, observed live: an unchecked
-# `temp_dir=$(mktemp -d)` returns empty when the temp dir is denied or
-# full. Every path derived from it then resolves absolute (/repo), the
-# mkdir and cd that follow fail while silenced, and the suite's git
-# fixture commands execute with the CWD still on the INVOKING repo,
-# committing its working tree via `git add -A` and overwriting its
-# user.email.
-#
-# RED: mktemp is broken all THREE ways it breaks in the wild — a non-zero
-# exit; a success that yields an empty string, which is the failure the
-# guard's `-n` arm exists for and the one an exit-status-only guard
-# survives; and a success handing back a real path that is a regular FILE,
-# which is what `mktemp -d` degraded to a plain `mktemp` produces and what
-# the guard's `-d` arm exists for. Under each, a suite must exit 2, print
-# its own refusal in words true of THAT shape, and leave a victim repo
-# byte-identical. GREEN: with a working mktemp each suite still passes and
-# still leaves the victim untouched, so the guard costs the healthy path
-# nothing.
-#
-# One shim per fault SHAPE, never per message. The guard grew from one arm
-# to three while this loop still iterated two shims, so the third arm was
-# decoration: deleting it from every roster suite, or corrupting its
-# wording, left this file printing "all temp-dir guard tests passed".
-#
-# The roster is DERIVED, never hand-listed: every `*.test.sh` in the repo
-# that mentions mktemp, minus this file. A hardcoded list covers the
-# suites someone remembered; the seventh suite would be covered by
-# nothing and fail nothing. Derivation has its own three failure modes,
-# all of which used to pass: narrowing it to a subset (pinned by a second
-# count spelled with find rather than a recursive grep); emptying it
-# altogether (pinned by running a copy of this suite alone in a bare tree,
-# because an empty array under `set -u` is legal on the bash CI runs); and
-# WIDENING it back over `local/` (pinned by a planted scratch suite that
-# must be neither counted nor executed).
-#
-# scripts/custodian-history.sh is checked by name at the end. It carries
-# the same guard but is not a suite, so no derivation over `*.test.sh` can
-# ever reach it.
-#
-# Deliberately over the ~100-line refactor bar. Splitting it would put the
-# derivation, the shims and the drift oracle in separate files, and a
-# roster that cannot see its own shims is the exact failure this file was
-# written to catch. Trim its prose before reaching for its code.
+# Three broken-mktemp shims against a DERIVED roster of every suite that
+# mentions mktemp, plus custodian-history.sh by name.
+# Background: docs/test-suites.md#temp-dir-guard
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
