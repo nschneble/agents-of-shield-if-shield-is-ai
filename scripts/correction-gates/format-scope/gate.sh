@@ -25,9 +25,13 @@
 # Self-contained: pure bash + prettier, no hosted tool. prettier is found
 # via $PRETTIER / --prettier (an executable) or, in a target repo,
 # node <dir>/node_modules/.bin/prettier — the sandbox-safe `node <bin>`
-# form (npx and npm run are denied). A pre-flight probe fails fast (exit 2)
-# if prettier cannot run at all, so a missing install is an ENV error, not
-# every touched file misread as unclean. Exit codes read as prettier's own:
+# form (npx and npm run are denied). Since the gate cannot install
+# prettier, ./prettier-version pins the version and the pre-flight CHECKS
+# it: exit 2 if prettier cannot run at all or reports another version, so
+# a missing or wrong install is an ENV error, not every touched file
+# misread as unclean. Two prettier versions disagree about the same file,
+# so an unchecked binary makes the verdict the caller's, not the gate's.
+# Exit codes read as prettier's own:
 # 0 clean, 1 style issues, >=2 unsupported/parse (a file prettier cannot
 # handle is a note, never a violation — the out-of-glob carve-out).
 #
@@ -49,6 +53,11 @@
 #
 # Exit: 0 clean · 1 any violation · 2 usage/env error.
 set -euo pipefail
+
+# resolved before the cd into DIR: the pin travels with the gate, not with
+# whatever repo it is pointed at
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PIN_FILE="$here/prettier-version"
 
 DIR="."
 RANGE="HEAD"
@@ -105,10 +114,20 @@ run_prettier() {  # forwards to prettier, returns its own exit code
   else node "./node_modules/.bin/prettier" "$@"; fi
 }
 
-# pre-flight: prettier must be runnable, else every --check misreads as
-# unclean. A missing/broken install is an ENV error (2), not a violation.
-run_prettier --version >/dev/null 2>&1 || {
+# pre-flight: prettier must be runnable AND be the pinned version, else
+# every --check misreads as unclean or answers for another formatter. A
+# missing/broken/wrong install is an ENV error (2), not a violation.
+[ -r "$PIN_FILE" ] || { echo "missing prettier pin: $PIN_FILE" >&2; exit 2; }
+pin=$(tr -d '[:space:]' < "$PIN_FILE")
+[ -n "$pin" ] || { echo "empty prettier pin: $PIN_FILE" >&2; exit 2; }
+
+found=$(run_prettier --version 2>/dev/null | tr -d '[:space:]') || true
+[ -n "$found" ] || {
   echo "prettier not runnable (set --prettier or install node_modules)" >&2
+  exit 2
+}
+[ "$found" = "$pin" ] || {
+  echo "prettier $found is not the pinned $pin (see $PIN_FILE)" >&2
   exit 2
 }
 
