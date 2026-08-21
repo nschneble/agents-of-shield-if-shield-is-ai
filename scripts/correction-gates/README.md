@@ -102,9 +102,14 @@ result runnable and durable.
 # exit: 0 all clean · 1 a gate found a violation · 2 a gate could not run
 ```
 
-CI runs the both-directions TESTS (stub/fixture-driven, no prettier/node
-needed), not the live runner over this repo — the live runner belongs in a
-wave's verify step, in the target repo where the tools it calls exist.
+CI runs both. The both-directions TESTS come first (stub/fixture-driven,
+no prettier/node needed) and prove each gate's logic; a live run over this
+tree then follows, because a stub-driven suite says nothing about whether
+this repo's own files satisfy the gates. The live step installs the
+version in `format-scope/prettier-version` and hands it over as
+`$PRETTIER` — the runner needs no flag of its own, since each `exec:` runs
+under `bash -c` and inherits the environment. A wave's verify step still
+runs the live runner too, in whatever repo it built in.
 
 ## Registered entries
 
