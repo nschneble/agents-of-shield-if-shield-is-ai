@@ -2,43 +2,9 @@
 # doc-bloat-scan.test.sh — both-directions test for the comment-bloat
 # detector.
 #
-# Every kind fires on a violating fixture (RED) AND the clean fixtures
-# produce ZERO output (green), in both the C-style and the JSX braced
-# (`{/* … */}`) spelling. The green side proves no false positive on: a
-# lowercase single-line comment, a single-line `/** … */`, consecutive
-# braced one-liners (a `{/*` read as an unconditional block opener would
-# swallow the code between them into a phantom block), a `// TODO:`
-# marker, a braced token inside a string, a `https://` URL (the `//` must
-# not read as a comment), and a comment of exactly 75 chars — the boundary
-# itself, paired with an exactly-76 line on the red side so the comparison
-# is pinned from both directions rather than somewhere in the middle.
-# Three more green shapes carry the block bookkeeping: a block with NO
-# content line at all, in both the bare and the `*`-only spelling, so that
-# miscounting an empty body emits a candidate quoting nothing; the braced
-# zero-content form, whose `*/}` closer has to strip to empty like a plain
-# `*/` does; and a `{ /*` block scope, which is not a comment opener
-# because the brace does not abut — the one rule the scanner states twice.
-# The unterminated fixtures cover the swallow-to-EOF hole: an opener that
-# never closes used to leave block state set for the rest of the file, so
-# every later candidate vanished at exit 0. Both spellings appear, each
-# followed by a candidate that must still be found and a chained second
-# false opener; the `.ts` one adds an over-75 CODE line that must NOT
-# fire, since that hit came from inside the phantom block. Only
-# `//`-family candidates can follow one — anything carrying a `*/` would
-# have closed it instead. On `.ts` that second opener puts its candidate
-# on opener+1, which is what pins the restart boundary — everywhere else
-# the first post-opener candidate sits further down, so an off-by-one
-# there swallowed a real hit and stayed green. The reverse direction is
-# the tally: a block that CLOSES emits none, and four is the whole
-# tree's count.
-# Four fixtures answer to the lexer rather than to the line shapes: a
-# `/*` inside a `//` comment, a comment inside a multi-line `${…}`
-# substitution, two lone backticks bracketing a Java text block's opener,
-# and an ordered PAIR scanned on its own, since one awk run reads many
-# files and the walk's order is find's. Delete any one and a mutant in
-# `scripts/custodian-mutation-kill.sh` survives.
-# Exit is always 0 — the scanner reports, it never gates. Pure bash,
-# jq-free.
+# C-style and JSX-braced, including block bookkeeping and lexer edge
+# cases. Exit is always 0 — the scanner reports, it never gates.
+# Background: docs/test-suites.md#doc-bloat-scan
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

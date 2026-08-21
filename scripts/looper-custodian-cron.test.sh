@@ -96,10 +96,23 @@ printf '%s\n' "$*" >> "$CRON_CALLS/gh-args"
 EOF
 chmod +x "$bin/gh"
 # cwd is all REPO still decides once LOGDIR and WINDOW_PROBE are set
+# CLAUDE_QUEUE lets a case script the attempt log's contents (one line per
+# call, queue-style like the probe), so a case can drive the ceiling/
+# session-limit markers without every other case forging output it never
+# asked for
 cat > "$bin/claude" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$CRON_CALLS/claude"
 pwd -P >> "$CRON_CALLS/claude-cwd"
+if [ -n "${CLAUDE_QUEUE:-}" ] && [ -f "$CLAUDE_QUEUE" ]; then
+  line=$(head -n 1 "$CLAUDE_QUEUE")
+  if [ "$(wc -l < "$CLAUDE_QUEUE")" -gt 1 ]; then
+    tail -n +2 "$CLAUDE_QUEUE" > "$CLAUDE_QUEUE.next" && mv "$CLAUDE_QUEUE.next" "$CLAUDE_QUEUE"
+  fi
+  # an empty queue line must still exit 0 — `&&`-as-last-statement made the
+  # stub itself "fail" whenever a case scripted a clean (no-marker) call
+  if [ -n "$line" ]; then printf '%s\n' "$line"; fi
+fi
 EOF
 chmod +x "$bin/claude"
 
@@ -150,9 +163,17 @@ run_cron() { # VAR=VAL... — extra env for this run
     env REPO="$case_dir/repo" LOGDIR="$case_dir/logs" \
       WINDOW_PROBE="$probe" CUSTODIAN_PATH_PREFIX="${case_bin:-$bin}" \
       PROBE_QUEUE="$case_dir/queue" CRON_CALLS="$case_dir/calls" \
+      CLAUDE_QUEUE="$case_dir/claude-queue" \
       "$@" "$cron" >/dev/null 2>&1
   rc=$?
 }
+
+# one line per claude invocation, in call order — unset/empty means silent,
+# same as every case that doesn't need the attempt log to say anything.
+# LAST line is STICKY and repeats on every call past the queue's end, same
+# as the probe queue above — a case with fewer lines than calls must pad
+# the tail with "" or a later call re-emits the final scripted line
+claude_queue() { printf '%s\n' "$@" > "$case_dir/claude-queue"; }
 
 # the wrapper PREPENDS this dir, so a stub here SHADOWS a tool; sealing
 # PATH to this dir alone is what makes one ABSENT instead
@@ -184,9 +205,17 @@ logged() {
 issue()  { grep -qF "$1" "$case_dir/calls/gh-args" 2>/dev/null; }
 
 # the stubbed uuid makes the argv deterministic, so -x pins flag order too
-LAUNCH_ARGV="-p /looper-custodian --session-id $STUB_UUID --dangerously-skip-permissions --output-format text"
+LAUNCH_ARGV="-p /looper-custodian --session-id $STUB_UUID --output-format json"
 # `--`: the argv starts with `-p`, which grep would read as its own flags
 launched() { grep -qxF -- "$LAUNCH_ARGV" "$case_dir/calls/claude" 2>/dev/null; }
+
+# the resume launch (the `claude` call inside the LIMIT_MARKER branch) had
+# no assertion at all pinning its argv; this is what made a flag/payload
+# change there ship green (local/TODOs.md item 1).
+# same computation as the wrapper's own DATE, run at the same moment
+TEST_DATE="$(date +%Y-%m-%d)"
+RESUME_ARGV="-p /looper-custodian resume $TEST_DATE --session-id $STUB_UUID --output-format json"
+resume_launched() { grep -qxF -- "$RESUME_ARGV" "$case_dir/calls/claude" 2>/dev/null; }
 
 # --- the bound itself, both directions, before any case leans on it ------
 bounded 1 sleep 5 >/dev/null 2>&1
@@ -450,6 +479,64 @@ check "NO-PYTHON3: names the absent interpreter" $?
 [ "$(calls claude)" = 1 ] && r=0 || r=1
 check "NO-PYTHON3: launches unguarded (claude called $(calls claude)x)" "$r"
 launched; check "NO-PYTHON3: launched the custodian skill, headless" $?
+
+# --- SESSION LIMIT then a resume that clears: the whole resume path -----
+# no test drove LIMIT_MARKER before this — the resume launch shipped with
+# zero coverage (local/TODOs.md item 1). Queue two probe reads (gate, then
+# wait_for_window_reset's own reset lookup) and two claude calls (the limit
+# hit, then a clean resume). The trailing "" pads the claude queue so the
+# resume call gets silence, not a sticky repeat of the limit marker — see
+# claude_queue's own comment.
+setup_case "$OK_LINE" "$OK_LINE"
+claude_queue "hit your session limit" ""
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "SESSION-LIMIT-RESUMES: exits 0 (got $rc)" "$r"
+[ "$(calls claude)" = 2 ] && r=0 || r=1
+check "SESSION-LIMIT-RESUMES: launched claude twice (got $(calls claude))" "$r"
+launched; check "SESSION-LIMIT-RESUMES: first call is the normal launch" $?
+resume_launched; check "SESSION-LIMIT-RESUMES: second call is the resume launch, same flags" $?
+[ "$(calls sleep)" = 1 ] && r=0 || r=1
+check "SESSION-LIMIT-RESUMES: waited out the window once (sleep called $(calls sleep)x)" "$r"
+grep -qF '"reason":"session-limit"' "$case_dir/logs/resume.json" 2>/dev/null
+check "SESSION-LIMIT-RESUMES: left a session-limit breadcrumb" $?
+[ "$(calls gh)" = 0 ] && r=0 || r=1
+check "SESSION-LIMIT-RESUMES: opened no issue (gh called $(calls gh)x)" "$r"
+
+# --- SESSION LIMIT then a resume that ALSO hits it: no blind retry loop --
+setup_case "$OK_LINE" "$OK_LINE"
+claude_queue "hit your session limit" "hit your session limit"
+run_cron
+[ "$rc" -eq 4 ] && r=0 || r=1
+check "SESSION-LIMIT-FAILS: exits 4 (got $rc)" "$r"
+[ "$(calls claude)" = 2 ] && r=0 || r=1
+check "SESSION-LIMIT-FAILS: did not retry past the resume attempt (claude called $(calls claude)x)" "$r"
+resume_launched; check "SESSION-LIMIT-FAILS: the resume attempt used the resume argv" $?
+issue 'Custodian INCOMPLETE'; check "SESSION-LIMIT-FAILS: opens the INCOMPLETE issue" $?
+issue 'the automatic post-reset resume attempt also failed'
+check "SESSION-LIMIT-FAILS: issue names both failures" $?
+
+# --- PERMISSION DENIAL: invisible in exit code, this is the loud notice --
+# a denied tool call fails closed but never appears in plain output; only
+# --output-format json's permission_denials array carries it
+setup_case "$OK_LINE"
+claude_queue '{"permission_denials":["Write"],"result":"done"}'
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "PERMISSION-DENIAL: still exits 0 — denial doesn't change the run's own outcome (got $rc)" "$r"
+issue 'Custodian permission denial'; check "PERMISSION-DENIAL: opens the permission-denial issue" $?
+issue 'Write'; check "PERMISSION-DENIAL: issue names the denied tool" $?
+[ "$(calls osascript)" -ge 1 ] && r=0 || r=1
+check "PERMISSION-DENIAL: fires a notification (osascript called $(calls osascript)x)" "$r"
+
+# --- NO DENIAL: an empty permission_denials array stays silent -----------
+setup_case "$OK_LINE"
+claude_queue '{"permission_denials":[],"result":"done"}'
+run_cron
+[ "$rc" -eq 0 ] && r=0 || r=1
+check "NO-DENIAL: exits 0 (got $rc)" "$r"
+[ "$(calls gh)" = 0 ] && r=0 || r=1
+check "NO-DENIAL: opens no issue (gh called $(calls gh)x)" "$r"
 
 # --- the seams themselves: nothing was written outside the case dirs ----
 [ -f "$temp_dir/case-1/logs/cron.log" ]

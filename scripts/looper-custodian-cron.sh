@@ -5,14 +5,25 @@
 # (local/loops scratch, ~/.claude memory, gates.jsonl across local repos) that
 # an isolated cloud session cannot reach.
 #
-# Runs headless with --dangerously-skip-permissions because an unattended job
-# cannot answer permission prompts. This is bounded: the scheduled run is
-# PROPOSE-ONLY. C ingests the history index (derived cache), A rm's gitignored
-# scratch (only after C has indexed it — ingest-guard), B is read-only, E hits
-# the web, and the run ends by OPENING a GitHub issue. No tracked-file edits
-# happen on this path. Destructive memory/agent edits are Phase D
-# (/looper-custodian apply), which is human-triggered and never scheduled. The
-# destructive-git guard hook still blocks history rewrites.
+# Runs headless with no --dangerously-skip-permissions: an unattended job
+# cannot answer a prompt, so it relies on ~/.claude/settings.json's allowlist
+# to clear every tool call this run makes instead of skipping the check
+# entirely. This is bounded: the scheduled run is PROPOSE-ONLY. C ingests the
+# history index (derived cache), A rm's gitignored scratch (only after C has
+# indexed it — ingest-guard), B is read-only, E hits the web, and the run
+# ends by OPENING a GitHub issue. No tracked-file edits happen on this path.
+# Destructive memory/agent edits are Phase D (/looper-custodian apply), which
+# is human-triggered and never scheduled. The destructive-git guard hook
+# still blocks history rewrites. A tool call the allowlist doesn't cover
+# fails closed (no prompt to answer, so the call itself never executes) —
+# but `claude -p` still exits 0 on that run, and the denial is otherwise
+# invisible: it never appears anywhere in `--output-format text`'s output.
+# The wrapper runs `--output-format json` for exactly this reason and reads
+# the response's `permission_denials` array on every attempt that exits 0
+# (permission_denials(), below) — a non-empty result fires a SEPARATE loud
+# alert (alert_permission_denied) layered on top of whatever the run's own
+# outcome was; it does not change that outcome, since the denied call
+# already failed closed and the run may have otherwise completed cleanly.
 #
 # The claude call gets MAX_ATTEMPTS tries with backoff — the 2026-07-06 and
 # 2026-07-13 runs both died to a transient "API Error: Connection closed
@@ -117,6 +128,42 @@ CEILING_MARKER="Background tasks still running after"
 # ("You've hit your session limit · resets 2pm"). Matched as a substring so it
 # holds regardless of the reset-time suffix.
 LIMIT_MARKER="hit your session limit"
+
+# Echoes denied tool names from a --output-format json attempt log's
+# permission_denials array (sorted, deduped, comma-joined); nothing if the
+# array is empty or the log isn't valid JSON — an unparseable log is a
+# different problem than a denial and not this check's job to flag.
+permission_denials() {
+  python3 -c '
+import json, sys
+try:
+    p = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+d = p.get("permission_denials") or []
+def name(x):
+    if isinstance(x, dict):
+        return str(x.get("tool_name") or x.get("tool") or x.get("name") or x)
+    return str(x)
+names = sorted({name(x) for x in d})
+if names:
+    print(", ".join(names))
+' < "$1" 2>/dev/null
+}
+
+# A denied tool call fails closed (never executes) but is otherwise
+# invisible — see header. The run itself already exited 0 and is NOT
+# treated as failed; this is an additional notice so the allowlist gap
+# gets seen and fixed, layered on top of whatever the run's own outcome
+# was.
+alert_permission_denied() {
+  local denied="$1" logfile="$2"
+  osascript -e "display notification \"Tool call(s) blocked by the allowlist: $denied\" with title \"looper-custodian PERMISSION DENIED\"" >>"$LOG" 2>&1 || true
+  gh issue create \
+    --title "Custodian permission denial $DATE" \
+    --body "$(printf 'The weekly run completed, but the allowlist in `~/.claude/settings.json` blocked at least one tool call: **%s**.\n\nA blocked call never executes — it fails closed — so nothing destructive happened. But the run may be missing work it tried to do. See `%s` for what it attempted, and extend the allowlist if the call should be permitted.\n' "$denied" "$logfile")" \
+    >>"$LOG" 2>&1 || true
+}
 
 # One line per logged phase, for the INCOMPLETE issue body.
 phases_summary() {
@@ -337,8 +384,7 @@ while true; do
   echo "=== looper-custodian run $(date) (attempt $attempt/$MAX_ATTEMPTS, session $SID) ===" >> "$LOG"
   claude -p "/looper-custodian" \
     --session-id "$SID" \
-    --dangerously-skip-permissions \
-    --output-format text \
+    --output-format json \
     > "$ATTEMPT_LOG" 2>&1
   rc=$?  # NOT `status` — that's a read-only zsh special parameter (it IS $?);
          # assigning it is fatal in a script, which is how the 2026-07-27 run
@@ -372,8 +418,7 @@ EOF
     echo "=== resume attempt $(date) (session $RESUME_SID) ===" >> "$LOG"
     claude -p "/looper-custodian resume $DATE" \
       --session-id "$RESUME_SID" \
-      --dangerously-skip-permissions \
-      --output-format text \
+      --output-format json \
       > "$RESUME_LOG" 2>&1
     rrc=$?
     cat "$RESUME_LOG" >> "$LOG"
@@ -383,10 +428,14 @@ EOF
         'The headless run hit the session usage limit mid-flight, and the automatic post-reset resume attempt also failed.'
       exit 4
     fi
+    denied="$(permission_denials "$RESUME_LOG")"
+    [ -n "$denied" ] && alert_permission_denied "$denied" "$RESUME_LOG"
     exit 0
   fi
 
   if [ "$rc" -eq 0 ]; then
+    denied="$(permission_denials "$ATTEMPT_LOG")"
+    [ -n "$denied" ] && alert_permission_denied "$denied" "$ATTEMPT_LOG"
     exit 0
   fi
   if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
