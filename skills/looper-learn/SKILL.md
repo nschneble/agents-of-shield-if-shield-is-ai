@@ -10,7 +10,7 @@ Suite of looper skills ran. Determine how went, capture reusable lessons.
 Learn runs at two altitudes, depending on who invokes it:
 
 - **Wave mode** — invoked by `the-looper` as step 6, ONCE per wave. Diagnoses the seven steps of that one wave. The per-wave checklist below.
-- **Run mode** — invoked by `loop-de-looper` ONCE at termination, after the final crew pass and before `looper-recap`. Diagnoses the *orchestration* across the whole run — sizing, scope, crew cadence, escalation routing — not any single wave. The run-level checklist below.
+- **Run mode** — invoked by `loop-de-looper` ONCE at termination, after the final crew pass and before `looper-recap`. Diagnoses the _orchestration_ across the whole run — sizing, scope, crew cadence, escalation routing — not any single wave. The run-level checklist below.
 
 A wave can go perfectly while the orchestration around it was wrong (queue mis-sized, crew fired too late, a `full` run that was really one wave). Wave mode never catches that — it can't see past its own wave. Run mode exists for exactly that blind spot. Both modes feed the same save-level table and the same honesty rule.
 
@@ -29,7 +29,7 @@ For each step in the wave's loop, ask:
 
 Invoked by `loop-de-looper` at termination. Read the run's real trail — `local/loops/<branch>/gates.jsonl`, `git log --oneline main..HEAD`, the wave queue scope emitted, the nonbeliever verdict + sizing — and ask about the ORCHESTRATION, not any one wave:
 
-1. **sizing**: Did nonbeliever size the goal right *in hindsight*? A `full-orchestration` run that collapsed to one real wave was over-sized; a `single-wave` that ballooned into a corrective queue was under-sized. Either is a nonbeliever-skill lesson, not a wave lesson.
+1. **sizing**: Did nonbeliever size the goal right _in hindsight_? A `full-orchestration` run that collapsed to one real wave was over-sized; a `single-wave` that ballooned into a corrective queue was under-sized. Either is a nonbeliever-skill lesson, not a wave lesson.
 2. **scope**: Did the queue hold, or did a wave turn out to depend on a later one (dependency order wrong)? Were waves the right grain — any that should have split, or merged? Did the run need a mid-flight re-scope (sign scope mis-decomposed up front)? Pilot-first honored for cross-cutting?
 3. **crew cadence**: Did crew passes fire at the right drift? Too often (parallel passes burned on near-empty diffs) or too late (a blocker surfaced large that an earlier pass would have caught small)? Were the `waves=4 / files=30` triggers right for THIS domain, or should CLAUDE.md carry an override?
 4. **escalation routing**: Did specialist gates fire when plan emitted ESCALATE, and clear in one round? Any thrash — same gate requested twice, which should have gone to the user sooner? Was Task-tool unavailability logged honestly (`ran: false`), never invented?
@@ -62,17 +62,17 @@ Skill caused failure (missing checklist item, vague advice, blind spot) → prop
 
 ## Recurring failure → durable guardrail (not just a note)
 
-A memory records that something went wrong; it does not *prevent* the recurrence. When a failure is one a **check could have caught** — and especially when it has now happened more than once — the lesson is incomplete until it proposes a durable guardrail, not only a prose note. "Fails twice → add a guardrail" beats "fails twice → write it down again," because the next run reads code/tests, not every memory.
+A memory records that something went wrong; it does not _prevent_ the recurrence. When a failure is one a **check could have caught** — and especially when it has now happened more than once — the lesson is incomplete until it proposes a durable guardrail, not only a prose note. "Fails twice → add a guardrail" beats "fails twice → write it down again," because the next run reads code/tests, not every memory.
 
 Classify the recurring failure by what would have caught it, and propose the matching artifact:
 
-| Failure shape | Durable guardrail to propose |
-| ------------- | ---------------------------- |
+| Failure shape                                                               | Durable guardrail to propose                                                                                                                                                                                   |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A behavior regressed / a bug reappeared that a runnable oracle could assert | An **executable verification assertion** — graduate it into `looper-verify` as a standing check (see its `## Standing regression assertions`), or a project test. Its pass, not memory, is the gate next time. |
-| A convention/constraint was violated that a rule could state flatly | A **CLAUDE.md policy line** (per-project) or a one-line addition to the relevant skill/agent body (cross-project). |
-| An orchestration step misfired the same way across runs | A **skill/agent body edit** to the misfiring step (the table above), not a third memory restating the symptom. |
+| A convention/constraint was violated that a rule could state flatly         | A **CLAUDE.md policy line** (per-project) or a one-line addition to the relevant skill/agent body (cross-project).                                                                                             |
+| An orchestration step misfired the same way across runs                     | A **skill/agent body edit** to the misfiring step (the table above), not a third memory restating the symptom.                                                                                                 |
 
-Discipline: the guardrail is *proposed*, not silently installed — same propose/dispose line the rest of the system holds. Learn writes the memory (the evidence) AND names the concrete check to add (the fix); a human/commit adopts the check. A guardrail with no failing-case behind it is speculation — only propose one a real, cited failure motivates. Do not over-fit: one flaky incident is a note, a *repeated* or check-shaped failure is a guardrail.
+Discipline: the guardrail is _proposed_, not silently installed — same propose/dispose line the rest of the system holds. Learn writes the memory (the evidence) AND names the concrete check to add (the fix); a human/commit adopts the check. A guardrail with no failing-case behind it is speculation — only propose one a real, cited failure motivates. Do not over-fit: one flaky incident is a note, a _repeated_ or check-shaped failure is a guardrail.
 
 ## What NOT to save
 

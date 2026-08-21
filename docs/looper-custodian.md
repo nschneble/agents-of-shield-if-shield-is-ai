@@ -867,7 +867,7 @@ Refined 2026-08-20 from the lint's own reference-nesting arm:
     spec was told to imitate. Its four reference files cite each other in
     eight places, every one spelled bare, and
     `custodian-skill-lint.sh skills/loop-de-looper` reported `structural
-    violations: 0`. Meanwhile this spec's own extraction was shaped around
+violations: 0`. Meanwhile this spec's own extraction was shaped around
     the rule as though it did bind — one paragraph stayed in `SKILL.md`
     only because moving it into a reference would have made that reference
     cite two siblings by qualified path.

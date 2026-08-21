@@ -3,6 +3,7 @@
 What `scripts/custodian-log-recall.sh` asks, the four verdicts it can
 return, the exit contract, why its triggers are declared rather than
 mined from prose, and what a clean result does NOT buy. `SKILL.md
+
 ## Integration with existing pieces` points here.
 
 Consult this file before adding a prescribed log action to the spec, or
