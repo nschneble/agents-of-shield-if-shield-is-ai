@@ -145,7 +145,7 @@ Four properties the audit's honesty depends on:
   under-reported counter. Taking either alone leaves a one-field
   way around the whole check, and both have a RED fixture.
 - AN UNRESOLVABLE ASK ID IS WORSE THAN A MISSING ONE. `contract_ref:
-  "A7"` on a run whose contract has two asks reads as justified from
+"A7"` on a run whose contract has two asks reads as justified from
   every angle except the one that resolves it.
 - EXIT 0 MEANS FULLY CHECKED. A missing snapshot skips two arms, so
   the run exits 2 even with every surviving arm green — a caller

@@ -45,6 +45,28 @@ registry `README.md` wave-context contract). `--range` is the compare-ref
 for the git-derived changed set — default `HEAD`, but a committed wave can
 pass its own base so the check does not go dark post-commit.
 
+The prettier binary comes from `$PRETTIER` / `--prettier`; the runner
+needs no `--prettier` flag of its own, because it runs each `exec:` via
+`bash -c` and the environment passes straight through.
+
+## The pin
+
+`prettier-version` holds the one version this gate is normative against,
+and the pre-flight rejects any other with exit 2. Without it the verdict
+belonged to whichever binary the caller happened to supply: on this repo's
+57 tracked `.md` files, 3.6.2 and 3.9.6 disagree about two of them —
+`docs/looper-defend.md` and
+`skills/looper-commit/templates/structured-recap.md` each pass under one
+version and fail under the other. 3.6.2 is additionally unusable here: it
+has no fixed point on `docs/looper-custodian.md`, where each `--write`
+pass adds four more spaces of indent and the first pass collapses a nested
+list that both CommonMark and GitHub render.
+
+The gate cannot install prettier — `npx` and `npm run` are denied in the
+sandbox it runs in — so the pin is enforced, not applied. The repo carries
+no `package.json` by design; CI installs the pinned version from this file
+and hands it over via `$PRETTIER`.
+
 ## Measurement
 
 `replay.sh` scores the gate against the loop's own `history-index.jsonl`:

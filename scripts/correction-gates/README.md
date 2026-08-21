@@ -42,15 +42,15 @@ YAML frontmatter, then a prose body. The runner reads three top-level
 scalar fields; the rest is provenance the human maintains and the reader
 relies on.
 
-| field        | read by runner | purpose                                                    |
-| ------------ | :------------: | ---------------------------------------------------------- |
-| `id`         |       yes      | stable identifier (also the directory name)                |
-| `enabled`    |       yes      | `false` parks an entry without deleting it (runner SKIPs)  |
-| `exec`       |       yes      | the command the runner runs, from the entry dir           |
-| `title`      |        —       | one-line human summary                                      |
-| `needs`      |        —       | which wave-context vars the exec consumes (documentation)  |
-| `provenance` |        —       | where the correction came from: `memories`, `correction` (the atomic rule), `recurrence`, `origin`/`pilot` |
-| `asserts`    |        —       | what the compiled check asserts, in one sentence           |
+| field        | read by runner | purpose                                                                                                    |
+| ------------ | :------------: | ---------------------------------------------------------------------------------------------------------- |
+| `id`         |      yes       | stable identifier (also the directory name)                                                                |
+| `enabled`    |      yes       | `false` parks an entry without deleting it (runner SKIPs)                                                  |
+| `exec`       |      yes       | the command the runner runs, from the entry dir                                                            |
+| `title`      |       —        | one-line human summary                                                                                     |
+| `needs`      |       —        | which wave-context vars the exec consumes (documentation)                                                  |
+| `provenance` |       —        | where the correction came from: `memories`, `correction` (the atomic rule), `recurrence`, `origin`/`pilot` |
+| `asserts`    |       —        | what the compiled check asserts, in one sentence                                                           |
 
 `exec` is run via `bash -c` from the entry directory, so it can reference
 the wave-context variables the runner exports. Specs are repo-committed and
@@ -60,12 +60,12 @@ reviewed — the same trust posture as any in-tree script.
 
 The runner exports a fixed set of variables the `exec` lines read:
 
-| variable          | meaning                                                     |
-| ----------------- | ----------------------------------------------------------- |
-| `CG_DIR`          | repo working root the wave built in (absolute)              |
-| `CG_RANGE`        | git ref/range a gate compares against (default `HEAD`)      |
-| `CG_TOUCHED_FILE` | wave's declared touched files, one per line (may be empty)  |
-| `CG_CHANGED_FILE` | explicit changed-file list, one per line (may be empty)     |
+| variable          | meaning                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `CG_DIR`          | repo working root the wave built in (absolute)             |
+| `CG_RANGE`        | git ref/range a gate compares against (default `HEAD`)     |
+| `CG_TOUCHED_FILE` | wave's declared touched files, one per line (may be empty) |
+| `CG_CHANGED_FILE` | explicit changed-file list, one per line (may be empty)    |
 
 A gate that needs none of these (a whole-tree scan) simply ignores them.
 
@@ -102,13 +102,18 @@ result runnable and durable.
 # exit: 0 all clean · 1 a gate found a violation · 2 a gate could not run
 ```
 
-CI runs the both-directions TESTS (stub/fixture-driven, no prettier/node
-needed), not the live runner over this repo — the live runner belongs in a
-wave's verify step, in the target repo where the tools it calls exist.
+CI runs both. The both-directions TESTS come first (stub/fixture-driven,
+no prettier/node needed) and prove each gate's logic; a live run over this
+tree then follows, because a stub-driven suite says nothing about whether
+this repo's own files satisfy the gates. The live step installs the
+version in `format-scope/prettier-version` and hands it over as
+`$PRETTIER` — the runner needs no flag of its own, since each `exec:` runs
+under `bash -c` and inherits the environment. A wave's verify step still
+runs the live runner too, in whatever repo it built in.
 
 ## Registered entries
 
-| id                  | class                          | provenance                        |
-| ------------------- | ------------------------------ | --------------------------------- |
-| `format-scope`      | file formatting (pre-commit)   | E-greenlight-1 pilot, PR #41      |
-| `no-ai-attribution` | commit/PR-surface hygiene      | memory `no-ai-attribution`, PR #8 |
+| id                  | class                        | provenance                        |
+| ------------------- | ---------------------------- | --------------------------------- |
+| `format-scope`      | file formatting (pre-commit) | E-greenlight-1 pilot, PR #41      |
+| `no-ai-attribution` | commit/PR-surface hygiene    | memory `no-ai-attribution`, PR #8 |

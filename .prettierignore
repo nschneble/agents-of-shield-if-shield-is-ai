@@ -1,0 +1,15 @@
+# Files prettier@3.9.6 cannot reformat without changing what the page says.
+# Each converges to a fixed point; each fails the rendered-HTML check that
+# admits a file to a format sweep, because the change lands inside a code
+# fence, where whitespace is content. Fixing one means deciding what its
+# fence should hold, which is an edit to the document, not a format run.
+# Drop a line here once its fence is settled.
+
+# the settings.json example goes from 9 compact lines to 30
+hooks/README.md
+
+# the JSONC receipt example loses its column-aligned trailing comments
+skills/looper-custodian/references/artifacts.md
+
+# a blank line lands inside a nested fence; 3.6.2 reads this file as clean
+skills/looper-commit/templates/structured-recap.md

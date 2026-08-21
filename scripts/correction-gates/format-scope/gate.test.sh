@@ -15,8 +15,9 @@
 # Self-contained: prettier is stubbed via $PRETTIER, so the test needs no
 # node/prettier install and runs in CI. The stub mirrors prettier's exit
 # codes keyed on sentinels in the file body: @unsupported -> 2 (no parser),
-# @dirty -> 1 (style issues), else -> 0 (clean); --version -> 0 (the gate's
-# pre-flight availability probe). The gate's logic — not prettier's
+# @dirty -> 1 (style issues), else -> 0 (clean); --version echoes
+# $PRETTIER_STUB_VERSION, which the pre-flight now compares against
+# ./prettier-version. The gate's logic — not prettier's
 # formatting — is under test, so a controlled verdict per file is the right
 # oracle. A real-prettier end-to-end pass is proven at build, not here.
 set -uo pipefail
@@ -54,13 +55,19 @@ check() { # desc, condition-already-evaluated ($?)
 stub="$temp_dir/prettier-stub.sh"
 cat > "$stub" <<'STUB'
 #!/usr/bin/env bash
-[ "$1" = "--version" ] && { echo "0.0.0-stub"; exit 0; }
+[ "$1" = "--version" ] && { echo "${PRETTIER_STUB_VERSION:-0.0.0-stub}"; exit 0; }
 file="${!#}"
 grep -q -- '@unsupported' "$file" 2>/dev/null && exit 2
 grep -q -- '@dirty' "$file" 2>/dev/null && exit 1
 exit 0
 STUB
 chmod +x "$stub"
+
+# read, not hardcoded, so a bump cannot leave the cases below stale
+pin_file="$here/prettier-version"
+[ -r "$pin_file" ] || die_temp "no prettier pin at $pin_file"
+export PRETTIER_STUB_VERSION; PRETTIER_STUB_VERSION=$(tr -d '[:space:]' < "$pin_file")
+[ -n "$PRETTIER_STUB_VERSION" ] || die_temp "empty prettier pin at $pin_file"
 
 # --- GREEN: only the touched file changed and it is prettier-clean. ---
 # every fixture dir is guarded: an unmade dir sends the writes below to
@@ -135,6 +142,26 @@ printf 'const x = 1;\n'         > "$gd/vendor.js"
 printf '.a { color: green; }\n' > "$gd/a.css"
 out=$(PRETTIER="$stub" "$gate" --dir "$gd" a.css); rc=$?
 [ "$rc" -eq 0 ] && r=0 || r=1; check "GIT-DERIVED GREEN: only-touched change passes via git set (exit 0)" "$r"
+
+# --- PIN: the pre-flight must accept only the pinned prettier. ---
+p="$temp_dir/pin"; mkdir -p "$p" || die_temp "cannot create $p"
+printf '.a { color: red; }\n' > "$p/a.css"
+printf 'a.css\n' > "$p/changed.txt"
+out=$(PRETTIER="$stub" "$gate" --dir "$p" --changed "$p/changed.txt" a.css 2>&1); rc=$?
+[ "$rc" -eq 0 ] && r=0 || r=1; check "PIN GREEN: pinned version passes pre-flight (exit 0)" "$r"
+
+out=$(PRETTIER_STUB_VERSION=9.9.9 PRETTIER="$stub" \
+  "$gate" --dir "$p" --changed "$p/changed.txt" a.css 2>&1); rc=$?
+[ "$rc" -eq 2 ] && r=0 || r=1; check "PIN RED: off-pin version is an ENV error (exit 2)" "$r"
+printf '%s\n' "$out" | grep -q "prettier 9.9.9 is not the pinned $PRETTIER_STUB_VERSION"
+check "PIN RED: message names the found version and the pin" $?
+
+# fail closed: a lost pin must refuse, not trust the caller's binary
+nopin="$temp_dir/nopin"; mkdir -p "$nopin" || die_temp "cannot create $nopin"
+command cp "$gate" "$nopin/gate.sh"
+out=$(PRETTIER="$stub" "$nopin/gate.sh" --dir "$p" --changed "$p/changed.txt" a.css 2>&1); rc=$?
+[ "$rc" -eq 2 ] && r=0 || r=1; check "PIN RED: missing pin file is an ENV error (exit 2)" "$r"
+printf '%s\n' "$out" | grep -q 'missing prettier pin'; check "PIN RED: message names the missing pin" $?
 
 echo
 if [ "$fails" -eq 0 ]; then echo "all format-scope gate tests passed"; exit 0

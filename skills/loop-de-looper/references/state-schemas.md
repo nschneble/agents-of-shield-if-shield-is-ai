@@ -68,7 +68,6 @@ exemption above exists to prevent. The receipts check is era-gated the
 same way: a branch with no receipts log is NOT EVALUABLE, never a
 violation. When receipts cover a meaningful span, G3 can retire into it.
 
-
 ## run-state.json shape
 
 ```json

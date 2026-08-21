@@ -125,7 +125,6 @@ Structured brief, seven sections (plus `## Ranked alternate plans` below, which 
    State minimum-viable rung chosen approach sits at, and why:
 
    1. YAGNI (skip) 2. Stdlib 3. Platform/framework native 4. Existing installed dep 5. One-liner 6. Minimal custom
-
    - Rung 6 (custom) requires named justification: perf, a11y, security, data-loss, trust-boundary, OR real requirement from research that no lower rung satisfies. Cite requirement (`research §X` or `file:line`).
    - One line: `Rung N – <approach in 5 words> – <why this rung>`.
    - Bias, not rule. Lower rung wins ties; escape hatches must be named.
