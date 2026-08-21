@@ -2,12 +2,8 @@
 # custodian-mutation-kill.test.sh — both-directions test for the mutation
 # harness.
 #
-# The harness scores other suites, so the failure that matters is a
-# harness that scores everything green. Three shapes are pinned against
-# fixture scripts, never the real checks: a suite that CAN catch its
-# mutant (killed), a suite that cannot (SURVIVED), and a pattern that
-# matches nothing (DID NOT APPLY — the false-kill shape, which must be a
-# failure and never a pass).
+# killed, SURVIVED, and DID NOT APPLY, pinned against fixtures.
+# Background: docs/test-suites.md#custodian-mutation-kill
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
