@@ -420,7 +420,8 @@ Refined 2026-07-28 from user feedback on the report issue (issue #29):
     detailed technical body — verbatim evidence, failed relocation search, paths,
     `validate-by` — FOLLOWS that lead. The verbatim-citation rail (decision 8) is
     untouched: evidence is still quoted exactly, it just no longer opens the item. A
-    concrete before/after `B-retire` template ships inline in `SKILL.md` so the
+    concrete before/after `B-retire` template ships inline in
+    `skills/looper-custodian/references/report-issue.md` so the
     headless cron has a shape to copy, and the same lead-with-plain rule extends to
     each phase section's intro and to the Phase B/E proposal-output lines. Sibling of
     decision 17: both close a legibility gap between "the work is correct" and "a

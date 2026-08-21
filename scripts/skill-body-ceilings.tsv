@@ -25,4 +25,4 @@
 # Opt-in: a skill with no row here is not checked.
 #
 # skill	ceiling	note
-looper-custodian	10143	9667 actual, 476 under; the ceiling was set at 9493 + ~650 for one mechanism, priced off the receipts sweep; extraction took it from 13076
+looper-custodian	8691	8041 actual, 650 under; the ceiling is 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
