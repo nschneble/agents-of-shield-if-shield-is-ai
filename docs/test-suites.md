@@ -305,6 +305,79 @@ derivation, the shims and the drift oracle in separate files, and a roster
 that cannot see its own shims is the exact failure this suite was written to
 catch. Trim its prose before reaching for its code.
 
+## usage-window-probe
+
+Producer-side test for scripts/usage-window-probe.sh, the probe
+scripts/looper-custodian-cron.sh reads at run start.
+
+The consumer's suite came first, and its probe fixtures are honest captures —
+but a capture pins only what the probe emitted the day it was taken. Renaming
+`five_hour` to `5h` in the probe left the whole battery green while every real
+run read `unread no_utilization` and launched unguarded. This suite is the
+other side of that seam.
+
+NO NETWORK, AND NO SEAM. The probe makes a live authenticated call, and it
+needed no `${VAR:-default}` transport seam to reach: every non-deterministic
+input it has is already controllable from the environment. Each case runs the
+real script, unmodified, under `env -i` with
+
+- PATH sealed to a per-case dir, so `security(1)` is ABSENT rather than stubbed
+  on the dotfile arms, and the real curl is unreachable from every arm
+- a stub `curl` that prints a recorded header block and records its own argv
+- HOME pointed at a fixture credential blob holding a fake token
+- `expiresAt` written relative to `date +%s`, so the freshness arms cannot rot
+
+Rejected: a `PROBE_CURL` seam (buys nothing the sealed PATH does not, and adds
+a production line whose only caller is a test); a stub HTTP server (a listener,
+a port and a race, for no gain); extracting the parser (a rewrite, and it would
+test the extract rather than the probe).
+
+A stub is written only after `rm -f`. `seal()` leaves a SYMLINK in that slot,
+and `>` through a symlink truncates the system binary it points at instead of
+shadowing it — which is how the first draft's `parse_failed` case quietly went
+on using the real python3.
+
+FIXTURE PROVENANCE — one live capture, 2026-08-21, of the REAL response header
+block, taken by running the real probe under a `curl` shim that tees its own
+stdout. One API call, the probe did its own auth, and no token was recorded.
+Kept verbatim: CRLF endings, and the CONNECT preamble the local proxy added,
+which doubles as the case for skipping a line that carries no colon. Variants
+are exact-string edits of that block, and `hdrs()` refuses an edit matching
+nothing — a no-op edit silently re-tests the capture.
+
+Observed live on it: `allowed` on both windows, `representative-claim:
+five_hour`, and `overage-status: rejected` sitting on a header the probe must
+NOT read, which is what makes the captured case discriminating. NOT observed
+live: `rejected` on a window status — the consumer suite says the same — and
+any representative claim other than `five_hour`, so the pass-through arm uses
+a visibly synthetic value rather than inventing a vocabulary.
+
+Three emitters, three shapes, each pinned byte for byte:
+
+```
+success               json.dumps spacing; read_ok, source, five_hour,
+                      weekly, representative
+emit_unreadable       a bare printf, no space anywhere
+no_ratelimit_headers  json.dumps again — spaced, and NOT the printf shape
+```
+
+The reason enumeration is DERIVED, never listed: the suite records which reason
+each case observed and compares that set against the literals grepped out of
+the probe, so a seventh reason with no case reddens instead of passing
+unnoticed.
+
+The SEAM arm reads the consumer suite's two captured fixtures and compares
+their key paths against what the probe emits today. Nothing else in the repo
+compares the two, and that gap is what put this suite here.
+
+Deliberately over the ~100-line refactor bar. Every case is welded to the one
+captured block — the goldens are that capture's own numbers and the variants
+are edits to it — so splitting the emitter cases from the credential cases
+would leave the capture in one file, half its goldens in another, and the
+sealed-PATH harness that makes any of it hermetic in a third. The bulk is
+arithmetic: a case costs five lines and asserts four things. Trim its prose
+before reaching for its code.
+
 ## validate-looper-config
 
 Both-directions test for the config validator: its CI-wiring check, its

@@ -61,5 +61,7 @@ jobs:
         run: ./hooks/guard-pr-template.test.sh
       - name: Custodian cron run-start usage-window gate (both directions)
         run: ./scripts/looper-custodian-cron.test.sh
+      - name: Usage-window probe emitted shapes (both directions)
+        run: ./scripts/usage-window-probe.test.sh
       - name: Temp-dir guard across suites (both directions)
         run: ./scripts/temp-dir-guard.test.sh

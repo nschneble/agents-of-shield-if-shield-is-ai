@@ -155,6 +155,12 @@ lexer-subst-enter-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qlx_expr[lx_sp
 lexer-subst-nesting-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (lx_brace[lx_sp] == 0) lx_expr[lx_sp] = 0; else lx_brace[lx_sp]--\E!lx_expr[lx_sp] = 0!
 lexer-slash-body-lexed|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s!\Qif (d == "/") return\E!if (d == "/") { i += 2; continue }!
 lexer-per-file-reset-off|doc-bloat-scan.sh|doc-bloat-scan.test.sh|s%\Qlx_cmt = 0; lx_sp = 0\E%lx_cmt = lx_cmt; lx_sp = lx_sp%
+probe-five-hour-renamed|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q"five_hour":window("5h")\E/"5h":window("5h")/
+probe-unreadable-spaced|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q{"read_ok":false,"reason":"%s"}\E/{"read_ok": false, "reason": "%s"}/
+probe-reason-renamed|usage-window-probe.sh|usage-window-probe.test.sh|s/\Qemit_unreadable "probe_failed"\E/emit_unreadable "curl_failed"/
+probe-status-from-bare-header|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q"status":h.get(f"anthropic-ratelimit-unified-{prefix}-status")\E/"status":h.get("anthropic-ratelimit-unified-status")/
+probe-representative-hardcoded|usage-window-probe.sh|usage-window-probe.test.sh|s/\Qh.get("anthropic-ratelimit-unified-representative-claim")\E/"five_hour"/
+probe-expiry-skew-dropped|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q+ 60000))\E/+ 0))/
 TABLE
 }
 
