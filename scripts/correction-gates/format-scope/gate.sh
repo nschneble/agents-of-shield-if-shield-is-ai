@@ -54,8 +54,7 @@
 # Exit: 0 clean · 1 any violation · 2 usage/env error.
 set -euo pipefail
 
-# resolved before the cd into DIR: the pin travels with the gate, not with
-# whatever repo it is pointed at
+# resolved before the cd: the pin travels with the gate, not the repo
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PIN_FILE="$here/prettier-version"
 

@@ -63,8 +63,7 @@ exit 0
 STUB
 chmod +x "$stub"
 
-# the pin is read, not hardcoded, so bumping the version does not silently
-# leave every case below testing a version the gate no longer accepts
+# read, not hardcoded, so a bump cannot leave the cases below stale
 pin_file="$here/prettier-version"
 [ -r "$pin_file" ] || die_temp "no prettier pin at $pin_file"
 export PRETTIER_STUB_VERSION; PRETTIER_STUB_VERSION=$(tr -d '[:space:]' < "$pin_file")
@@ -157,8 +156,7 @@ out=$(PRETTIER_STUB_VERSION=9.9.9 PRETTIER="$stub" \
 printf '%s\n' "$out" | grep -q "prettier 9.9.9 is not the pinned $PRETTIER_STUB_VERSION"
 check "PIN RED: message names the found version and the pin" $?
 
-# fail closed: a gate whose pin file is gone must refuse, not fall back to
-# trusting whatever binary it was handed
+# fail closed: a lost pin must refuse, not trust the caller's binary
 nopin="$temp_dir/nopin"; mkdir -p "$nopin" || die_temp "cannot create $nopin"
 command cp "$gate" "$nopin/gate.sh"
 out=$(PRETTIER="$stub" "$nopin/gate.sh" --dir "$p" --changed "$p/changed.txt" a.css 2>&1); rc=$?
