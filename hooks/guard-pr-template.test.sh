@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
 # guard-pr-template.test.sh — both-directions test for the PR-template guard.
 #
-# Both directions matter for opposite reasons. A guard that never fires is
-# the status quo it was built to replace. A guard that fires on a body
-# that DID follow the template teaches people to route around it, and a
-# routed-around guard is worse than none because it also reads as
-# enforcement. So the fail-open arms are tested as carefully as the bite.
-#
-# Self-contained: builds fixture repos in a temp dir, feeds the hook the
-# same PreToolUse JSON Claude Code sends. No git remote, no network, no
-# ~/.claude. Needs a writable temp dir and aborts rather than degrade.
+# Fail-open arms tested as carefully as the bite. Fixture repos in a temp
+# dir, fed the same PreToolUse JSON Claude Code sends.
+# Background: docs/test-suites.md#guard-pr-template
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

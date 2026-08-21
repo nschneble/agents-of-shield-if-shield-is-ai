@@ -2,18 +2,9 @@
 # guard-destructive-git.test.sh — both-directions test for the PreToolUse
 # guard.
 #
-# Standing rule: RED (the guard denies what it claims to deny) AND green
-# (ordinary work is not blocked). The green half is the load-bearing one
-# here: a guard that over-blocks gets disabled, and a disabled guard
-# protects nothing.
-#
-# The guard reads a PreToolUse payload on stdin and, to DENY, prints a
-# JSON object carrying permissionDecision:"deny". To ALLOW it prints
-# nothing. Exit status is 0 either way, so the decision is read from
-# stdout, never from $?.
-#
-# Self-contained: no git repo, no network, no temp files — the guard is a
-# pure stdin/stdout filter.
+# Decision read from stdout, never from $?, since the guard exits 0 either
+# way. Pure stdin/stdout filter: no git repo, no network, no temp files.
+# Background: docs/test-suites.md#guard-destructive-git
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

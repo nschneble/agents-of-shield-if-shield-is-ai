@@ -2,10 +2,9 @@
 # skill-body-ceiling.test.sh — both-directions test for the body-ceiling
 # check.
 #
-# The failure that matters is a check that stops checking: a ceilings file
-# it cannot read, a row it skips, a comparison that never fires. Each of
-# those looks exactly like a clean run from the outside, so the shapes are
-# pinned here rather than the happy path alone.
+# Pins the shapes where the check stops checking — unreadable ceilings
+# file, skipped row, comparison that never fires.
+# Background: docs/test-suites.md#skill-body-ceiling
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

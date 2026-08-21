@@ -2,18 +2,8 @@
 # loop-receipts.test.sh — both-directions test for the receipt check, and
 # for the hook that writes what it reads.
 #
-# The hook half matters as much as the check half: a hook that silently
-# writes nothing makes every branch NOT EVALUABLE, which is a clean exit
-# forever. So the writer is exercised against real payload shapes, not
-# assumed.
-#
-# THE FIXTURES BELOW ARE THE PAYLOAD THE RUNTIME ACTUALLY SENDS, dumped
-# from a live PostToolUse call: tool_response carries interrupted,
-# isImage, noOutputExpected, stderr, stdout — and no exit code, under any
-# spelling. An earlier version of this file hand-wrote `exit_code: 0`,
-# asserted on it, and passed green while the check it covers could not
-# reach its own clean arm on a single real branch. A fixture that
-# manufactures the schema it validates proves nothing.
+# Fixtures are a live PostToolUse payload, dumped not hand-written.
+# Background: docs/test-suites.md#loop-receipts
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

@@ -2,42 +2,9 @@
 # loop-state-audit.test.sh — both-directions test for the run-state
 # drift audit.
 #
-# Standing rule: a new invariant is tested RED (goes off on a violating
-# fixture) AND green (clean fixture passes). Every comparison arm gets
-# both, because an audit that silently stopped comparing would print
-# `STATE DRIFT: 0` — the same words as a clean run. The arm count in the
-# headline is what separates those two, so it is asserted too.
-#
-# Five properties the audit's honesty depends on:
-#   - THE LIVE SEGMENT is load-bearing. A `commit` line above a later
-#     `_declared` belongs to a superseded dispatch, so the wave is NOT
-#     shipped. One fixture pair carries both directions: the same lines
-#     with and without the trailing declaration. Without the pair, an
-#     audit that grepped the whole file for `commit` and an audit that
-#     read segments correctly would each pass some single arm.
-#   - NOT EVALUABLE is not clean. A journal with an unparseable line
-#     cannot be typed, so the four journal-derived arms are SKIPPED
-#     rather than compared against a floor — and the report has to say
-#     which wave and why, or a damaged journal quietly shrinks the
-#     comparison to the arms that happen to still work.
-#   - The EXIT CODE tracks the printed drift count on every fixture, so
-#     a caller branching on `$?` and a human reading the report never
-#     disagree. `agree` below re-derives it from the report's own
-#     headline rather than restating an expected number.
-#   - EXIT 0 MEANS FULLY CHECKED, not "nothing I compared disagreed".
-#     A resume branches on this code to decide whether to trust the
-#     snapshot, so a run whose position arms were skipped exits 2 even
-#     with every surviving arm green — and a disagreement the audit did
-#     settle outranks that, since drift is actionable and a gap is only
-#     a reason to go looking. Both directions have an arm.
-#   - A LEGACY SNAPSHOT IS NOT A DRIFTING ONE. Older run dirs key queue
-#     entries `n` with a prose status, carry no `last_crew_wave`, and
-#     hold no journals; each oracle must decline rather than report the
-#     schema gap as lost position. Caught by sweeping real dirs in
-#     sibling repos, where the first cut reddened every arm of all four.
-#
-# Fixtures are written by this file — never read from gitignored
-# `local/`. Pure bash + jq, self-contained.
+# Every comparison arm both ways, plus the arm count and the exit code.
+# Fixtures written by this suite; pure bash + jq.
+# Background: docs/test-suites.md#loop-state-audit
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

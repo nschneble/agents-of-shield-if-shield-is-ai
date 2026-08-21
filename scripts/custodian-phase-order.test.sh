@@ -2,65 +2,9 @@
 # custodian-phase-order.test.sh — both-directions test for the
 # phase-order log check.
 #
-# Standing rule: a new invariant is tested RED (goes off on a violating
-# fixture) AND green (clean fixture passes). Proves both predicates go
-# off citing their offending lines verbatim, that the exit code tracks
-# them, and that every report-only class stays out of the violation set.
-# The predicates, those classes and the exit contract are spec'd in
-# skills/looper-custodian/references/phase-order-check.md.
-#
-# Six further properties the check's honesty depends on:
-#   - SEGMENTATION is load-bearing: deleting the `resume` marker from
-#     the GREEN fixture, and changing nothing else, must turn it RED.
-#     Without that arm a check that ignored segments entirely would
-#     still pass GREEN, and decision 24's resume clause would be
-#     untested.
-#   - The EXIT CODE must agree with the report's own printed total on
-#     every fixture. It once did not: the code was scraped back out of
-#     the rendered prose, so a newline inside a logged `action` injected
-#     a counterfeit `TOTAL VIOLATIONS: 0` that `head -1` preferred, and
-#     a real violation exited 0. `agree` below re-derives the expected
-#     code from the LAST total line on every case, and one fixture
-#     carries that injection deliberately.
-#   - NOTHING CHECKED is not clean: a log the check cannot read asserts
-#     nothing, so it must be distinguishable from a verified run at BOTH
-#     the headline and the exit code, or schema drift greens the gate
-#     forever.
-#   - The P2 DISCRIMINATOR reads the earlier phase-B line, not the
-#     segment number. One fixture pair carries both directions: a
-#     textbook E-only resume tail exits 0, and the same fixture with its
-#     phase-B lines deleted exits 1. Without the pair, a check that
-#     flagged every no-B segment and a check that flagged none would
-#     each pass some single arm.
-#   - CLAIM DISCIPLINE, in both directions, INCLUDING on the
-#     disclaimer's own line. The report must say it asserts log order
-#     only (decision 24 caps what this check may claim), and it must NOT
-#     say anything more. The negative arm strips the pinned SUBSTRING
-#     rather than the line it sits on: dropping the line hid every
-#     overclaim welded onto it, which is the one place a future edit is
-#     actually likely to put one.
-#   - SINGLE HOME, the one property here that is about the repo rather
-#     than the report. The discriminator argument is stated once, in
-#     the reference, and no linter compares two prose copies of a rule
-#     — so the restructure that gave it one home rests on review alone
-#     unless something counts. This counts.
-#
-# Fixtures are written by this file — never read from gitignored
-# `local/`. Pure bash + jq, self-contained.
-#
-# Deliberately over the ~100-line refactor bar, and the reason covers
-# part of the file rather than all of it. Two fixtures are welded to
-# their assertions: RED and DIED carry all four of the cited-LINE-NUMBER
-# arms (`precedes line 6`, `MALFORMED  line 9`, `MALFORMED  line 10`,
-# `first at line 3`), so moving them to a second file would strand them
-# where they cannot see the fixture that numbers them, and every future
-# fixture edit would drift them silently. That claims 75 code lines —
-# RED 56, DIED 19 — and no more. The other fixtures assert on content
-# with `grep -q`, carry no line-number coupling, and would split
-# cleanly — they stay here for convenience, not cohesion.
-# The bulk is arithmetic, not slack — an arm costs two lines (the probe,
-# then `check`), so the assertion floor at the foot of the file already
-# prices most of the body. Trim its prose before reaching for its code.
+# Both predicates, the exit contract and every report-only class.
+# Fixtures written by this suite; pure bash + jq.
+# Background: docs/test-suites.md#custodian-phase-order
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

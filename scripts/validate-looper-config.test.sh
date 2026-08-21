@@ -1,27 +1,10 @@
 #!/usr/bin/env bash
 # validate-looper-config.test.sh — both-directions test for the config
-# validator: its CI-wiring check, its frontmatter checks, and its
-# reference-integrity warnings.
+# validator: CI wiring, frontmatter, reference integrity.
 #
-# The wiring check is why this file exists. It has been wrong in BOTH
-# directions and reddened nothing either time. Matching only lines that
-# start `run:` missed a suite invoked inside a `run: |` block scalar and
-# called a wired suite unwired. Widening the match to the whole YAML body
-# then accepted any MENTION: with the real step deleted, a suite named in a
-# step `name:`, in an `on: push: paths:` filter, or in a trailing `# TODO`
-# comment all read as wired. So both directions are pinned here — the
-# spellings CI never executes must ERROR, and the three it does execute
-# must not.
-#
-# Self-contained: builds a fixture repo in a temp dir carrying its own copy
-# of the validator, which resolves its repo root from its own path. No git,
-# no network. Needs a writable temp dir, so it must run sandbox-off
-# locally; it aborts rather than degrade when it cannot get one.
-#
-# The verdict is derived from a results LOG, and an expected assertion
-# count is asserted alongside it. Both because this file is now what
-# guarantees every other suite reaches CI, and a guarantor that can
-# false-green through its own accountant guarantees nothing.
+# Fixture repo in a temp dir; verdict from a results log, with the
+# assertion count asserted beside it.
+# Background: docs/test-suites.md#validate-looper-config
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

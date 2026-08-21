@@ -1,18 +1,9 @@
 #!/usr/bin/env bash
 # custodian-log-recall.test.sh — both-directions test for the recall check.
 #
-# Both directions matter more here than in most suites, because the
-# failure this check exists to catch is an ABSENCE. A check that reports
-# a missing line is easy; a check that stays quiet when the line is
-# present, and that refuses to call an unfired rule clean, is the part
-# that can silently rot into "always green" or "always red".
-#
-# So four verdict classes are pinned, not two: SATISFIED, VIOLATION,
-# NOT EVALUABLE, and the UNDECLARED exit that fires when the spec grows
-# a requirement nobody taught the check to time.
-#
-# Self-contained: fixture spec + fixture logs in a temp dir. No git, no
-# network, and it never reads the real local/custodian corpus.
+# Four verdict classes pinned, not two: SATISFIED, VIOLATION, NOT
+# EVALUABLE and UNDECLARED. Fixture spec + logs in a temp dir.
+# Background: docs/test-suites.md#custodian-log-recall
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
