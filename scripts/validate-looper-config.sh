@@ -224,6 +224,25 @@ real_path() {  # realpath is not on stock macOS; readlink -f is not on bash 3.2 
     printf '%s/%s\n' "$(pwd -P)" "$p" )
 }
 
+# --- Doc mirror: a docs/ heading that also names a skill section ---
+# The doc copy of a rule is the one nothing enforces, so it is the one a
+# fixing wave misses while the skill moves on — the observed shape behind a
+# repeating class of corrective wave. Three such sections (`## Why it
+# exists`, `## Governing principle: …`) were deleted when the decision logs
+# moved to docs/decisions/; this is what stops them growing back. WARN, not
+# ERROR: a generic heading can collide honestly, and doc rot should not
+# block a merge.
+skill_heads=$(grep -h '^## ' skills/*/SKILL.md 2>/dev/null | sort -u)
+for f in docs/*.md docs/decisions/*.md; do
+  [ -e "$f" ] || continue
+  while IFS= read -r h; do
+    [ -n "$h" ] || continue
+    if printf '%s\n' "$skill_heads" | grep -qxF "$h"; then
+      warn "$f restates a skill section: \`$h\` — the skill is the enforced copy"
+    fi
+  done < <(grep '^## ' "$f" 2>/dev/null)
+done
+
 if [ -d "$CLAUDE_HOME/agents" ]; then
   repo_root=$(pwd -P)
   for area in agents skills hooks; do

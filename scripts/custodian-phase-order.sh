@@ -5,7 +5,7 @@
 #
 # The rule it compiles (skills/looper-custodian/SKILL.md
 # `## Maintenance run`, recorded as decision 24 in
-# docs/looper-custodian.md): phases run ONE AT A TIME, a phase is done
+# docs/decisions/looper-custodian.md): phases run ONE AT A TIME, a phase is done
 # when its subagents have RETURNED rather than when they were
 # dispatched, and Phase E is probed and dispatched only after Phase B
 # has fully returned. Until now that rule was prose addressed to an
@@ -130,7 +130,7 @@ analysis=$(jq -Rn --arg log "$LOG" '
       + [ "P1  no phase-E line before a phase-B line inside one run segment",
           "P2  no segment carrying phase-E lines with no phase-B line logged at or before it",
           "    (a no-B segment with an EARLIER phase-B line is a resume tail, reported not counted)",
-          "    (spec skills/looper-custodian/references/phase-order-check.md · rule SKILL.md ## Maintenance run, decision 24 in docs/looper-custodian.md)",
+          "    (spec skills/looper-custodian/references/phase-order-check.md · rule SKILL.md ## Maintenance run, decision 24 in docs/decisions/looper-custodian.md)",
           "    ASSERTS LOG ORDER ONLY, never runtime serialization: a run that dispatched",
           "    out of order and logged in order passes this check (decision 24).",
           "    segments: checked \($checked | length) · unordered \($p2) · resume tail \($tail | length) · not evaluable \($skipped | length) · violations \($p1 + $p2)" ]

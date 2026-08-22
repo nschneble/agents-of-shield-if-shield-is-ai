@@ -75,8 +75,4 @@ Every issue cite `path/to/file.ts:Lstart-Lend`. CLAUDE.md-derived findings quote
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-diamantaire/`. Write directly, directory exist.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-No save: derivable code patterns, CLAUDE.md content, ephemeral state. Verify before acting on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-diamantaire/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

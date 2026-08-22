@@ -1,64 +1,15 @@
 # Looper Defend — design rationale + decision log
 
+Off the crew drift-check surface by design: this is append-only history
+cited by date, not spec anything reads at runtime. The executable spec is
+skills/looper-defend/SKILL.md.
+
 Status: **built.** Operational spec (the five phases, the adapter table, the
 artifacts, the `apply` grammar, the full "what it does") lives in
 `skills/looper-defend/SKILL.md` — that is the source of truth. This doc holds
 only what the skill doesn't: _why_ it exists, _why_ the choices are what they
 are, and the _decision record_. Don't duplicate mechanics here — if a phase's
 behavior changes, it changes in `SKILL.md`.
-
-## Why it exists
-
-Two surfaces already touch security, and both answer the same question —
-"is this CHANGE safe?":
-
-- **`security-review`** (built-in) reviews the pending diff on the current
-  branch.
-- **`the-diamantaire`** carries security as one of its review dimensions, also
-  over recently-modified code.
-
-Both are reactive and diff-scoped. Nothing hunts the question "is this REPO
-safe?" — a proactive pass over the whole tree, the reachable code paths, the
-dependency manifests, the trust boundaries, and (where cheap) git history for
-leaked secrets, independent of any pending change. A vulnerability that was
-merged clean months ago, or that lives in a dependency nobody touched this
-sprint, is invisible to a diff review precisely because there is no diff.
-
-`looper-defend` is that proactive whole-repo hunt. It is deliberately NOT a
-reimplementation of diff review — its triage phase MAY call `/security-review`
-as one input signal for the pending-diff sub-case, but the hunt is the part
-neither built-in covers. And it is the on-demand sibling of `looper-custodian`:
-custodian housekeeps the looper _system_ on a weekly cadence; defend hunts a
-_target codebase_ when a human asks.
-
-## Governing principle: defend PROPOSES, human DISPOSES
-
-The spine of the design, and the reason the phases split into auto vs gated.
-
-An autonomous hunt that auto-rewrites application code to "fix" a suspected
-vuln is exactly the "merging outpaces comprehension" failure the
-loop-engineering sources warn about — and it is worse here than for a feature
-wave, because a mis-triaged false positive "fixed" in app logic can introduce
-the very defect it claimed to close. The reference harness draws the same line:
-its patch ladder "verifies the crash is gone, not that the diff is safe to
-upstream," so it surfaces the diff for a human rather than auto-applying. So:
-
-- **Recon / find / triage / report run automatically** — read-only analysis, no
-  source touched. They enumerate, hunt, verify, and rank.
-- **Patch is propose-only** — every remediation lands as a checkbox in the
-  report and proceeds through the build pipeline ONLY after a human ticks it.
-- **One narrow class MAY auto-apply** — a dependency version bump to a pinned
-  CVE-fix version, when the suite stays green with zero application-code change.
-  Even it lands as a reviewable draft-PR commit: the human gates the MERGE, not
-  the tick.
-
-This is the same discipline the loop and custodian already hold. It is also the
-`no-third-party-hosted-tool-reliance` posture applied to remediation: the loop
-"stays self-contained… a rented hosted layer breaks that portability, adds an
-auth/availability failure mode a headless cron can't clear." Defend never
-auto-mutates app code behind a human's back for the same family reason custodian
-never auto-edits a memory or an agent — the write is the thing that must be
-comprehended before it lands, and defend is the propose-side of that split.
 
 ## Why these mechanisms (the non-obvious choices)
 

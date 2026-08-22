@@ -32,7 +32,7 @@
 # ADVISORY (INFO, exit stays 0): the token/line budgets above, plus one reference
 #   file CROSS-LINKING another (`adv-reference-chain`) — a prose mention, not a
 #   load path, so it is an extraction judgement like the budgets, while the
-#   depth check above measures a path fact (docs/looper-custodian.md decision 29).
+#   depth check above measures a path fact (docs/decisions/looper-custodian.md decision 29).
 #   Token counts are APPROXIMATE — chars/4, the standard rough BPE proxy (see
 #   `est_file_tokens`).
 #   For markdown/code-ish prose the real BPE tokenizer runs slightly HOTTER than

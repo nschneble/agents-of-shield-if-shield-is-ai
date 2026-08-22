@@ -303,11 +303,30 @@ run_fixture
 printf '%s\n' "$out" | grep -q 'omits `/beta apply`'
 check "a declared verb absent from the family doc warns by name" $?
 
+# --- doc mirror: a docs/ heading that restates a skill section ----------
+# The doc copy of a rule is the one nothing enforces, so a fixing wave
+# updates the skill and leaves the doc saying the old thing. Both
+# directions, and on the warning text rather than rc, since this is a WARN.
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\n## Governing principle\n\nSpec text.\n' \
+  > "$fix/skills/beta/SKILL.md"
+
+printf '# Skills\n\n## Catalog\n\nA heading no skill uses.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+! printf '%s\n' "$out" | grep -q 'restates a skill section'
+check "a docs heading no skill uses does not warn" $?
+
+printf '# Skills\n\n## Governing principle\n\nThe restated copy.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+printf '%s\n' "$out" | grep -q 'restates a skill section: `## Governing principle`'
+check "a docs heading that restates a skill section warns by name" $?
+
 # --- the tally, derived from the log rather than from a counter ---------
 # EXPECTED_CHECKS is the floor. Add or remove a fixture block and this
 # number moves with it — that is the point: a block deleted on its own
 # reads as silence, and silence is what this file exists to stop.
-EXPECTED_CHECKS=23
+EXPECTED_CHECKS=25
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

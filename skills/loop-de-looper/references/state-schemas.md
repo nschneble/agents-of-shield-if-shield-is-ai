@@ -7,7 +7,8 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
 ```json
 {
   "wave": 4,
-  "kind": "crew", // "crew" | "pre-build-specialist" | "wave-retry" | "stale-skip"
+  "kind": "crew", // CLOSED enum, see below — the audit rejects anything else
+  "pass": "final", // crew lines only: "interim" | "final" | "re-crew"; else null
   "agent": "the-diamantaire", // crew member or specialist name
   "task_tool_available": true, // false = orchestrator could NOT invoke; rules in SKILL.md `## Gate artifacts`
   "ran": true, // false when task_tool_available is false
@@ -21,6 +22,10 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
   "summary": "one line, cited from agent output"
 }
 ```
+
+`kind` is a CLOSED enum of exactly nine tokens: `crew`, `pre-build-specialist`, `wave-retry`, `stale-skip`, `executor-handback`, `usage-window`, `finding-audit`, `pr-finalization`, `orchestration-incident`. Anything else is a write bug, and the audit fails on it.
+
+**The variant belongs in `pass`, never in `kind`.** This is the whole reason the enum is enforced rather than merely documented. Every consumer selects on `.kind == "crew"`, so a line spelled `crew-interim`, `crew-final`, `crew-final-summary` or `crew-final-all-seven` is not a stricter label — it is a line the audit cannot see. One real run logged 31 distinct spellings across ~50 lines, and its crew coverage was invisible to `loop-finding-audit.sh` for every one of them that was not exactly `crew`. A closed enum plus a separate `pass` field is what makes a crew line countable.
 
 `gates` is the field that separates a finding from a corrective wave. A crew agent's own severity label does NOT set it — the orchestrator sets it after applying `SKILL.md` `## Finding severity floor`, and a `true` without both `gated_by` and `contract_ref` is inadmissible. Everything else is a batched finding: `gates: false`, both justification fields `null`, and the finding itself recorded in `run-state.json` `cleanup_batch` rather than here.
 

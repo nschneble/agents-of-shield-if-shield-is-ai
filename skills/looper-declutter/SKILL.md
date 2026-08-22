@@ -5,7 +5,7 @@ description: On-demand whole-repo comment-bloat sweep — find over-narrated com
 
 Proactive whole-repo comment-bloat hunt + human-gated snips. `looper-defend` hunts a target repo for security defects; `looper-declutter` hunts the same repo for over-explained comments and proposes surgical trims. Same shape (on-demand, whole-repo, propose-only, `apply`/`--dry-run`), different quarry.
 
-Full design rationale + decision log: `docs/looper-declutter.md`. This file is the executable spec.
+Full design rationale + decision log: `docs/decisions/looper-declutter.md`. This file is the executable spec.
 
 ## Why this exists — and how it differs from what already trims comments
 

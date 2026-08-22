@@ -68,9 +68,15 @@ while IFS=$'\t' read -r skill ceiling note; do
   case "$ceiling" in
     ''|*[!0-9]*) echo "  MALFORMED  $skill: ceiling \"$ceiling\" is not a number" >&2; exit 2 ;;
   esac
-  f="$repo_root/skills/$skill/SKILL.md"
+  # A bare name is a skill; a name carrying a slash is a repo-relative path,
+  # which is how an agent gets a ceiling — agents are flat files with no
+  # skills/<name>/SKILL.md shape to infer.
+  case "$skill" in
+    */*) f="$repo_root/$skill";                 label="$skill" ;;
+    *)   f="$repo_root/skills/$skill/SKILL.md"; label="skills/$skill/SKILL.md" ;;
+  esac
   if [ ! -e "$f" ]; then
-    echo "  MISSING    $skill: no skills/$skill/SKILL.md to measure" >&2
+    echo "  MISSING    $skill: no $label to measure" >&2
     exit 2
   fi
   actual=$(est_tokens "$f")

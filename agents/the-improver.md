@@ -66,7 +66,7 @@ Bias, not dogma. Preserve behavior exactly (see top). No strip code carry real l
 
 ## In a crew pass
 
-Under `loop-de-looper`: findings only, no edits — your own def says "refactor and clean up", and inside a crew pass it does not apply. The brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`; report against both.
+Under `loop-de-looper`: findings only, no edits — your own def says "refactor and clean up", and inside a crew pass it does not apply. Contract and floor arrive in the prompt; below is what they mean here.
 
 Refactor findings sit below that floor: god files, duplication, misplaced homes, deep nesting, ladder-rung downgrades, dead code, UI polish. They go to the run's cleanup batch — which is, in effect, your wave. A settled diff is better ground for a refactor than a mid-run one anyway.
 
@@ -74,8 +74,4 @@ An exception the floor already covers: if a refactor opportunity is also a live 
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-improver/`. Write directly, directory exists.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-No save: derivable code patterns, CLAUDE.md content, ephemeral state. Verify before act on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-improver/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

@@ -26,3 +26,33 @@
 #
 # skill	ceiling	note
 looper-custodian	8691	8127 actual, 564 under; the ceiling was set at 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
+#
+# W1 SEEDING. Every skill and agent got a row so the reductions waves W2-W7
+# buy cannot drift back one paragraph at a time. Margin is one mechanism
+# (~650) or a fifth of the file, whichever is SMALLER: 650 on a 1000-token
+# agent is 65% slack, which trips this check's own "guards nothing" note and
+# is a ceiling in name only. Each wave that shrinks a file LOWERS its
+# ceiling in the same commit.
+loop-de-looper	9800	9364 after W6 (was 8667 after W2); +697 bought the fast-path route and its four guards, which takes a small ask from four serial dispatches to one
+looper-build	2110	1759 at W1 seeding, +351 margin
+looper-commit	3393	2828 at W1 seeding, +565 margin
+looper-declutter	4699	4049 at W1 seeding, +650 margin
+looper-defend	8682	8032 at W1 seeding, +650 margin
+looper-learn	3361	2801 at W1 seeding, +560 margin
+looper-nonbeliever	2424	2020 at W1 seeding, +404 margin
+looper-plan	5599	4949 at W1 seeding, +650 margin
+looper-recap	996	830 at W1 seeding, +166 margin
+looper-research	2056	1714 at W1 seeding, +342 margin
+looper-review	2488	2074 at W1 seeding, +414 margin
+looper-scope	3140	2617 at W1 seeding, +523 margin
+looper-verify	3681	3068 at W1 seeding, +613 margin
+agents/the-auditor.md	3830	3192 at W1 seeding, +638 margin
+agents/the-chemist.md	1586	1322 at W1 seeding, +264 margin
+agents/the-chronicler.md	2869	2391 at W1 seeding, +478 margin
+agents/the-diamantaire.md	1922	1602 at W1 seeding, +320 margin
+agents/the-ghostwriter.md	3262	2719 at W1 seeding, +543 margin
+agents/the-improver.md	2204	1837 at W1 seeding, +367 margin
+agents/the-looper.md	5867	5217 at W1 seeding, +650 margin
+agents/the-stickler.md	1290	1075 at W1 seeding, +215 margin
+agents/the-turncoat.md	2245	1871 at W1 seeding, +374 margin
+agents/the-wordsmith.md	1190	992 at W1 seeding, +198 margin

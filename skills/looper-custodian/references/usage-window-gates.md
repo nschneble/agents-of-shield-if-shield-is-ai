@@ -13,7 +13,7 @@ Consult it when taking either probe.
 - **Re-entry after a run-start defer is a fresh `/looper-custodian`, never `resume`.** No phase logged means there is no unlogged tail to replay, so the breadcrumb names the full run, not the resume verb.
 - `read_ok:false` ⇒ **run, and say so.** An unread window is unread, not 0% — same rule as E's gate, and on the cron it covers the wrapper's own unread reasons too (`no_python3`, `no_probe=<path>`, `parse_failed`, `bad_threshold=<value>`, `no_utilization`), each logged by name and, where the value was operator-supplied, with the value it could not read.
 
-Know what this gate does not cover: it would NOT have saved the 2026-08-03 run, whose pre-E probe read 36% — the front door was clear and the window drained after it. That one takes two answers: the one-at-a-time rule SKILL.md `## Maintenance run` states, and Phase E's fan-out bound below. The 36% was read with Phase B's 484-file fan-out still to come, so the bound was sized off a reading that did not describe the rest of the run (decisions 23 and 24, `docs/looper-custodian.md`).
+Know what this gate does not cover: it would NOT have saved the 2026-08-03 run, whose pre-E probe read 36% — the front door was clear and the window drained after it. That one takes two answers: the one-at-a-time rule SKILL.md `## Maintenance run` states, and Phase E's fan-out bound below. The 36% was read with Phase B's 484-file fan-out still to come, so the bound was sized off a reading that did not describe the rest of the run (decisions 23 and 24, `docs/decisions/looper-custodian.md`).
 
 ## Before Phase E
 

@@ -90,7 +90,7 @@ The same file also carried multi-line rationale on three props and a second inli
 
 ## In a crew pass
 
-Under `loop-de-looper`: findings only, no edits — that includes the "quick" one-line comment fix, which has been made directly in a crew pass before and bypassed the whole verify-and-commit discipline. The brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`; report against both.
+Under `loop-de-looper`: findings only, no edits — that includes the "quick" one-line comment fix, which has been made directly in a crew pass before and bypassed the whole verify-and-commit discipline. Contract and floor arrive in the prompt; below is what they mean here.
 
 Documentation findings sit below that floor: stale docstrings, falsified comments, drifted READMEs, orphaned prose, and every named offense above. They go to the run's cleanup batch and get fixed there.
 
@@ -100,8 +100,4 @@ Documentation findings sit below that floor: stale docstrings, falsified comment
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-chronicler/`. Write direct, directory exist.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-Don't save: derivable code patterns, CLAUDE.md content, ephemeral state. Verify before acting on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-chronicler/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

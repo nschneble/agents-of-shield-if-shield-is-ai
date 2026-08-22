@@ -55,10 +55,10 @@ needs no `--prettier` flag of its own, because it runs each `exec:` via
 and the pre-flight rejects any other with exit 2. Without it the verdict
 belonged to whichever binary the caller happened to supply: on this repo's
 57 tracked `.md` files, 3.6.2 and 3.9.6 disagree about two of them —
-`docs/looper-defend.md` and
+`docs/decisions/looper-defend.md` and
 `skills/looper-commit/templates/structured-recap.md` each pass under one
 version and fail under the other. 3.6.2 is additionally unusable here: it
-has no fixed point on `docs/looper-custodian.md`, where each `--write`
+has no fixed point on `docs/decisions/looper-custodian.md`, where each `--write`
 pass adds four more spaces of indent and the first pass collapses a nested
 list that both CommonMark and GitHub render.
 

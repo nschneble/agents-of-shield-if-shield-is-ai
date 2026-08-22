@@ -106,12 +106,25 @@ out=$("$check" --ceilings 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check_that "a value-taking flag with no value exits 2 (got $rc)" $?
 
+# --- a slash-carrying row is a repo-relative path, not a skill name ------
+mkdir -p "$root/agents"
+head -c 400 /dev/zero | tr '\0' 'x' > "$root/agents/solo.md"
+printf '%s\t%s\t%s\n' "agents/solo.md" "200" "fixture" > "$ceilings"
+run
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'ok         agents/solo.md'
+check_that "an agent row measures the path it names (got $rc)" $?
+
+printf '%s\t%s\t%s\n' "agents/gone.md" "200" "fixture" > "$ceilings"
+run
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'no agents/gone.md'
+check_that "a slash row naming a missing file exits 2 (got $rc)" $?
+
 # --- the real file is honest about the real tree -------------------------
 out=$("$check" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'looper-custodian'
 check_that "the committed ceilings file passes against the real tree (got $rc)" $?
 
-EXPECTED_CHECKS=14
+EXPECTED_CHECKS=16
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

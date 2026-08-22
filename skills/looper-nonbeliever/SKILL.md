@@ -46,6 +46,8 @@ Second output, orthogonal to the verdict. Before any queue gets built, judge how
 
 Bias honestly. Most goals handed to Loop de Looper are genuinely multi-wave — that's why the user reached for it — so `full-orchestration` is the common case; the cheap-out paths exist only so a misfiled small ask doesn't pay full freight. Size by the work, not by how the user phrased it.
 
+**On `single-wave`, emit the goal contract too.** That route skips `looper-scope` (`loop-de-looper` `## Step 0`), so nothing downstream produces one otherwise — and a wave with no contract has nothing to measure a finding against. One numbered ask in the user's own words, with the exit criterion that closes it. Same shape as scope's section 0, one item; you have already read the raw goal to size it.
+
 Vague is NOT small. A goal with no definition of done ("improve performance") is not `inline` — it is a **STOP** on the Authority axis: route the sizing question back to the user with bounded readings to pick from. Sizing labels work that is _understood and small_; it never silently shrinks work that is merely _unspecified_.
 
 ## Output

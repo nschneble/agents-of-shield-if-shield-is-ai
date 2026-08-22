@@ -5,35 +5,13 @@ description: Perform independent code reviews of bugfixes and feature implementa
 
 Qualitative review. Independent from build + verify. Question not "does work" (verify answer that) but "right shape, fit codebase, hidden costs?"
 
-## Invoke specialist reviewers
+## Escalating to a specialist
 
-Domains beyond general eng → orchestrator invoke specialists via Task tool. Skill recommend + synthesize reports.
+A domain beyond general engineering is the orchestrator's to fire, not this skill's — recommend it and hand back; do not invoke and do not substitute your own judgment for it.
 
-Under `loop-de-looper`, recommended specialists feed orchestrator's crew pass mechanism, fired at trigger points (every 4 waves OR 30 cumulative file changes, plus mandatory final crew), not per-wave parallel spawns inside wave loop. Per-wave review sorts findings into blockers and batched, same two buckets as `## Output`; crew pass on cumulative diff catch cross-wave drift single-wave review cannot see.
+**Name the reviewer, not its bar.** Each crew agent's definition IS its criteria, fixed before the diff is seen rather than improvised at review time ([VeriLA, arxiv 2503.12651](https://arxiv.org/abs/2503.12651): "defines clear expectations of each agent by curating human-designed agent criteria"). This skill used to restate all seven bars, which put a second copy of every reviewer's contract somewhere nothing enforces it — the copy that goes stale when an agent's own definition moves. The roster and the routing live in `loop-de-looper` `## Step 3`; the bar lives in the agent.
 
-| Domain                                                 | Reviewer                                  |
-| ------------------------------------------------------ | ----------------------------------------- |
-| General code review                                    | `the-diamantaire`                         |
-| Convention adherence (style, naming, project patterns) | `the-stickler`                            |
-| Accessibility (post-build review of shipped UI)        | `accessibility-agents:accessibility-lead` |
-| Test coverage and quality                              | `the-chemist`                             |
-| Documentation                                          | `the-chronicler`                          |
-| Voice and tone (prose surfaces, AI-slop tells)         | `the-ghostwriter`                         |
-| Refactor / simplification opportunities                | `the-improver`                            |
-
-Invoke specialists parallel where possible. Synthesize findings, not concatenate.
-
-## Pre-defined reviewer criteria
-
-Each crew reviewer's bar is fixed **before** the diff is seen — curated upfront, not improvised by the judge at review time ([VeriLA, arxiv 2503.12651](https://arxiv.org/abs/2503.12651): "defines clear expectations of each agent by curating human-designed agent criteria"). Recommend a reviewer → you assert the criteria below are the gate it'll be held to. The specialist's own agent def is source of truth; this is the contract the loop expects it to enforce. Surfaces per-agent failures instead of one floating, made-up bar.
-
-- **`the-diamantaire`** (general code review): correctness, module boundaries, exception/guard fit, rung fit — confidence-scored, only high-confidence surfaced.
-- **`the-stickler`** (convention adherence): naming taboos, suffix conventions, DTO/shape/union choice, Tailwind class order, barrel structure — rule quoted verbatim.
-- **`accessibility-agents:accessibility-lead`** (shipped UI): WCAG SC met and measured at every real paint site, decorative-vs-interactive ARIA, focus + keyboard reach, live-region announcements.
-- **`the-chemist`** (test coverage and quality): every error branch covered, real-behavior assertions over mocked plumbing, role/label queries, at least one real-user-flow integration test.
-- **`the-chronicler`** (documentation): external contracts thorough because strangers read them, internal comments at a zero default, one line the ceiling, and every named offense the wave shipped itemized — justifier, user story, explainer, restater, gloss. Reviews for comments that were NOT earned; a bare internal file is the target, never a finding.
-- **`the-ghostwriter`** (voice and tone): prose surfaces read like Nick wrote them — no em-dashes, no slop vocabulary, no commit-linked comment archaeology, per-surface case/punctuation matrix respected. Findings only in crew mode, no edits.
-- **`the-improver`** (refactor / simplification): ladder walk before custom, god-file split (by lines of code, docs excluded), extract only at real repetition, behavior preserved, no drive-by scope.
+Under `loop-de-looper`, a recommendation feeds the crew-pass mechanism, which fires on concentrated risk and once at the end (`loop-de-looper` `## Step 2d`). That is the division of labour: this per-wave review sorts THIS wave's findings into the two buckets in `## Output`, and the crew pass reads the cumulative diff for cross-wave drift a single-wave review cannot see.
 
 ## What to look for
 

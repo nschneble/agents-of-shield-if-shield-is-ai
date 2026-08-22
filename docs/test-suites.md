@@ -327,6 +327,23 @@ cannot read, a row it skips, a comparison that never fires. Each of those
 looks exactly like a clean run from the outside, so the shapes are pinned in
 this suite rather than the happy path alone.
 
+A row whose name carries a slash is a repo-relative path rather than a skill
+name, which is how an agent gets a ceiling — agents are flat files with no
+`skills/<name>/SKILL.md` shape to infer. Both directions of that are pinned:
+the path resolving, and the path dangling.
+
+## spec-load
+
+Both-directions test for the spec-load instrument, which reports what each
+entry point loads before it reads a line of the code under work.
+
+The arm that matters is MISSING. This instrument exists to prove later waves
+cut what they claim, so its own failure mode is reporting a saving it never
+measured: a renamed file quietly leaving the sum, or a baseline entry the
+manifest stopped covering. Both are exit 2, and both are asserted here in
+each direction. The mutant that turns the missing-file stop into a skipped
+row was run against this suite and takes two assertions red with it.
+
 ## temp-dir-guard
 
 Both-directions test for the temp-dir guard that every self-contained suite

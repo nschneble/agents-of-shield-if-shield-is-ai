@@ -1,50 +1,14 @@
 # Looper Custodian — design rationale + decision log
 
+Off the crew drift-check surface by design: this is append-only history
+cited by date, not spec anything reads at runtime. The executable spec is
+skills/looper-custodian/SKILL.md.
+
 Status: **built.** Operational spec (phases, artifacts, scheduling, the full
 "what it does") lives in `skills/looper-custodian/SKILL.md` — that is the source
 of truth. This doc holds only what the skill doesn't: _why_ it exists, _why_ the
 choices are what they are, and the _decision record_. Don't duplicate mechanics
 here — if a phase's behavior changes, it changes in `SKILL.md`.
-
-## Why it exists
-
-The looper system learns and tidies _per run_: `looper-learn` writes lessons at
-the end of each wave and orchestration; `the-turncoat` streamlines an agent or
-skill when asked. Nothing runs _across_ runs and _across_ repos on a cadence.
-Over weeks that leaves three rots no per-run step can see:
-
-- **Memory rot** — `MEMORY.md` + memory files accumulate duplicates and
-  contradictions; a later memory supersedes an earlier one but the earlier is
-  never removed, so recall surfaces stale guidance.
-- **Artifact litter** — `local/loops/<branch>/` keeps `run-state.json` +
-  `gates.jsonl` for branches long since merged and deleted.
-- **Lost cross-run signal** — the same crew finding recurs across many runs and
-  repos, but no one looks at the aggregate, so the systemic fix never surfaces.
-
-Custodian is the scheduled, cross-run, cross-repo maintenance layer. It does not
-replace `looper-learn` or `the-turncoat` — it batches and aggregates what they
-do, plus the memory-contradiction GC neither does today.
-
-## Governing principle: custodian PROPOSES, human DISPOSES
-
-The spine of the design, and the reason it's split into auto vs gated phases.
-
-An unattended job that auto-edits memories or agents is exactly the "merging
-outpaces comprehension" failure the loop-engineering sources warn about.
-Auto-deleting a memory because a later one "contradicts" it can silently destroy
-a deliberate exception. So:
-
-- **Read-only / regenerable work runs automatically** — artifact GC, memory
-  audit report, cross-repo digest, research digest.
-- **Anything that writes a memory or an agent is propose-only** — it lands as a
-  checkbox in the report issue and applies ONLY through `apply` after a human
-  ticks the box.
-
-This is the same discipline the loop already holds (does NOT auto-revert
-commits, does NOT flip draft→ready). Carried rails follow from it: no memory
-deleted on contradiction alone without both sides quoted verbatim; no agent
-rewritten except via `the-turncoat` on an approved target; bounded proposals per
-run; unavailable tool ⇒ `ran: false`, never an invented outcome.
 
 ## Why these mechanisms (the non-obvious choices)
 

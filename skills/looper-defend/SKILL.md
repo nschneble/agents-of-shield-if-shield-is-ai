@@ -5,7 +5,7 @@ description: On-demand autonomous vulnerability hunt + remediation over a whole 
 
 Proactive whole-repo vulnerability hunt + human-gated remediation. `looper-custodian` GCs and audits the looper system on a cadence; `looper-defend` hunts a TARGET codebase for security defects on demand. Structure mined from Anthropic's `defending-code-reference-harness` (threat-model → scan → triage → patch, plus its `/customize` stack-abstraction) — the STRUCTURE, not its ASAN/Docker/gVisor substrate, which is a hard third-party dependency this family forbids (`[[no-third-party-hosted-tool-reliance]]`).
 
-Full design rationale + decision log: `docs/looper-defend.md`. This file is the executable spec.
+Full design rationale + decision log: `docs/decisions/looper-defend.md`. This file is the executable spec.
 
 ## Why this exists — and how it differs from what already reviews security
 
