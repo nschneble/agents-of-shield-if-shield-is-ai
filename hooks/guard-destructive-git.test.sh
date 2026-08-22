@@ -66,6 +66,19 @@ denies 'gh pr merge 42 --squash'
 denies 'gh repo delete owner/repo'
 denies 'gh release delete v1.0.0'
 
+# Same irreversible actions, reached via gh api instead of the verb form.
+denies 'gh api repos/owner/repo/pulls/5/merge -X PUT'
+denies 'gh api -X PUT repos/owner/repo/pulls/5/merge'
+denies 'gh api --method PUT repos/owner/repo/pulls/5/merge'
+denies 'gh api repos/owner/repo -X DELETE'
+denies 'gh api -X DELETE repos/owner/repo'
+denies 'gh api repos/owner/repo/releases/123 -X DELETE'
+denies 'gh api repos/owner/repo/releases/tags/v1.0.0 -X DELETE'
+denies 'gh api repos/owner/repo/git/refs/heads/main -X DELETE'
+denies 'gh api repos/owner/repo/git/refs/heads/main -X PATCH -f sha=abc -f force=true'
+denies 'gh api graphql -f query="mutation { deleteRepository(input: {}) { clientMutationId } }"'
+denies 'gh api graphql -f query="query { viewer { login } }"'
+
 # Mass filesystem destruction.
 denies 'find . -name "*.tmp" -delete'
 denies 'find . -type f -exec rm {} \;'
@@ -108,6 +121,15 @@ allows 'git fetch origin main'
 allows 'gh pr view 42 --json body'
 allows 'gh pr list --state open'
 allows 'gh issue comment 40 --body "done"'
+
+# gh api: ordinary reads, and mutations outside this guard's covered set.
+allows 'gh api repos/owner/repo/pulls/5'
+allows 'gh api repos/owner/repo'
+allows 'gh api user'
+allows 'gh api repos/owner/repo/pulls/5/commits'
+allows 'gh api repos/owner/repo/pulls -X POST -f title=x -f head=a -f base=b'
+allows 'gh api repos/owner/repo/issues -X POST -f title=bug'
+allows 'gh api repos/owner/repo/git/refs -X POST -f ref=refs/heads/new -f sha=abc'
 
 # find is allowlisted for read use.
 allows 'find . -name "*.ts"'
