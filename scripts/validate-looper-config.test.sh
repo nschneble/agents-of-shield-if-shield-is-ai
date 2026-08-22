@@ -303,11 +303,60 @@ run_fixture
 printf '%s\n' "$out" | grep -q 'omits `/beta apply`'
 check "a declared verb absent from the family doc warns by name" $?
 
+# --- doc mirror: a docs/ heading that restates a skill section ----------
+# The doc copy of a rule is the one nothing enforces, so a fixing wave
+# updates the skill and leaves the doc saying the old thing. Both
+# directions, and on the warning text rather than rc, since this is a WARN.
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\n## Governing principle\n\nSpec text.\n' \
+  > "$fix/skills/beta/SKILL.md"
+
+printf '# Skills\n\n## Catalog\n\nA heading no skill uses.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+! printf '%s\n' "$out" | grep -q 'restates a skill section'
+check "a docs heading no skill uses does not warn" $?
+
+printf '# Skills\n\n## Governing principle\n\nThe restated copy.\n' \
+  > "$fix/docs/looper-skills.md"
+run_fixture
+printf '%s\n' "$out" | grep -q 'restates a skill section: `## Governing principle`'
+check "a docs heading that restates a skill section warns by name" $?
+
+# --- heading integrity: a cited `## Heading` must exist where it is cited -
+# The file resolving is not the section resolving, and that gap is what an
+# extraction breaks. Three shapes matter: the heading present, the heading
+# gone, and the PREFIX convention (`## Step 3` citing `## Step 3 — mechanics`),
+# which an exact-match first cut rejected on 12 correct citations.
+mkdir -p "$fix/skills/beta/references"
+printf '# Ref\n\n## Phase C — ingest\n\nBody.\n' > "$fix/skills/beta/references/r.md"
+
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\nSee `references/r.md` `## Phase C`.\n' \
+  > "$fix/skills/beta/SKILL.md"
+run_fixture
+! printf '%s\n' "$out" | grep -q 'no such heading'
+check "a prefix citation of a real heading does not warn" $?
+
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\nSee `references/r.md` `## Phase Z`.\n' \
+  > "$fix/skills/beta/SKILL.md"
+run_fixture
+printf '%s\n' "$out" | grep -q 'cites `## Phase Z` in references/r.md, which has no such heading'
+check "a citation of a vanished heading warns by name" $?
+
+# a reference body is walked too — the stale citation that motivated this
+# check sat in one, where nothing had ever read it
+printf 'Body cites `SKILL.md` `## Nowhere`.\n' > "$fix/skills/beta/references/r2.md"
+printf -- '---\nname: beta\ndescription: fixture skill.\n---\n\n## Real\n' \
+  > "$fix/skills/beta/SKILL.md"
+run_fixture
+printf '%s\n' "$out" | grep -q 'r2.md cites `## Nowhere`'
+check "a stale citation inside a references/ body is caught" $?
+rm -f "$fix/skills/beta/references/r2.md"
+
 # --- the tally, derived from the log rather than from a counter ---------
 # EXPECTED_CHECKS is the floor. Add or remove a fixture block and this
 # number moves with it — that is the point: a block deleted on its own
 # reads as silence, and silence is what this file exists to stop.
-EXPECTED_CHECKS=23
+EXPECTED_CHECKS=28
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

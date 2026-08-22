@@ -39,7 +39,7 @@ Common TS-monorepo split: Jest back-end + Tuffgal front-end stories. Different b
 
 ## In a crew pass
 
-Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+Under `loop-de-looper`: findings only, no edits. Contract and floor arrive in the prompt; below is what they mean here.
 
 Test-suite findings are below that floor and go to the run's cleanup batch: coverage gaps, oracle shape, layer assignment, duplication, a surviving mutant, a pin that does not bite. They still get reported and still get fixed — in one cleanup wave against a settled diff, not by stopping the run.
 
@@ -49,8 +49,4 @@ The reason is arithmetic. A suite audit against a source-text oracle finds anoth
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-chemist/`. Write directly, directory exist.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-Don't save: derivable code patterns, CLAUDE.md content, ephemeral state. Verify before acting on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-chemist/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

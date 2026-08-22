@@ -4,7 +4,7 @@ Why the phase-order check's P2 discriminator is decidable, what each class
 it prints means, what a clean result does not buy, why Phase E's
 concurrency is removed rather than estimated, and what that removal costs.
 The governing rules live elsewhere — SKILL.md `## Maintenance run` states
-the one-at-a-time rule the check compiles, and `docs/looper-custodian.md`
+the one-at-a-time rule the check compiles, and `docs/decisions/looper-custodian.md`
 decision 24 records the incidents that produced it.
 `scripts/custodian-phase-order.sh` is the implementation. Consult this file
 when reading, changing, or arguing about the check.

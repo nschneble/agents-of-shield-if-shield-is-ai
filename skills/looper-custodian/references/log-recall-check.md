@@ -20,8 +20,8 @@ obligation was skipped.
 This asks the complementary question: for every log action the spec
 prescribes, has any run ever written it?
 
-It found its own reason for existing. `SKILL.md ## Phase E` requires a
-re-probe after `deep-research` returns, logged as `action "window cost"`,
+It found its own reason for existing. `references/usage-window-gates.md`
+requires a re-probe after `deep-research` returns, logged as `action "window cost"`,
 and calls that line what turns the candidate cap "from a conservative
 guess into a calibrated number". Across nine archived runs the string
 appears zero times, while five of them recorded deep-research returning.

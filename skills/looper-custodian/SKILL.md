@@ -5,7 +5,7 @@ description: Scheduled cross-run, cross-repo housekeeping for the looper system.
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
 
-Full design rationale + decision log: `docs/looper-custodian.md`. This file is the executable spec.
+Full design rationale + decision log: `docs/decisions/looper-custodian.md`. This file is the executable spec.
 
 ## Governing principle: custodian PROPOSES, human DISPOSES
 
@@ -47,7 +47,7 @@ A repo missing, or with no `local/loops/`, is **skipped with a logged note** —
 
 ## Maintenance run — phases C → A → B → E → F
 
-Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.jsonl` line while the source dirs still exist; only then may Phase A reap them. The 2026-07-13 run proved the old A-first order destructive: reap deleted 11 `gates.jsonl` files whose lines had never been ingested, and "rebuild from source" cannot rebuild from a source the GC just deleted (decision 13, `docs/looper-custodian.md`). A and C and E are purely informational in the issue; B and E carry the actionable checkboxes (E only when a candidate is concrete enough to act on). Each phase logs to `local/custodian/<date>/custodian-log.jsonl` before the issue is written.
+Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.jsonl` line while the source dirs still exist; only then may Phase A reap them. The 2026-07-13 run proved the old A-first order destructive: reap deleted 11 `gates.jsonl` files whose lines had never been ingested, and "rebuild from source" cannot rebuild from a source the GC just deleted (decision 13, `docs/decisions/looper-custodian.md`). A and C and E are purely informational in the issue; B and E carry the actionable checkboxes (E only when a candidate is concrete enough to act on). Each phase logs to `local/custodian/<date>/custodian-log.jsonl` before the issue is written.
 
 **Run them ONE AT A TIME — a phase is done when its subagents have RETURNED, not when they were dispatched.** No phase's fan-out may still be in flight when the next phase begins, and in particular **Phase E is probed and dispatched only after Phase B has fully returned**. The order is a sequence to execute, not a sequence to start. The 2026-08-03 run did not LOG it that way: its log records the pre-E probe and `deep-research dispatched`, and only then `memory audit fan-out dispatched (8 Read-only subagents)` across 484 files. So the order the spec asserted is not the order that run logged, and E's headroom reading was logged ahead of Phase B's fan-out rather than after it. What that cost in tokens is not knowable and is not claimed: there is no per-phase accounting, and inventing one would be the same fabricated gauge this spec refuses everywhere else.
 

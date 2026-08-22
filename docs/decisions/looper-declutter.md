@@ -1,18 +1,10 @@
 # Looper Declutter — design rationale + decision log
 
+Off the crew drift-check surface by design: this is append-only history
+cited by date, not spec anything reads at runtime. The executable spec is
+skills/looper-declutter/SKILL.md.
+
 The human dossier behind `skills/looper-declutter/SKILL.md`. The SKILL.md is the executable spec; this file records WHY the non-obvious choices were made, so a future edit doesn't re-litigate a settled call.
-
-## Why it exists
-
-Comment discipline was already fully owned — `the-chronicler` (mechanics), `the-ghostwriter` (voice/de-slop), `the-improver` (delete-restate) — but only enforced REACTIVELY, inside a `looper-review` crew pass over the pending diff. That covers new bloat a change introduces. It never reaches bloat that predates the change: a file whose comments were over-narrated long ago is never re-touched unless a diff happens to cross those lines.
-
-`looper-declutter` is the proactive whole-repo sweep that closes the gap — exactly the relationship `looper-defend` has to `security-review`/`the-diamantaire`: they review the pending diff, defend hunts the whole repo. Declutter : comment-bloat :: defend : security.
-
-The trigger for building it: a real target repo (Linklater) accumulated well over a thousand comment-bloat candidates the reactive crew had never seen.
-
-## Governing principle: declutter PROPOSES, human DISPOSES
-
-A comment is a judgment call, not a mechanical fact. An autonomous pass that auto-rewrote every flagged comment would flatten a deliberate GOTCHA, lowercase a proper noun, or truncate the one line that carries the real gotcha. So scan/triage/report run read-only and automatically; every snip is a checkbox that applies only after a human ticks it and runs `/looper-declutter apply`. There is NO auto-apply class — the one place this differs from defend, which auto-lands a dependency CVE bump. A dep bump has a mechanical oracle (suite stays green, diff confined to the lockfile); a comment trim has none, so it never skips the tick.
 
 ## Why these mechanisms (the non-obvious choices)
 

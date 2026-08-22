@@ -195,6 +195,10 @@ copied=$(find "$pristine/scripts" -name '*.sh' -type f 2>/dev/null | grep -c . |
 # ../hooks/, the other runs `git -C ..`), so no mutant could ever be
 # declared for those scripts — a whole area silently unscoreable.
 [ -d "$repo_root/hooks" ] && /bin/cp -a "$repo_root/hooks" "$pristine/hooks" 2>/dev/null
+# agents/ for the same reason: scripts/skill-body-ceilings.tsv carries rows
+# naming agents/*.md, and a row whose file is absent is exit 2, so the whole
+# ceiling suite baselines RED in here and scores nothing.
+[ -d "$repo_root/agents" ] && /bin/cp -a "$repo_root/agents" "$pristine/agents" 2>/dev/null
 if [ ! -d "$pristine/.git" ] && command -v git >/dev/null; then
   ( cd "$pristine" && git init -q . \
       && git -c user.email=mutkill@local -c user.name=mutkill \

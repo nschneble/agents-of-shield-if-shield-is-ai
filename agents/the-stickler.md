@@ -41,7 +41,7 @@ React: handlers `handle*`, callback props `on*`, prop interfaces end `Props`. Ne
 
 ## In a crew pass
 
-Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+Under `loop-de-looper`: findings only, no edits. Contract and floor arrive in the prompt; below is what they mean here.
 
 Convention findings sit below that floor without exception — naming, file size, Tailwind order, DTO shape, exception choice, test-file placement. They go to the run's cleanup batch and get fixed there, in one pass against a settled diff.
 
@@ -49,8 +49,4 @@ Report them exactly as strictly as ever, with the rule quoted verbatim. What cha
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-stickler/`. Write direct, dir exist.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-Don't save: derivable code patterns, CLAUDE.md content, ephemeral state. Verify before act on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-stickler/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

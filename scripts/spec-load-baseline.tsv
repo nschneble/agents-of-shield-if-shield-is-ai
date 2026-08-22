@@ -1,0 +1,33 @@
+# spec-load baseline — entry, always-tokens, conditional-tokens
+#
+# W2 raised orchestrator-run 19960 -> 20573: the retired-cadence evidence and
+# the domain-match rule. Paid once per run; it removes ~28k/run of crew
+# dispatch, which this instrument does not see because it counts definitions,
+# not dispatches. Recording both numbers is the point.
+#
+# W3 added 9/2/3 tokens to custodian/defend/declutter: the citation path grew
+# from docs/ to docs/decisions/. Nothing else in those specs moved.
+#
+# W4 CORRECTION. The W1 baseline recorded orchestrated-wave at 17702 always,
+# but it had already marked looper-plan and looper-build conditional, which
+# the-looper did NOT do until W4 made it so. The true W1 floor was 24410;
+# post-W4 it is 17433, a real -6977. An instrument that encodes the fix it is
+# meant to measure reports that fix as free, and this is the note that keeps
+# the error visible instead of buried in a number that never moved.
+#
+# W6 raised orchestrator-run 20573 -> 21502 and pre-flight 2020 -> 2121: the
+# fast-path route with its four guards, and nonbeliever's contract duty on
+# the single-wave route. Both paid once per run; together they take a small
+# ask from four serial dispatches to one.
+#
+# Follow-up wave: +241 orchestrator-run (the floor's docs-vs-false-string
+# tie-break), +57 declutter-run and +4 custodian-run (two false claims
+# corrected in reference bodies). All three are prose that a check now
+# enforces mechanically.
+orchestrator-run	21849	1898
+pre-flight	2121	2617
+orchestrated-wave	17437	10311
+crew-agent	13692	0
+custodian-run	17633	4114
+defend-run	8034	0
+declutter-run	6647	0

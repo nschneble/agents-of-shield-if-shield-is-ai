@@ -1,0 +1,60 @@
+# What each entry point loads, before it reads a line of the code under work.
+#
+# WHY A MANIFEST AND NOT A GLOB. The cost of a spec is not a property of
+# where it sits on disk, it is a property of which dispatch pulls it in.
+# `skills/looper-plan/SKILL.md` costs nothing on a wave that arrives with
+# `gate outputs` and 4949 tokens on one that doesn't. Only a hand-kept list
+# can say which. A glob over skills/ would report one number for both and
+# be wrong twice.
+#
+# CONDITIONS. `always` means every dispatch of that entry point pays it.
+# Anything else names the wave shape that pays it, and scripts/spec-load.sh
+# reports the always-total and the conditional tail separately — the
+# always-total is the floor no run can get under.
+#
+# A row naming a file that does not exist is a HARD ERROR, not a skipped
+# row. A rename that silently drops a file from the sum reads as a saving,
+# which is the one failure this instrument must not have.
+#
+# entry	path	condition
+orchestrator-run	skills/loop-de-looper/SKILL.md	always
+orchestrator-run	skills/loop-de-looper/references/protocol-detail.md	always
+orchestrator-run	skills/loop-de-looper/references/state-schemas.md	always
+orchestrator-run	skills/loop-de-looper/references/rails.md	always
+orchestrator-run	skills/loop-de-looper/references/pr-lifecycle.md	pr-finalization
+pre-flight	skills/looper-nonbeliever/SKILL.md	always
+pre-flight	skills/looper-scope/SKILL.md	full-orchestration
+orchestrated-wave	agents/the-looper.md	always
+orchestrated-wave	skills/looper-research/SKILL.md	always
+orchestrated-wave	skills/looper-plan/SKILL.md	no-gate-outputs
+orchestrated-wave	skills/looper-build/SKILL.md	code-wave
+orchestrated-wave	skills/looper-verify/SKILL.md	always
+orchestrated-wave	skills/looper-review/SKILL.md	always
+orchestrated-wave	skills/looper-learn/SKILL.md	always
+orchestrated-wave	skills/looper-commit/SKILL.md	always
+orchestrated-wave	skills/looper-commit/templates/pr-body.md	new-pr
+orchestrated-wave	skills/looper-commit/templates/pr-guidelines.md	new-pr
+orchestrated-wave	skills/looper-commit/templates/structured-recap.md	new-pr
+orchestrated-wave	skills/loop-de-looper/templates/wave-brief-standing.md	runtime-code
+crew-agent	agents/the-auditor.md	always
+crew-agent	agents/the-chemist.md	always
+crew-agent	agents/the-chronicler.md	always
+crew-agent	agents/the-diamantaire.md	always
+crew-agent	agents/the-ghostwriter.md	always
+crew-agent	agents/the-improver.md	always
+crew-agent	agents/the-stickler.md	always
+custodian-run	skills/looper-custodian/SKILL.md	always
+custodian-run	skills/looper-custodian/references/phase-detail.md	always
+custodian-run	skills/looper-custodian/references/phase-order-check.md	always
+custodian-run	skills/looper-custodian/references/log-recall-check.md	always
+custodian-run	skills/looper-custodian/references/artifacts.md	always
+custodian-run	skills/looper-custodian/references/usage-window-gates.md	always
+custodian-run	skills/looper-custodian/references/report-issue.md	always
+custodian-run	skills/looper-custodian/references/scheduling.md	scheduling-verb
+custodian-run	skills/looper-custodian/references/resume.md	resume-verb
+custodian-run	skills/looper-custodian/references/history-verb.md	history-verb
+custodian-run	skills/looper-custodian/references/phase-d-apply.md	apply-verb
+defend-run	skills/looper-defend/SKILL.md	always
+declutter-run	skills/looper-declutter/SKILL.md	always
+declutter-run	skills/looper-declutter/references/candidate-kinds.md	always
+declutter-run	skills/looper-declutter/references/artifacts.md	always

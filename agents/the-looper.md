@@ -40,6 +40,18 @@ All four must pass. Format first; per `[[feedback-improver-format]]`, format-las
 6. **looper-learn**: Capture lessons. Save to memory, CLAUDE.md, or skill body per scope. Propose skill/agent edits if step failed in repeat-likely way. Brutal honesty required.
 7. **looper-commit**: Always runs. Commit any code/doc changes from this wave. Auto-detect PR state: branch has existing PR → just commit; no existing PR → create draft assigned `@me`. External-state waves (PR body refresh, GitHub release, baseline approval handoff) skip commit but still run PR detection for context. Refuse if pre-flight (verify PASS + review NO blockers + format/lint/test/build green) fails.
 
+## Conditional step loads
+
+Load a step's skill when the wave reaches that step, not before. The brief already declares the wave's shape, and three loads are conditional on it:
+
+| Load                    | Not loaded when                                                  | Why                                                                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `looper-plan`           | the brief carries `gate outputs`                                 | step 2 already says to skip plan and use the values direct. Reading its body in order to then not run it is the wave paying for a step its own brief ruled out |
+| `looper-build`          | external-state wave (PR body refresh, release, baseline handoff) | there is no source edit to make, and commit's external-state path already handles a clean tree                                                                 |
+| `looper-verify` oracles | no-oracle prose or doc wave                                      | the coherence fallback is the part that applies; the executable-oracle apparatus is not                                                                        |
+
+This is NOT permission to skip a step. Verify and review still run and still gate, exactly as `## Step journal` says. What changes is that a wave stops paying to read a specification for work its brief already ruled out — and a resume pays it again on every re-dispatch, so the saving is per dispatch, not per wave.
+
 ## Step journal
 
 A dispatch can die mid-wave — session limit, crash, a context kill. Journal each step as it completes so the re-dispatch resumes instead of restarting: `local/loops/<branch>/wave-N.jsonl`, named for the wave, append-only, one file per wave, in the same branch-keyed dir the orchestrator's `run-state.json` and `gates.jsonl` already use. Line shapes are in `skills/loop-de-looper/references/state-schemas.md`.
@@ -105,15 +117,7 @@ Pre-build escalations by domain:
 
 Plan emit ESCALATE without prior orchestrator gate pre-flight: STOP + produce hand-off report telling orchestrator (a) which gate to invoke, (b) what input to pass, (c) what output looper need to resume at step 3 (build).
 
-Post-build qualitative review specialists (orchestrator invokes after looper's build):
-
-| Domain                             | Reviewer                                  |
-| ---------------------------------- | ----------------------------------------- |
-| General code review                | `the-diamantaire`                         |
-| Convention adherence               | `the-stickler`                            |
-| Accessibility (UI changes shipped) | `accessibility-agents:accessibility-lead` |
-| Test coverage                      | `the-chemist`                             |
-| Documentation                      | `the-chronicler`                          |
+Post-build qualitative review is the orchestrator's crew pass, and its roster lives in `skills/loop-de-looper/SKILL.md` `### Step 3`. Name the domain in `gates needed post-build` and let the orchestrator pick the reviewer — a third copy of that table here is a third place to update when a reviewer's remit moves.
 
 ## Orchestrator handoff format
 

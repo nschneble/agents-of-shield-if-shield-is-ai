@@ -145,7 +145,7 @@ Each finding: file:line, what fails, WCAG SC number + name + level, user impact 
 
 ## In a crew pass
 
-Under `loop-de-looper`: findings only, no edits, and the brief carries the run's goal contract plus `skills/loop-de-looper/SKILL.md` `## Finding severity floor`. Report against both.
+Under `loop-de-looper`: findings only, no edits. Contract and floor arrive in the prompt; below is what they mean here.
 
 What gates: a WCAG failure on UI THIS run shipped, cited at its `path:Lstart-Lend` inside the run's own diff. A 🔴 Critical on a surface the run built is exactly the finding the floor exists to let through.
 
@@ -155,8 +155,4 @@ Severity is not the same question as ownership. A pre-existing Critical is more 
 
 ## Memory
 
-Save memories to `/Users/nickschneble/.claude/agent-memory/the-auditor/`. Write direct, directory exists.
-
-Types: `user`, `feedback`, `project`, `reference`. Feedback/project: lead with rule/fact, then **Why:** and **How to apply:** Index all in `MEMORY.md` as one-line entries.
-
-Don't save: derivable code patterns, git history, debug recipes, CLAUDE.md content, ephemeral task state. Verify file paths + function names before acting on stale memories.
+Save to `/Users/nickschneble/.claude/agent-memory/the-auditor/`. The format, the type taxonomy, the `MEMORY.md` index and the don't-save list are injected by the harness; this line exists only to name the directory.

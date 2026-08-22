@@ -258,7 +258,7 @@ description: the two most recent archived runs did not LOG that order, and
 nothing enforces the runtime. What exists is `scripts/custodian-phase-order.sh`,
 which Phase F runs over the run's own log and which asserts the order the run
 LOGGED — never that the runtime was serialized (decision 24,
-`docs/looper-custodian.md`):
+`docs/decisions/looper-custodian.md`):
 
 - **C** mines wave history across repos into a cited index
 - **A** GCs merged-branch artifacts under `local/loops/`
@@ -275,7 +275,7 @@ Governing rail: custodian proposes, human disposes. Read-only/regenerable
 work auto-applies. Anything that writes a memory or an agent lands as a
 checkbox and applies only through a human-checked `apply` step, which is
 previewable and reversible. Design rationale + full decision log live in
-`docs/looper-custodian.md`.
+`docs/decisions/looper-custodian.md`.
 
 ---
 
@@ -305,7 +305,7 @@ run read-only and automatically; patch is propose-only, landing as a
 checkbox that applies only after a human ticks it and runs `/looper-defend
 apply`. One narrow class — a dependency CVE bump with zero app-code change —
 may auto-apply, and even it lands as a reviewable draft-PR commit. Design
-rationale + full decision log live in `docs/looper-defend.md`.
+rationale + full decision log live in `docs/decisions/looper-defend.md`.
 
 ---
 
@@ -338,7 +338,7 @@ a human ticks it and runs `/looper-declutter apply`. No auto-apply class — a
 comment trim is always a judgment call. It reuses the existing comment-rule
 owners (`the-chronicler`, `the-ghostwriter`, `the-improver`) rather than
 duplicating them. Design rationale + full decision log live in
-`docs/looper-declutter.md`.
+`docs/decisions/looper-declutter.md`.
 
 ---
 

@@ -84,8 +84,8 @@ run() { out=$("$runner" --dir "$1" 2>&1); rc=$?; }
 # --- GREEN: one corrective, one justified gating finding. -------------
 g="$temp_dir/green"; mkrun "$g"
 run "$g"
-printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 5 check(s)'
-check "GREEN: a justified run reports zero violations over all 5 arms" $?
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 6 check(s)'
+check "GREEN: a justified run reports zero violations over all 6 arms" $?
 agree "GREEN:"
 ! printf '%s\n' "$out" | grep -q 'VIOLATION'
 check "GREEN: no arm prints a VIOLATION line" $?

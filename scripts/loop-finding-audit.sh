@@ -197,6 +197,19 @@ while IFS=$'\t' read -r count wave; do
 done < <(jq -r 'select(.kind == "crew" and .ran != false) | "\(.wave)\t\(.agent)"' "$GATES" \
          | sort -u | cut -f1 | uniq -c | awk '{printf "%s\t%s\n", $1, $2}')
 
+# --- kind is a closed enum -----------------------------------------------
+# Every other arm selects on `.kind == "crew"`, so a line spelled
+# `crew-interim` or `crew-final-all-seven` is not a stricter label — it is a
+# line no arm can see. One real run logged 31 spellings across ~50 lines and
+# its crew coverage was invisible for all but the exact `crew` ones. The
+# variant belongs in `pass` (references/state-schemas.md).
+checked=$((checked + 1))
+while IFS= read -r bad_kind; do
+  [ -n "$bad_kind" ] || continue
+  flag "gates.jsonl carries kind \`$bad_kind\`, which is not in the closed enum — put the variant in \`pass\`"
+done < <(jq -r '.kind // empty' "$GATES" 2>/dev/null | sort -u | grep -vxE \
+  'crew|pre-build-specialist|wave-retry|stale-skip|executor-handback|usage-window|finding-audit|pr-finalization|orchestration-incident')
+
 echo
 for note in ${notes+"${notes[@]}"}; do echo "  $note"; done
 [ ${#notes[@]} -eq 0 ] || echo
