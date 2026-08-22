@@ -77,14 +77,28 @@ if printf '%s' "$norm" | grep -Eq 'git +push +\S+ +:\S'; then
 fi
 # Local history rewrites + irreversible remote resource actions.
 if printf '%s' "$norm" | grep -Eq \
-  'git +reset +.*--hard|git +rebase\b|git +commit\b.*--amend|git +branch +-D\b|git +filter-branch\b|git +filter-repo\b|git +reflog +expire\b|git +gc\b.*--prune|git +update-ref +-d\b|git +clean +.*-[a-z]*f|gh +pr +merge\b|gh +repo +delete\b|gh +release +delete\b'; then
+  'git +reset +.*--hard|git +rebase\b|git +commit\b.*--amend|git +filter-branch\b|git +filter-repo\b|git +reflog +expire\b|git +gc\b.*--prune|git +update-ref +-d\b|git +clean +.*-[a-z]*f|gh +pr +merge\b|gh +repo +delete\b|gh +release +delete\b'; then
   deny "Blocked by guard: command rewrites history or deletes/merges a remote resource. Run manually if intended."
+fi
+# Forced branch delete: -D, or delete+force in any order/spelling. -D is
+# git's own shorthand for both, so it needs no special case here.
+branch_delete='\bgit\b[^;&|]*\bbranch\b[^;&|]*( -[dDf]*[dD][dDf]*\b|--delete\b)'
+branch_force='\bgit\b[^;&|]*\bbranch\b[^;&|]*( -[dDf]*[fD][dDf]*\b|--force\b)'
+if printf '%s' "$norm" | grep -Eq "$branch_delete" && printf '%s' "$norm" | grep -Eq "$branch_force"; then
+  deny "Blocked by guard: forced branch delete can lose commits with no other ref. Run manually if intended."
 fi
 
 # --- Mass / arbitrary filesystem destruction ---
 # find with -delete or -exec rm (since find:* is allowlisted for read use).
 if printf '%s' "$norm" | grep -Eq 'find\b.*-delete\b|find\b.*-exec +rm\b'; then
   deny "Blocked by guard: find -delete / -exec rm can mass-delete files. Run manually if intended."
+fi
+# rm with both recursive and force present, any flag order, short or long.
+# Leading space, not (^| ): some greps mis-anchor a non-leading ^ group.
+rm_recursive='(^| )rm\b[^;&|]*( -[fiIrRvd]*[rR][fiIrRvd]*\b|--recursive\b)'
+rm_force='(^| )rm\b[^;&|]*( -[fiIrRvd]*f[fiIrRvd]*\b|--force\b)'
+if printf '%s' "$norm" | grep -Eq "$rm_recursive" && printf '%s' "$norm" | grep -Eq "$rm_force"; then
+  deny "Blocked by guard: rm with recursive + force can mass-delete files. Run manually if intended."
 fi
 
 # --- Piping into a shell interpreter — hide-the-command / remote-exec bypass ---
