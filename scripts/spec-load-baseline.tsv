@@ -19,10 +19,15 @@
 # fast-path route with its four guards, and nonbeliever's contract duty on
 # the single-wave route. Both paid once per run; together they take a small
 # ask from four serial dispatches to one.
-orchestrator-run	21502	1898
+#
+# Follow-up wave: +241 orchestrator-run (the floor's docs-vs-false-string
+# tie-break), +57 declutter-run and +4 custodian-run (two false claims
+# corrected in reference bodies). All three are prose that a check now
+# enforces mechanically.
+orchestrator-run	21849	1898
 pre-flight	2121	2617
 orchestrated-wave	17437	10311
 crew-agent	13692	0
-custodian-run	17629	4114
+custodian-run	17633	4114
 defend-run	8034	0
-declutter-run	6590	0
+declutter-run	6647	0

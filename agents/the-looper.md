@@ -117,7 +117,7 @@ Pre-build escalations by domain:
 
 Plan emit ESCALATE without prior orchestrator gate pre-flight: STOP + produce hand-off report telling orchestrator (a) which gate to invoke, (b) what input to pass, (c) what output looper need to resume at step 3 (build).
 
-Post-build qualitative review is the orchestrator's crew pass, and its roster lives in `skills/loop-de-looper/SKILL.md` `## Step 3`. Name the domain in `gates needed post-build` and let the orchestrator pick the reviewer — a third copy of that table here is a third place to update when a reviewer's remit moves.
+Post-build qualitative review is the orchestrator's crew pass, and its roster lives in `skills/loop-de-looper/SKILL.md` `### Step 3`. Name the domain in `gates needed post-build` and let the orchestrator pick the reviewer — a third copy of that table here is a third place to update when a reviewer's remit moves.
 
 ## Orchestrator handoff format
 

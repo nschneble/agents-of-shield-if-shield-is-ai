@@ -48,19 +48,21 @@ A finding may block a wave and spawn a corrective ONLY when it is in a gating cl
 
 **Gating classes:**
 
-| class                     | test                                                                         |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| correctness regression    | a defect at a `file:line` inside THIS run's diff (`git diff <wave1>^..HEAD`) |
-| security                  | an exploitable defect on a line the run touched                              |
-| data loss                 | irreversible state or unrecoverable user data                                |
-| a11y regression           | a WCAG failure on UI THIS run shipped                                        |
-| false user-visible string | a shipped string that is factually wrong about what the code does            |
+| class                     | test                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| correctness regression    | a defect at a `file:line` inside THIS run's diff (`git diff <wave1>^..HEAD`)                                                                        |
+| security                  | an exploitable defect on a line the run touched                                                                                                     |
+| data loss                 | irreversible state or unrecoverable user data                                                                                                       |
+| a11y regression           | a WCAG failure on UI THIS run shipped                                                                                                               |
+| false user-visible string | a string an END USER sees at runtime that is factually wrong about what the code does. Spec, doc and comment prose is NOT in this class (see below) |
 
 **Batched, never gating:** docs, comments, docstrings, naming, conventions, LOC and god-file size, test hygiene, surviving mutants, oracle shape or completeness, refactor opportunities, voice and tone, commit-message and PR-body prose, and anything pre-existing that this run did not cause.
 
 **Admissibility, on top of class.** A gating finding must also cite either a `goal_contract` ask it protects or a `path:Lstart-Lend` the run changed. A finding citing neither batches regardless of class. This is the rule that ends the unrelated-issue chase: a defensible defect about code the run never touched is still not this run's business.
 
-A crew agent calling something a blocker does not make it gating — the floor does, and `## Step 3` applies it. Voice and tone never gate: a string that is _false_ gates under the last class and may be raised by any agent, a string that is merely off-voice batches. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
+A crew agent calling something a blocker does not make it gating — the floor does, and `## Step 3` applies it. Voice and tone never gate: a string that is _false_ gates under the last class and may be raised by any agent, a string that is merely off-voice batches.
+
+**A false statement in a spec, doc, or comment batches — it is not a "false user-visible string".** The two entries collided honestly: a stale cross-reference is both documentation (never gating) and a shipped string that is wrong about what the code does (gating), and four reviewers reading the same defect split three-to-one on it. The tie is broken toward BATCH, for a reason that is not merely "docs are cheap": a reader misled by a spec fails loudly at the next step — the path does not resolve, the heading is not there, the check refuses — whereas an end user misled by a runtime string has no such backstop. Those spec failures are also now MECHANICAL: `scripts/validate-looper-config.sh` resolves every backtick'd path AND every cited `## Heading`, in reference and template bodies as well as specs. A class a check already owns does not need the floor to stop a wave for it. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
 
 Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.jsonl` line and checked by `scripts/loop-finding-audit.sh` (`## Gate artifacts`).
 

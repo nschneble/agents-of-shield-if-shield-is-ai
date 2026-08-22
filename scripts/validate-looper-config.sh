@@ -69,6 +69,10 @@ has_frontmatter() {
 check_references() {
   local file="$1" token target
   local dir; dir=$(dirname "$file")
+  # A file already inside references/ or templates/ cites its siblings as
+  # `references/x.md`, meaning the skill's dir — not a nested one below itself.
+  local root="$dir"
+  case "$dir" in */references|*/templates) root=$(dirname "$dir") ;; esac
   # Pull every `backtick`-wrapped token, one per line. The backticks are literal
   # regex chars, not shell expansion — single quotes are intentional. Process
   # substitution (not a pipeline) so warn's counter survives the loop.
@@ -76,7 +80,7 @@ check_references() {
   while IFS= read -r token; do
     case "$token" in
       agents/*|skills/*|docs/*|scripts/*) target="$token" ;;
-      templates/*|references/*) target="$dir/$token" ;;
+      templates/*|references/*) target="$root/$token" ;;
       *) continue ;;
     esac
     # Skip globs / placeholders / anchors / non-file tokens.
@@ -90,6 +94,65 @@ check_references() {
     esac
     [ -e "$target" ] || warn "$file references \`$token\` which does not exist"
   done < <(grep -oE '`[^`]+`' "$file" 2>/dev/null | tr -d '`')
+}
+
+# --- Heading integrity: a cited `## Heading` must exist in the file cited ---
+# check_references above proves the FILE resolves. It cannot tell that the
+# SECTION does, and that is the half extraction breaks: move a rule out of
+# SKILL.md into references/, repair two of the three citers, and the third
+# still names a heading that is gone. The file still resolves, so nothing
+# caught it — four independent reviewers did, months later.
+#
+# Two spellings, both live in the corpus:
+#   `path/to/file.md` `## Heading`      (65 sites, optionally with → between)
+#   `path/to/file.md ## Heading`        (1 site)
+# A bare `## Heading` with no file beside it is self-referential and skipped:
+# resolving it means knowing which file the sentence means, which is prose.
+check_heading_refs() {
+  local file="$1" pair path heading target h found
+  local dir; dir=$(dirname "$file")
+  local root="$dir"
+  case "$dir" in */references|*/templates) root=$(dirname "$dir") ;; esac
+  while IFS= read -r pair; do
+    path=${pair%%$'\t'*}; heading=${pair#*$'\t'}
+    [ -n "$path" ] && [ -n "$heading" ] || continue
+    case "$path" in
+      agents/*|skills/*|docs/*|scripts/*) target="$path" ;;
+      templates/*|references/*)           target="$root/$path" ;;
+      # A bare `SKILL.md` cited from references/ or templates/ means the
+      # sibling skill, one level up — not a SKILL.md inside that directory.
+      # Resolving it there is why the first cut of this check skipped the
+      # exact stale citation it was written for.
+      *.md) if [ -e "$dir/$path" ]; then target="$dir/$path"
+            else target="$root/$path"; fi ;;
+      *) continue ;;
+    esac
+    [ -e "$target" ] || continue   # check_references already warned on this
+    # PREFIX match, not exact. The house style cites `## Step 3` for a heading
+    # spelled `## Step 3 — crew pass mechanics`, and 12 of the 13 hits on the
+    # first exact-match cut were that convention, not drift.
+    # The separator after a prefix citation is not always a space: the corpus
+    # writes `### Step 3` for `### Step 3: Crew pass`, `## Phase C` for
+    # `## Phase C — ingest`, and `## Step 2a` for `## Step 2a — brief
+    # authoring`. Accepting only a space rejected the house convention and
+    # sent me to "fix" a citation that was already correct.
+    found=0
+    while IFS= read -r h; do
+      if [ "$h" = "$heading" ]; then found=1; break; fi
+      if [ "${h:0:${#heading}}" = "$heading" ]; then
+        case "${h:${#heading}:1}" in ' '|':'|'—'|'–'|'-') found=1; break ;; esac
+      fi
+    done < <(grep '^#' "$target" 2>/dev/null)
+    [ "$found" -eq 1 ] \
+      || warn "$file cites \`$heading\` in $path, which has no such heading"
+  done < <(
+    # two-backtick form, with an optional arrow between the halves
+    grep -oE '`[A-Za-z0-9_./-]+\.md` *(→ *)?`#{2,} [^`]+`' "$file" 2>/dev/null \
+      | sed -E 's/`([A-Za-z0-9_./-]+\.md)` *(→ *)?`(#{2,} [^`]+)`/\1\t\3/'
+    # one-backtick form
+    grep -oE '`[A-Za-z0-9_./-]+\.md #{2,} [^`]+`' "$file" 2>/dev/null \
+      | sed -E 's/`([A-Za-z0-9_./-]+\.md) (#{2,} [^`]+)`/\1\t\2/'
+  )
 }
 
 validate_spec() {
@@ -108,6 +171,7 @@ validate_spec() {
     err "$file declares name \`$name\` but path implies \`$expected_name\`"
   fi
   check_references "$file"
+  check_heading_refs "$file"
 }
 
 # --- Agents: agents/<name>.md, skip *.original.md backups ---
@@ -128,6 +192,22 @@ for d in skills/*/; do
     continue
   fi
   validate_spec "$f" "$skill"
+done
+
+# --- Reference + template bodies: paths and headings only, no frontmatter ---
+# These carry no frontmatter, so validate_spec cannot walk them — which meant
+# nothing checked their citations at all. That is where the stale
+# `SKILL.md ## Phase E` sat: an extraction moved the rule, repaired the two
+# citers that happened to be checked files, and left the one in references/
+# unread by any check for months.
+# docs/decisions/ is deliberately NOT walked: those are append-only history,
+# off the drift-check surface by design, and they quote illustrative paths
+# (`scripts/foo.sh`, `references/gone.md`) that describe a check rather than
+# cite a file. Walking them turns a decision log into a source of warnings.
+for f in skills/*/references/*.md skills/*/templates/*.md docs/*.md; do
+  [ -e "$f" ] || continue
+  check_references "$f"
+  check_heading_refs "$f"
 done
 
 # --- Doc mirror: every declared subcommand verb reaches the family doc ---

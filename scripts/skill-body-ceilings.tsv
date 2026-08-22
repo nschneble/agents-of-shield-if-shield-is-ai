@@ -33,7 +33,7 @@ looper-custodian	8691	8127 actual, 564 under; the ceiling was set at 8041 + ~650
 # agent is 65% slack, which trips this check's own "guards nothing" note and
 # is a ceiling in name only. Each wave that shrinks a file LOWERS its
 # ceiling in the same commit.
-loop-de-looper	9800	9364 after W6 (was 8667 after W2); +697 bought the fast-path route and its four guards, which takes a small ask from four serial dispatches to one
+loop-de-looper	10005	9605 after the floor-ambiguity clarification; +241 resolved the docs-vs-false-string collision four reviewers split 3-1 on
 looper-build	2110	1759 at W1 seeding, +351 margin
 looper-commit	3393	2828 at W1 seeding, +565 margin
 looper-declutter	4699	4049 at W1 seeding, +650 margin
