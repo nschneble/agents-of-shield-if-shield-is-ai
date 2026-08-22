@@ -77,14 +77,58 @@ if printf '%s' "$norm" | grep -Eq 'git +push +\S+ +:\S'; then
 fi
 # Local history rewrites + irreversible remote resource actions.
 if printf '%s' "$norm" | grep -Eq \
-  'git +reset +.*--hard|git +rebase\b|git +commit\b.*--amend|git +branch +-D\b|git +filter-branch\b|git +filter-repo\b|git +reflog +expire\b|git +gc\b.*--prune|git +update-ref +-d\b|git +clean +.*-[a-z]*f|gh +pr +merge\b|gh +repo +delete\b|gh +release +delete\b'; then
+  'git +reset +.*--hard|git +rebase\b|git +commit\b.*--amend|git +filter-branch\b|git +filter-repo\b|git +reflog +expire\b|git +gc\b.*--prune|git +update-ref +-d\b|git +clean +.*-[a-z]*f|gh +pr +merge\b|gh +repo +delete\b|gh +release +delete\b'; then
   deny "Blocked by guard: command rewrites history or deletes/merges a remote resource. Run manually if intended."
+fi
+# Forced branch delete: -D, or delete+force in any order/spelling. -D is
+# git's own shorthand for both, so it needs no special case here.
+branch_delete='\bgit\b[^;&|]*\bbranch\b[^;&|]*( -[dDf]*[dD][dDf]*\b|--delete\b)'
+branch_force='\bgit\b[^;&|]*\bbranch\b[^;&|]*( -[dDf]*[fD][dDf]*\b|--force\b)'
+if printf '%s' "$norm" | grep -Eq "$branch_delete" && printf '%s' "$norm" | grep -Eq "$branch_force"; then
+  deny "Blocked by guard: forced branch delete can lose commits with no other ref. Run manually if intended."
+fi
+
+# --- gh api: the same actions above, reached via raw REST/GraphQL ---
+# Each check is its own grep call, chained with &&: some grep builds
+# silently fail to match a single regex chaining three \bWORD\b segments.
+api_scope='\bgh\b[^;&|]*\bapi\b'
+if printf '%s' "$norm" | grep -Eq "$api_scope"; then
+  method_put='(-X|--method) *[Pp][Uu][Tt]\b'
+  method_delete='(-X|--method) *[Dd][Ee][Ll][Ee][Tt][Ee]\b'
+  method_patch='(-X|--method) *[Pp][Aa][Tt][Cc][Hh]\b'
+  path_pr_merge='pulls/[0-9]+/merge\b'
+  # repos/OWNER/REPO with nothing after it: gh repo delete's real endpoint.
+  path_delete_targets='(repos/[^/ ]+/[^/ ]+( |$)|releases/([0-9]+|latest|tags/[^ ]+)\b|git/refs/heads/[^ ]+\b)'
+  # POST to git/refs/ creates a branch (safe); PATCH force-moves one.
+  path_force_ref='git/refs/[^ ]+\b'
+  if printf '%s' "$norm" | grep -Eq "$method_put" \
+     && printf '%s' "$norm" | grep -Eq "$path_pr_merge"; then
+    deny "Blocked by guard: gh api PR merge. Run manually if intended."
+  fi
+  if printf '%s' "$norm" | grep -Eq "$method_delete" \
+     && printf '%s' "$norm" | grep -Eq "$path_delete_targets"; then
+    deny "Blocked by guard: gh api delete (repo/release/branch). Run manually if intended."
+  fi
+  if printf '%s' "$norm" | grep -Eq "$method_patch" \
+     && printf '%s' "$norm" | grep -Eq "$path_force_ref"; then
+    deny "Blocked by guard: gh api force ref update. Run manually if intended."
+  fi
+  if printf '%s' "$norm" | grep -Eq '\bgraphql\b'; then
+    deny "Blocked by guard: gh api graphql can mutate via a query string this guard can't parse. Run manually if intended."
+  fi
 fi
 
 # --- Mass / arbitrary filesystem destruction ---
 # find with -delete or -exec rm (since find:* is allowlisted for read use).
 if printf '%s' "$norm" | grep -Eq 'find\b.*-delete\b|find\b.*-exec +rm\b'; then
   deny "Blocked by guard: find -delete / -exec rm can mass-delete files. Run manually if intended."
+fi
+# rm with both recursive and force present, any flag order, short or long.
+# Leading space, not (^| ): some greps mis-anchor a non-leading ^ group.
+rm_recursive='(^| )rm\b[^;&|]*( -[fiIrRvd]*[rR][fiIrRvd]*\b|--recursive\b)'
+rm_force='(^| )rm\b[^;&|]*( -[fiIrRvd]*f[fiIrRvd]*\b|--force\b)'
+if printf '%s' "$norm" | grep -Eq "$rm_recursive" && printf '%s' "$norm" | grep -Eq "$rm_force"; then
+  deny "Blocked by guard: rm with recursive + force can mass-delete files. Run manually if intended."
 fi
 
 # --- Piping into a shell interpreter — hide-the-command / remote-exec bypass ---
