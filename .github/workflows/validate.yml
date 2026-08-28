@@ -26,37 +26,6 @@ jobs:
         run: ./scripts/custodian-phase-order.test.sh
       - name: Custodian log recall check (both directions)
         run: ./scripts/custodian-log-recall.test.sh
-      - name: DEBUG skill-body-ceiling baseline in pristine sandbox
-        run: |
-          set -x
-          echo "=== git status before any copy ==="
-          git status --porcelain
-          echo "=== diff of the two files under test ==="
-          git diff -- skills/loop-de-looper/SKILL.md scripts/skill-body-ceilings.tsv
-          echo "=== live byte counts ==="
-          wc -c skills/loop-de-looper/SKILL.md scripts/skill-body-ceilings.tsv
-          echo "=== ceilings row ==="
-          grep -n "loop-de-looper" scripts/skill-body-ceilings.tsv
-          echo "=== CR count in working file ==="
-          grep -c $'\r' skills/loop-de-looper/SKILL.md || true
-          echo "=== git blob byte count ==="
-          git show HEAD:skills/loop-de-looper/SKILL.md | wc -c
-          echo "=== cmp working file vs blob ==="
-          git show HEAD:skills/loop-de-looper/SKILL.md > /tmp/blob.md
-          cmp skills/loop-de-looper/SKILL.md /tmp/blob.md || true
-          echo "=== byte-level diff around it ==="
-          diff <(od -c skills/loop-de-looper/SKILL.md) <(od -c /tmp/blob.md) | head -40
-          temp_root=$(mktemp -d "${TMPDIR:-/tmp}/debug-mutkill.XXXXXX")
-          pristine="$temp_root/pristine"
-          mkdir -p "$pristine"
-          cp -a scripts "$pristine/scripts"
-          cp -a skills "$pristine/skills"
-          [ -d local ] && cp -a local "$pristine/local"
-          [ -d hooks ] && cp -a hooks "$pristine/hooks"
-          [ -d agents ] && cp -a agents "$pristine/agents"
-          ( cd "$pristine" && git init -q . && git -c user.email=mutkill@local -c user.name=mutkill commit -q --allow-empty -m sandbox )
-          cd "$pristine"
-          bash scripts/skill-body-ceiling.test.sh
       - name: Mutation-kill harness (both directions)
         run: ./scripts/custodian-mutation-kill.test.sh
       - name: Every declared mutant is killed by its suite
