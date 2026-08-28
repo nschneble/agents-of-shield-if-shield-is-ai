@@ -24,7 +24,14 @@
 # tie-break), +57 declutter-run and +4 custodian-run (two false claims
 # corrected in reference bodies). All three are prose that a check now
 # enforces mechanically.
-orchestrator-run	22148	1898
+#
+# +335 orchestrator-run for the brief-authoring rule that a technical claim
+# used as justification gets verified before it is written, or marked
+# unverified. Priced against the +241 tie-break above: a rule of the same
+# shape, carrying three cited instances, and trimmed twice before this
+# number was recorded. Paid once per run; it removes a verification detour
+# the executing wave was paying per dispatch.
+orchestrator-run	22483	1898
 pre-flight	2121	2617
 orchestrated-wave	17437	10311
 crew-agent	13692	0
