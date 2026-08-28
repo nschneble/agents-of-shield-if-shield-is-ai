@@ -37,6 +37,15 @@ jobs:
           wc -c skills/loop-de-looper/SKILL.md scripts/skill-body-ceilings.tsv
           echo "=== ceilings row ==="
           grep -n "loop-de-looper" scripts/skill-body-ceilings.tsv
+          echo "=== CR count in working file ==="
+          grep -c $'\r' skills/loop-de-looper/SKILL.md || true
+          echo "=== git blob byte count ==="
+          git show HEAD:skills/loop-de-looper/SKILL.md | wc -c
+          echo "=== cmp working file vs blob ==="
+          git show HEAD:skills/loop-de-looper/SKILL.md > /tmp/blob.md
+          cmp skills/loop-de-looper/SKILL.md /tmp/blob.md || true
+          echo "=== byte-level diff around it ==="
+          diff <(od -c skills/loop-de-looper/SKILL.md) <(od -c /tmp/blob.md) | head -40
           temp_root=$(mktemp -d "${TMPDIR:-/tmp}/debug-mutkill.XXXXXX")
           pristine="$temp_root/pristine"
           mkdir -p "$pristine"
