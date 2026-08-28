@@ -29,6 +29,14 @@ jobs:
       - name: DEBUG skill-body-ceiling baseline in pristine sandbox
         run: |
           set -x
+          echo "=== git status before any copy ==="
+          git status --porcelain
+          echo "=== diff of the two files under test ==="
+          git diff -- skills/loop-de-looper/SKILL.md scripts/skill-body-ceilings.tsv
+          echo "=== live byte counts ==="
+          wc -c skills/loop-de-looper/SKILL.md scripts/skill-body-ceilings.tsv
+          echo "=== ceilings row ==="
+          grep -n "loop-de-looper" scripts/skill-body-ceilings.tsv
           temp_root=$(mktemp -d "${TMPDIR:-/tmp}/debug-mutkill.XXXXXX")
           pristine="$temp_root/pristine"
           mkdir -p "$pristine"
