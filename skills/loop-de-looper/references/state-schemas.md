@@ -45,7 +45,7 @@ jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialis
 
 The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope in SKILL.md `## Gate artifacts`); the `outcome` check is crew-refutation-only. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt.
 
-Admissibility is checked separately by `scripts/loop-finding-audit.sh` over five arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, and the interim crew size. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other three read the log alone.
+Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over five arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, and the interim crew size. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other three read the log alone.
 
 ### Receipts: the half `verified_by` cannot prove
 
@@ -57,7 +57,7 @@ string both misses real evidence and accepts a typed claim.
 
 `hooks/record-execution-receipt.sh` records each shell execution to
 `local/loops/<branch>/receipts.jsonl`, and no agent authors it.
-`scripts/loop-receipts.sh` checks a wave's `executable` claim against it,
+`~/.claude/scripts/loop-receipts.sh` checks a wave's `executable` claim against it,
 run over each kept dir by the custodian's Phase A.
 
 A receipt carries no exit code, and that is not an omission: the
@@ -149,7 +149,7 @@ violation. When receipts cover a meaningful span, G3 can retire into it.
 
 `goal_contract` is written once, at the end of Step 1, and never edited afterwards — a run that grows its own contract can always justify whatever it did. `queue[].closes` names which asks a wave is meant to close, which is what makes "shipped 9 waves, ask A2 unstarted" visible in the snapshot rather than only in hindsight. `cleanup_batch` accumulates every finding the severity floor did not gate, and drains in one terminal wave; `open_questions` holds what the crew surfaced that the contract does not cover, and drains only by the user answering.
 
-This file is the one of the three that gets overwritten, so it is the only one that can silently lose position while the records beside it stay correct. `scripts/loop-state-audit.sh` compares it against them — the journals settle `waves_shipped`, `total_waves`, `wave_retries` and the queue's shipped entries, `gates.jsonl` settles `last_crew_wave`, and git settles the shas those entries name. Run it before trusting a snapshot on resume (SKILL.md `## State tracking`); exit 0 means every arm was compared and agreed, 1 means a named field disagreed and the records win, 2 means the audit could not settle everything it exists to settle. The `pr` arm is opt-in behind `--pr` because it needs the network.
+This file is the one of the three that gets overwritten, so it is the only one that can silently lose position while the records beside it stay correct. `~/.claude/scripts/loop-state-audit.sh` compares it against them — the journals settle `waves_shipped`, `total_waves`, `wave_retries` and the queue's shipped entries, `gates.jsonl` settles `last_crew_wave`, and git settles the shas those entries name. Run it before trusting a snapshot on resume (SKILL.md `## State tracking`); exit 0 means every arm was compared and agreed, 1 means a named field disagreed and the records win, 2 means the audit could not settle everything it exists to settle. The `pr` arm is opt-in behind `--pr` because it needs the network.
 
 `pr.body_sha` hashes the PR body as the LOOP last wrote it (wave-1 creation, then the terminal recap refresh) — the baseline Step 4's user-edit guard compares the live body against to tell its own text from the owner's. Without a persisted baseline that guard has nothing to diff and cannot fire correctly, and `editor.login` can't substitute: the loop authenticates as `@me`, so its edits and the owner's carry the same login. Absent on a run predating the field or one whose PR the loop didn't create — the guard reads absent as "assume user-edited" and takes the augment path, which is the safe direction.
 

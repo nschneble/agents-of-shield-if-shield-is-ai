@@ -24,7 +24,7 @@
 # tie-break), +57 declutter-run and +4 custodian-run (two false claims
 # corrected in reference bodies). All three are prose that a check now
 # enforces mechanically.
-orchestrator-run	21849	1898
+orchestrator-run	22148	1898
 pre-flight	2121	2617
 orchestrated-wave	17437	10311
 crew-agent	13692	0
