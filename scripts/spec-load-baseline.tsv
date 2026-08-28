@@ -32,14 +32,14 @@
 # number was recorded. Paid once per run; it removes a verification detour
 # the executing wave was paying per dispatch.
 #
-# +187 orchestrated-wave for #74's real-entry-point rule: verifying a fix
+# +163 orchestrated-wave for #74's real-entry-point rule: verifying a fix
 # against an external library now means running the entry point a real
 # caller invokes, not probing the function the fix touches. Paid once per
 # wave; the failure it prevents cost a shipped-then-refused build and a
 # second escalation round-trip.
-orchestrator-run	22483	1898
+orchestrator-run	22466	1898
 pre-flight	2121	2617
-orchestrated-wave	17624	10311
+orchestrated-wave	17600	10314
 crew-agent	13692	0
 custodian-run	17633	4114
 defend-run	8034	0
