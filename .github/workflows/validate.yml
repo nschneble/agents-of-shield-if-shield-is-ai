@@ -26,6 +26,20 @@ jobs:
         run: ./scripts/custodian-phase-order.test.sh
       - name: Custodian log recall check (both directions)
         run: ./scripts/custodian-log-recall.test.sh
+      - name: DEBUG skill-body-ceiling baseline in pristine sandbox
+        run: |
+          set -x
+          temp_root=$(mktemp -d "${TMPDIR:-/tmp}/debug-mutkill.XXXXXX")
+          pristine="$temp_root/pristine"
+          mkdir -p "$pristine"
+          cp -a scripts "$pristine/scripts"
+          cp -a skills "$pristine/skills"
+          [ -d local ] && cp -a local "$pristine/local"
+          [ -d hooks ] && cp -a hooks "$pristine/hooks"
+          [ -d agents ] && cp -a agents "$pristine/agents"
+          ( cd "$pristine" && git init -q . && git -c user.email=mutkill@local -c user.name=mutkill commit -q --allow-empty -m sandbox )
+          cd "$pristine"
+          bash scripts/skill-body-ceiling.test.sh
       - name: Mutation-kill harness (both directions)
         run: ./scripts/custodian-mutation-kill.test.sh
       - name: Every declared mutant is killed by its suite
