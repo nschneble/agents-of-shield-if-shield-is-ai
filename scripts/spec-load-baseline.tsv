@@ -31,7 +31,12 @@
 # shape, carrying three cited instances, and trimmed twice before this
 # number was recorded. Paid once per run; it removes a verification detour
 # the executing wave was paying per dispatch.
-orchestrator-run	22483	1898
+#
+# +252 orchestrator-run for #73's corrective-budget clarification: an
+# orchestrator direct-fix now counts toward correctives_this_wave /
+# corrective_waves the same as a dispatched wave, so the governor's rails
+# stay meaningful against it.
+orchestrator-run	22735	1898
 pre-flight	2121	2617
 orchestrated-wave	17437	10311
 crew-agent	13692	0

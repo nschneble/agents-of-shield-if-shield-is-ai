@@ -78,6 +78,8 @@ Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.json
 
 **One re-crew, scoped, terminal.** A corrective is re-checked exactly once, by the agents whose findings it targeted plus any whose domain its diff touched (`references/protocol-detail.md` `## Step 3`). That re-crew answers CLEARED / NOT-CLEARED on those findings and nothing else. New findings it raises batch. NOT-CLEARED is a STOP to the user, never another corrective. Without this the ladder is infinite: each corrective grows the diff, the re-crew reviews the bigger diff, and the new blocker earns the next corrective — observed at five correctives on one wave.
 
+**A direct fix counts as a corrective — cheaper to execute, not cheaper to account for.** The orchestrator may resolve a gating post-build or crew finding by editing the file itself instead of dispatching `the-looper`, when the fix is small (single file, roughly 1-20 lines), fully specified by the finding (no design judgment beyond applying it), and verified with a build + the relevant test run before commit. That path still increments `correctives_this_wave` / `corrective_waves` and binds to the same `max_correctives_per_wave` / `max_corrective_waves` rails as a dispatched corrective wave — a direct fix that would blow either rail gets batched or escalated exactly like a dispatched one would. A finding that doesn't meet the criteria — multi-file, ambiguous, or unverified before commit — gets a real `the-looper` dispatch. Observed: a run applied roughly a dozen small direct fixes against gate findings, all correct and verified, but `corrective_waves` ended the run at `0` — the rails were never mechanically exercised because nothing incremented them.
+
 ## Inputs
 
 1. **Goal**: raw user input. Single sentence to single paragraph.
@@ -147,7 +149,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported, no longer a trigger                     |
 | `last_review_verdict`          | from the-looper's review step                                                                                   |
 | `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
-| `corrective_waves`             | every floor-gated fix wave (not a queue item); never reset                                                      |
+| `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
 | `correctives_this_wave`        | +1 per corrective on the current wave; reset when the wave advances                                             |
 | `consecutive_no_progress`      | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
 | `wave_retries`                 | +1 on each stuck-wave retry dispatch; never reset                                                               |
