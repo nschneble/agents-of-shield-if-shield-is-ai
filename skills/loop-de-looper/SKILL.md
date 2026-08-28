@@ -62,9 +62,9 @@ A finding may block a wave and spawn a corrective ONLY when it is in a gating cl
 
 A crew agent calling something a blocker does not make it gating — the floor does, and `## Step 3` applies it. Voice and tone never gate: a string that is _false_ gates under the last class and may be raised by any agent, a string that is merely off-voice batches.
 
-**A false statement in a spec, doc, or comment batches — it is not a "false user-visible string".** The two entries collided honestly: a stale cross-reference is both documentation (never gating) and a shipped string that is wrong about what the code does (gating), and four reviewers reading the same defect split three-to-one on it. The tie is broken toward BATCH, for a reason that is not merely "docs are cheap": a reader misled by a spec fails loudly at the next step — the path does not resolve, the heading is not there, the check refuses — whereas an end user misled by a runtime string has no such backstop. Those spec failures are also now MECHANICAL: `scripts/validate-looper-config.sh` resolves every backtick'd path AND every cited `## Heading`, in reference and template bodies as well as specs. A class a check already owns does not need the floor to stop a wave for it. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
+**A false statement in a spec, doc, or comment batches — it is not a "false user-visible string".** The two entries collided honestly: a stale cross-reference is both documentation (never gating) and a shipped string that is wrong about what the code does (gating), and four reviewers reading the same defect split three-to-one on it. The tie is broken toward BATCH, for a reason that is not merely "docs are cheap": a reader misled by a spec fails loudly at the next step — the path does not resolve, the heading is not there, the check refuses — whereas an end user misled by a runtime string has no such backstop. Those spec failures are also now MECHANICAL: `~/.claude/scripts/validate-looper-config.sh` resolves every backtick'd path AND every cited `## Heading`, in reference and template bodies as well as specs. A class a check already owns does not need the floor to stop a wave for it. On an extraction wave a per-output-file LOC ceiling IS the contract, so it gates as an exit criterion, not as a size finding (`references/protocol-detail.md` `## Step 2a`).
 
-Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.jsonl` line and checked by `scripts/loop-finding-audit.sh` (`## Gate artifacts`).
+Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.jsonl` line and checked by `~/.claude/scripts/loop-finding-audit.sh` (`## Gate artifacts`).
 
 ## Corrective budget
 
@@ -154,7 +154,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
 | `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
-Then, in this order: write `run-state.json` (atomic), run `scripts/loop-finding-audit.sh`, evaluate the budget governor, the usage-window guard, and the crew trigger. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
+Then, in this order: write `run-state.json` (atomic), run `~/.claude/scripts/loop-finding-audit.sh`, evaluate the budget governor, the usage-window guard, and the crew trigger. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
 
 **2d. Crew trigger check.** ONE trigger, evaluated after every wave:
 
@@ -189,6 +189,8 @@ Write the gate artifact BEFORE looping back or resetting counters. Report all se
 
 **The final crew runs exactly once, and it runs last.** Cleanup batch wave, then final pass, then terminate. A run that crews, then ships another wave, then crews again has not been careful — it has paid for the same pass twice and re-opened a diff it had already settled. Observed: a five-wave run whose log carries a full final pass, a polish wave after it, and a second all-seven pass after that. If a wave genuinely must ship after the final pass, the run is not at termination; fold it in before the pass, or the pass it invalidates is the one that mattered.
 
+**`single-wave` is the one legitimate exception to that ordering, structurally.** Its budget is one crew pass total, and that pass is also the FIRST point anything could populate `cleanup_batch` — there is no earlier wave for a "cleanup, then final pass" ordering to fold into. The cleanup batch wave necessarily ships after the single pass here, not before it. That does not reopen the diff for review purposes if — and only if — the cleanup wave stays inside what the pass already specified (the literal findings, with their cited old/new text or line ranges) and adds no new gating-class scope. Close it out with an orchestrator-run build/typecheck/test pass over the cleanup wave's diff (not a second crew dispatch — single-wave's budget doesn't carry one) before declaring goal-complete. Observed: a single-wave scheduler fix whose cleanup wave rewrote an error message, fixed doc drift, and added one test the crew had specified in full; a same-session build+test rerun caught nothing further, and a second full crew pass would have re-reviewed prose already vetted.
+
 ### Step 4: Termination
 
 Loop terminates when:
@@ -203,7 +205,7 @@ For path 3, order is fixed: run the final crew FIRST, then report the bundle in 
 
 ## Gate artifacts
 
-Every gate the loop runs gets a durable on-disk record in `local/loops/<branch>/gates.jsonl`, appended never rewritten. A gate you can't audit isn't a gate: when the loop runs unattended, the artifact is the only way to tell a real review from one the orchestrator merely narrated. Prose in the final report is NOT a substitute. The rules that make the log trustworthy — `ran: false` for a gate that could not fire, verbatim verdicts, `outcome` for the refutation-posture reviewer, `verified_by` provenance, and the `gated_by` + `contract_ref` justification every gating claim carries — are in `references/rails.md` `## Gate artifacts`; line shapes are in `references/state-schemas.md`. Two checks enforce them: the provenance lint in that schema file, and `scripts/loop-finding-audit.sh`, which fails a run whose correctives were never justified against the floor and the contract.
+Every gate the loop runs gets a durable on-disk record in `local/loops/<branch>/gates.jsonl`, appended never rewritten. A gate you can't audit isn't a gate: when the loop runs unattended, the artifact is the only way to tell a real review from one the orchestrator merely narrated. Prose in the final report is NOT a substitute. The rules that make the log trustworthy — `ran: false` for a gate that could not fire, verbatim verdicts, `outcome` for the refutation-posture reviewer, `verified_by` provenance, and the `gated_by` + `contract_ref` justification every gating claim carries — are in `references/rails.md` `## Gate artifacts`; line shapes are in `references/state-schemas.md`. Two checks enforce them: the provenance lint in that schema file, and `~/.claude/scripts/loop-finding-audit.sh`, which fails a run whose correctives were never justified against the floor and the contract.
 
 ## State tracking
 
@@ -213,7 +215,7 @@ Three branch-keyed files under `local/loops/<branch>/`, three different jobs: **
 
 Resume mode (`/loop-de-looper resume`):
 
-- **Primary**: read `run-state.json`, then **audit it before trusting it** — `bash scripts/loop-state-audit.sh --branch <branch>`. Present-and-stale looks identical to present-and-correct until something compares the snapshot to the records beside it. Exit 0 → trust it. Exit 1 → the records win on every field the audit named; repair, then continue. Exit 2 → treat the unsettled fields as unknown and re-derive by hand. Read the arms it printed, not just the code.
+- **Primary**: read `run-state.json`, then **audit it before trusting it** — `bash ~/.claude/scripts/loop-state-audit.sh --branch <branch>`. Present-and-stale looks identical to present-and-correct until something compares the snapshot to the records beside it. Exit 0 → trust it. Exit 1 → the records win on every field the audit named; repair, then continue. Exit 2 → treat the unsettled fields as unknown and re-derive by hand. Read the arms it printed, not just the code.
 - **Mid-wave**: a wave the snapshot shows `pending` may still have a partly-finished journal. Re-dispatch it normally — do NOT parse the journal to decide which steps to hand it. The executor owns step granularity.
 - **Fallback only** (file missing / corrupt / pre-snapshot run): re-run scope, diff `git log main..HEAD` for shipped waves, re-derive counters from git stat. Lossy; the exception, not the path.
 
@@ -253,7 +255,7 @@ Two wave-boundary halts the governor's churn rails cannot see. Both finish the i
 - **A corrective's re-crew returns NOT-CLEARED** → STOP, escalate. The fix did not hold; a second patch on the same wave is not the answer (`## Corrective budget`)
 - **Crew finds a gating blocker requiring rollback** → STOP, escalate (no auto-revert commits)
 - **Budget governor STOP rail hit** → STOP, escalate with the persisted state report; resumable after the user raises a ceiling
-- **Finding audit fails** (`scripts/loop-finding-audit.sh` exit 1) → STOP, quote the offending line. A corrective the run cannot justify against the floor and the contract is the exact drift this skill exists to prevent. Exit 2 is NOT a stop: the audit could not settle every arm (an unreadable snapshot, a counter that is not a count). Report which arms it named as unsettled and continue — but do not read it as a pass, and repair the record it could not read at the next wave boundary
+- **Finding audit fails** (`~/.claude/scripts/loop-finding-audit.sh` exit 1) → STOP, quote the offending line. A corrective the run cannot justify against the floor and the contract is the exact drift this skill exists to prevent. Exit 2 is NOT a stop: the audit could not settle every arm (an unreadable snapshot, a counter that is not a count). Report which arms it named as unsettled and continue — but do not read it as a pass, and repair the record it could not read at the next wave boundary
 - **Context pressure at a wave boundary** → finish the wave, halt before the next dispatch. Clean handoff, not a failure
 - **Usage window at/above 95% at a wave boundary** → finish the wave, pause, schedule a self-resume. A PAUSE, not a STOP
 - **Queue exhausted, required-not-loopable items remain** → surface explicit list, await user action
