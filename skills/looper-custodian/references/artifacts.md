@@ -13,7 +13,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 ```json
 {
   "phase": "A",                       // "start" | "C" | "A" | "B" | "E" | "F"
-                                      // | "resume" | "D-apply"
+                                      // | "resume" | "D-apply" | "shadow"
   "repo": "tuffgal",
   "task_tool_available": true,        // false = could NOT invoke a sub-skill/agent
   "ran": true,                        // false when a needed tool was unavailable
@@ -23,6 +23,6 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
 ```
 
 - The **GitHub issue** is the human-review + approval surface; the jsonl is the machine record. They agree — the issue's claims trace to logged lines.
-- `phase` is read by `scripts/custodian-phase-order.sh`, which orders B against E and splits segments at each `resume` line. So a `resume` line is not bookkeeping — it is the boundary that lets a replayed tail be judged on its own terms, and a resume that logs no marker merges its tail into the segment before it.
+- `phase` is read by `scripts/custodian-phase-order.sh`, which orders B against E and splits segments at each `resume` line. So a `resume` line is not bookkeeping — it is the boundary that lets a replayed tail be judged on its own terms, and a resume that logs no marker merges its tail into the segment before it. A `shadow` line is inert to that check by the same reading — it is neither B, E, nor a boundary — which is why the on-demand trust check can share this log rather than open a second one. It is the one line kind that carries an extra field, `grader` (`blind-subagent` or `self`), because a trust check graded in a context that already knew the answer is weaker evidence than one that did not, and a reader cannot tell the two apart from the verdict alone.
 
 **`task_tool_available: false` ⇒ `ran: false` ⇒ no invented outcome.** Per the loop's `[[feedback-task-tool-availability]]` discipline: if custodian can't actually invoke `deep-research` / `the-turncoat` (no Task/Skill tool), it logs `ran: false` and says so in the issue — NEVER an invented digest or a claimed-but-unrun edit.

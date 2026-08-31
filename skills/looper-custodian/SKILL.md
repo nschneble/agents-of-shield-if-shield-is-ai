@@ -1,6 +1,6 @@
 ---
 name: looper-custodian
-description: Scheduled cross-run, cross-repo housekeeping for the looper system. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", or "looper-custodian history <query>".
+description: Scheduled cross-run, cross-repo housekeeping for the looper system. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", "looper-custodian history <query>", or "looper-custodian shadow".
 ---
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
@@ -26,10 +26,11 @@ So the line is sharp:
 | `/looper-custodian apply #<issue> --dry-run`                                       | **Phase D preview**: prints the EXACT before/after of each ticked item and writes nothing. Consent then approves a _previewed_ diff, not a _described_ one                                                                                                                         |
 | `/looper-custodian undo`                                                           | **restore** the most recent Phase D snapshot, reverting the last `apply`. Idempotent — a no-op on an already-clean tree                                                                                                                                                            |
 | `/looper-custodian history <query> [--agent\|--verdict\|--kind\|--file\|--repo …]` | **read-only lookup** over the cross-run history index — ranked, cited matches from `gates.jsonl` across repos. Writes nothing. `--rebuild` re-derives the index from source. Never on the cron                                                                                     |
+| `/looper-custodian shadow [<namespace>]`                                           | **trust check on Phase B itself**: runs the memory audit against a namespace with nothing left to find and grades whether it proposed anything anyway. Read-only, on demand, never on the cron. `references/fabrication-shadow-test.md`                                            |
 
 Phase D is NEVER part of the scheduled run. The cron only ever proposes. `--dry-run` and `undo` are human-triggered like `apply` itself.
 
-Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo` and `history` are sibling verbs (`history` read-only, takes a query arg + filter flags).
+Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo`, `history`, and `shadow` are sibling verbs (the last two read-only; `history` takes a query arg + filter flags, `shadow` an optional namespace).
 
 ## Repos (explicit, not auto-discovered)
 

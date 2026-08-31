@@ -42,10 +42,20 @@
 # caller invokes, not probing the function the fix touches. Paid once per
 # wave; the failure it prevents cost a shipped-then-refused build and a
 # second escalation round-trip.
+#
+# +229 always / +2038 conditional on custodian-run for the `shadow` verb:
+# the fabrication shadow-test on Phase B's own proposal step. The always
+# half is the routing only — the verb row, the grammar clause, the trigger
+# in the description, and the log line's extra field; the procedure itself
+# is conditional, loaded only when the verb is invoked, which is the whole
+# reason it is a verb and not a phase. Deliberately NOT a step in the
+# weekly run: a recurring arm would move the 2038 onto every cron for a
+# signal that moves when the model or the Phase B wording moves, not
+# weekly.
 orchestrator-run	22735	1898
 pre-flight	2121	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
-custodian-run	17633	4114
+custodian-run	17862	6152
 defend-run	8034	0
 declutter-run	6647	0

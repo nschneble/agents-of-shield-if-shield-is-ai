@@ -54,6 +54,7 @@ custodian-run	skills/looper-custodian/references/scheduling.md	scheduling-verb
 custodian-run	skills/looper-custodian/references/resume.md	resume-verb
 custodian-run	skills/looper-custodian/references/history-verb.md	history-verb
 custodian-run	skills/looper-custodian/references/phase-d-apply.md	apply-verb
+custodian-run	skills/looper-custodian/references/fabrication-shadow-test.md	shadow-verb
 defend-run	skills/looper-defend/SKILL.md	always
 declutter-run	skills/looper-declutter/SKILL.md	always
 declutter-run	skills/looper-declutter/references/candidate-kinds.md	always
