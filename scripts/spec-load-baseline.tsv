@@ -80,13 +80,19 @@
 # caught on loop-de-looper's own ceiling; this is that same commit's cost
 # on the other side of the accounting.
 #
-# +159 pre-flight: prettier reflowed looper-nonbeliever's table once
-# 9311709's addition widened a cell, padding every row to match. No
-# content changed, only column width.
+# +458 always on custodian-run for the Phase B fingerprint pre-filter
+# (issue #81, capn-hook): +98 in SKILL.md (a pointer bullet, trimmed once
+# already to clear skill-body-ceiling.sh's own budget) and +360 in
+# phase-detail.md (the scoping note: file:line-only, UNCHANGED still
+# counts resolved, GONE is never a shortcut to B-retire). Paid once per
+# run, every run, since the pre-filter itself runs unconditionally before
+# dispatch; what it SAVES (skipping LLM re-audit of unchanged citations)
+# is a per-citation conditional cost this instrument does not model,
+# same blind spot W4's note names for dispatch counts generally.
 orchestrator-run	23088	1898
 pre-flight	2452	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
-custodian-run	18937	6385
+custodian-run	19395	6385
 defend-run	8034	0
 declutter-run	6647	0
