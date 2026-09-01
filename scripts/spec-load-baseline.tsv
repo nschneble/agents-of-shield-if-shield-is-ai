@@ -72,8 +72,15 @@
 # flipped the tool grant in one clause; the rest of the 1075 is the
 # evidence that stops it being flipped back, and the accounting axis that
 # would have caught the miss without a shadow-test to go looking for it.
-orchestrator-run	22735	1898
-pre-flight	2121	2617
+#
+# +353 orchestrator-run / +172 pre-flight from 9311709: the branch-path
+# -flatten guardrail and the run-state.json-validate guardrail landed in
+# loop-de-looper/SKILL.md, plus a matching addition in
+# looper-nonbeliever/SKILL.md. Same growth the skill-body-ceiling check
+# caught on loop-de-looper's own ceiling; this is that same commit's cost
+# on the other side of the accounting.
+orchestrator-run	23088	1898
+pre-flight	2293	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
 custodian-run	18937	6385
