@@ -42,10 +42,51 @@
 # caller invokes, not probing the function the fix touches. Paid once per
 # wave; the failure it prevents cost a shipped-then-refused build and a
 # second escalation round-trip.
-orchestrator-run	22735	1898
-pre-flight	2121	2617
+#
+# +229 always / +2038 conditional on custodian-run for the `shadow` verb:
+# the fabrication shadow-test on Phase B's own proposal step. The always
+# half is the routing only — the verb row, the grammar clause, the trigger
+# in the description, and the log line's extra field; the procedure itself
+# is conditional, loaded only when the verb is invoked, which is the whole
+# reason it is a verb and not a phase. Deliberately NOT a step in the
+# weekly run: a recurring arm would move the 2038 onto every cron for a
+# signal that moves when the model or the Phase B wording moves, not
+# weekly.
+#
+# +1075 always / +233 conditional on custodian-run for the Phase B citation
+# fix. The always half is spread over three files that every custodian run
+# already loads: the delegation grant and the UNRESOLVED state in
+# phase-detail.md (+638), the second coverage axis in SKILL.md (+213), and
+# the B line's short-coverage spellings in report-issue.md (+223). The
+# conditional half is the shadow-test procedure brought into line with the
+# grant, loaded only on `shadow`. This is not one mechanism's worth of
+# prose and is not priced as one: it is a structural repair. The spec told
+# the auditor to resolve citations by existence-plus-grep and told the
+# delegated auditor it could only Read, so the delegated path could not
+# perform the test it was assigned — 18 of one run's 20 proposals were
+# positive-form and exactly one of the two deletions carried a search
+# behind it, which is what put a number on it. NOTE: the wave brief
+# stated 19/20 with a single retire; the run's own log says 20 = 11
+# repoint + 3 distill + 2 merge + 2 migrate + 2 retire, and the number
+# recorded here is the one the log supports. A cheaper edit could have
+# flipped the tool grant in one clause; the rest of the 1075 is the
+# evidence that stops it being flipped back, and the accounting axis that
+# would have caught the miss without a shadow-test to go looking for it.
+#
+# +353 orchestrator-run / +172 pre-flight from 9311709: the branch-path
+# -flatten guardrail and the run-state.json-validate guardrail landed in
+# loop-de-looper/SKILL.md, plus a matching addition in
+# looper-nonbeliever/SKILL.md. Same growth the skill-body-ceiling check
+# caught on loop-de-looper's own ceiling; this is that same commit's cost
+# on the other side of the accounting.
+#
+# +159 pre-flight: prettier reflowed looper-nonbeliever's table once
+# 9311709's addition widened a cell, padding every row to match. No
+# content changed, only column width.
+orchestrator-run	23088	1898
+pre-flight	2452	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
-custodian-run	17633	4114
+custodian-run	18937	6385
 defend-run	8034	0
 declutter-run	6647	0

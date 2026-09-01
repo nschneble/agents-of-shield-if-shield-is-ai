@@ -1,31 +1,8 @@
 #!/usr/bin/env bash
-# Validates the looper config surface: every agent and skill spec has the
-# frontmatter the harness needs, the declared name matches its path,
-# backtick'd repo-relative path references resolve to real files, every
-# subcommand verb a skill declares reaches docs/looper-skills.md, and every
-# test suite in the repo is wired into the CI workflow.
-#
-# Frontmatter problems are ERRORS (exit 1) — a malformed name/description can
-# silently break agent/skill resolution. An unwired test suite is an ERROR
-# too: a suite CI never runs is a red nobody sees (doc-bloat-scan.test.sh
-# sat out of the workflow for a week while failing). The wiring match reads
-# ONLY the command text CI executes, so it errs toward calling a suite
-# UNWIRED — the cheap direction: a false error costs a minute, a false
-# "wired" reproduces that silent week. Dangling path references are
-# WARNINGS (printed, non-fatal), as is a subcommand verb missing from the
-# family doc — both catch doc rot without blocking on a clever
-# false-positive. `[[memory-links]]` are intentionally NOT checked:
-# a dangling one is a valid forward-reference per the memory convention.
-#
-# Run from anywhere; resolves the repo root itself. Wire into CI (see
-# .github/workflows/validate.yml) and run locally before committing spec edits.
-#
-# Deliberately over the ~100-line refactor bar, same waiver
-# scripts/temp-dir-guard.test.sh carries. The four checks share one
-# `errors` verdict and one repo-root resolution, and the wiring check has
-# already been wrong in both directions — splitting it into a file that
-# cannot see the frontmatter walk's file list is how a fourth spelling
-# gets missed. Trim its prose before reaching for its code.
+# validates the looper config surface: agent/skill frontmatter, backtick'd
+# path + heading references, doc-mirror drift, and CI test-suite wiring.
+# Wiring is an ERROR (a suite CI skips is a red nobody sees); dangling
+# refs/mirrors are WARNINGS. Wire into .github/workflows/validate.yml.
 
 set -uo pipefail
 
@@ -38,15 +15,13 @@ warnings=0
 err()  { printf 'ERROR  %s\n' "$1" >&2; errors=$((errors + 1)); }
 warn() { printf 'WARN   %s\n' "$1" >&2; warnings=$((warnings + 1)); }
 
-# Extract a top-level frontmatter scalar (name/description) from a spec file.
-# Reads only the block between the first two `---` fences.
+# a top-level frontmatter scalar, read only from the first `---` block
 frontmatter_value() {
   awk -v key="$2" '
     NR == 1 && $0 != "---" { exit 1 }
     NR == 1 { infm = 1; next }
     infm && $0 == "---" { exit 0 }
     infm {
-      # match `key:` at column 0, capture the rest
       if ($0 ~ "^" key ":[[:space:]]*") {
         sub("^" key ":[[:space:]]*", "")
         print
@@ -60,22 +35,14 @@ has_frontmatter() {
   [ "$(head -n 1 "$1")" = "---" ]
 }
 
-# --- Reference integrity: backtick'd file paths must exist ---
-# Conservative: only tokens that look like a concrete file under one of the
-# tracked dirs, with no glob/placeholder chars. Skips `skills/*/SKILL.md`,
-# `local/loops/<branch>/...`, prose, and absolute/home paths. `templates/...`
-# and `references/...` tokens are skill-relative: resolved against the citing
-# spec's own directory.
+# backtick'd file paths must exist; templates/refs are skill-relative
 check_references() {
   local file="$1" token target
   local dir; dir=$(dirname "$file")
-  # A file already inside references/ or templates/ cites its siblings as
-  # `references/x.md`, meaning the skill's dir — not a nested one below itself.
+  # references/templates cite siblings against the skill dir, not itself
   local root="$dir"
   case "$dir" in */references|*/templates) root=$(dirname "$dir") ;; esac
-  # Pull every `backtick`-wrapped token, one per line. The backticks are literal
-  # regex chars, not shell expansion — single quotes are intentional. Process
-  # substitution (not a pipeline) so warn's counter survives the loop.
+  # process substitution, not a pipeline: warn's counter survives the loop
   # shellcheck disable=SC2016
   while IFS= read -r token; do
     case "$token" in
@@ -83,12 +50,10 @@ check_references() {
       templates/*|references/*) target="$root/$token" ;;
       *) continue ;;
     esac
-    # Skip globs / placeholders / anchors / non-file tokens.
-    case "$token" in
+    case "$token" in  # skip globs / placeholders / anchors
       *'*'*|*'<'*|*'>'*|*'('*|*')'*|*' '*|*'#'*) continue ;;
     esac
-    # Must look like a file (has a known extension).
-    case "$token" in
+    case "$token" in  # must have a known file extension
       *.md|*.sh|*.json|*.yml|*.yaml|*.plist|*.ts|*.tsx) : ;;
       *) continue ;;
     esac
@@ -96,18 +61,7 @@ check_references() {
   done < <(grep -oE '`[^`]+`' "$file" 2>/dev/null | tr -d '`')
 }
 
-# --- Heading integrity: a cited `## Heading` must exist in the file cited ---
-# check_references above proves the FILE resolves. It cannot tell that the
-# SECTION does, and that is the half extraction breaks: move a rule out of
-# SKILL.md into references/, repair two of the three citers, and the third
-# still names a heading that is gone. The file still resolves, so nothing
-# caught it — four independent reviewers did, months later.
-#
-# Two spellings, both live in the corpus:
-#   `path/to/file.md` `## Heading`      (65 sites, optionally with → between)
-#   `path/to/file.md ## Heading`        (1 site)
-# A bare `## Heading` with no file beside it is self-referential and skipped:
-# resolving it means knowing which file the sentence means, which is prose.
+# a cited heading must exist too, not just the file; a bare one is self-ref
 check_heading_refs() {
   local file="$1" pair path heading target h found
   local dir; dir=$(dirname "$file")
@@ -119,23 +73,13 @@ check_heading_refs() {
     case "$path" in
       agents/*|skills/*|docs/*|scripts/*) target="$path" ;;
       templates/*|references/*)           target="$root/$path" ;;
-      # A bare `SKILL.md` cited from references/ or templates/ means the
-      # sibling skill, one level up — not a SKILL.md inside that directory.
-      # Resolving it there is why the first cut of this check skipped the
-      # exact stale citation it was written for.
+      # a bare SKILL.md cited from references/templates means the sibling
       *.md) if [ -e "$dir/$path" ]; then target="$dir/$path"
             else target="$root/$path"; fi ;;
       *) continue ;;
     esac
     [ -e "$target" ] || continue   # check_references already warned on this
-    # PREFIX match, not exact. The house style cites `## Step 3` for a heading
-    # spelled `## Step 3 — crew pass mechanics`, and 12 of the 13 hits on the
-    # first exact-match cut were that convention, not drift.
-    # The separator after a prefix citation is not always a space: the corpus
-    # writes `### Step 3` for `### Step 3: Crew pass`, `## Phase C` for
-    # `## Phase C — ingest`, and `## Step 2a` for `## Step 2a — brief
-    # authoring`. Accepting only a space rejected the house convention and
-    # sent me to "fix" a citation that was already correct.
+    # PREFIX match: house style cites `## Step 3` for `## Step 3 — x`
     found=0
     while IFS= read -r h; do
       if [ "$h" = "$heading" ]; then found=1; break; fi
@@ -163,7 +107,7 @@ validate_spec() {
   fi
   name=$(frontmatter_value "$file" name)
   desc=$(frontmatter_value "$file" description)
-  # Strip one layer of surrounding quotes (specs mix `name: foo` and `name: "foo"`).
+  # strip one quote layer: specs mix `name: foo` and `name: "foo"`
   name=${name#[\"\']}; name=${name%[\"\']}
   [ -n "$name" ] || err "$file missing or empty \`name:\`"
   [ -n "$desc" ] || err "$file missing or empty \`description:\`"
@@ -194,31 +138,14 @@ for d in skills/*/; do
   validate_spec "$f" "$skill"
 done
 
-# --- Reference + template bodies: paths and headings only, no frontmatter ---
-# These carry no frontmatter, so validate_spec cannot walk them — which meant
-# nothing checked their citations at all. That is where the stale
-# `SKILL.md ## Phase E` sat: an extraction moved the rule, repaired the two
-# citers that happened to be checked files, and left the one in references/
-# unread by any check for months.
-# docs/decisions/ is deliberately NOT walked: those are append-only history,
-# off the drift-check surface by design, and they quote illustrative paths
-# (`scripts/foo.sh`, `references/gone.md`) that describe a check rather than
-# cite a file. Walking them turns a decision log into a source of warnings.
+# no frontmatter here; docs/decisions/ excluded, quotes illustrative paths
 for f in skills/*/references/*.md skills/*/templates/*.md docs/*.md; do
   [ -e "$f" ] || continue
   check_references "$f"
   check_heading_refs "$f"
 done
 
-# --- Doc mirror: every declared subcommand verb reaches the family doc ---
-# A skill and the doc that enumerates the family drift apart silently: the
-# skill grows a verb, the doc keeps the old shape, and every existing check
-# passes because both files are internally valid. Matches anywhere in the
-# doc, not just its invocation table — the cheap direction, since a verb
-# discussed in prose is documented and a false WARN costs more than a miss
-# here. Verb-set membership only: the doc's `**Trigger:**` lines are
-# deliberate abridgements of the descriptions, so comparing those would
-# fire on nearly every skill.
+# every declared subcommand verb must reach the family doc, or it drifts
 family_doc="docs/looper-skills.md"
 if [ -e "$family_doc" ]; then
   for d in skills/*/; do
@@ -232,22 +159,10 @@ if [ -e "$family_doc" ]; then
   done
 fi
 
-# --- CI wiring: every *.test.sh needs a step in the validate workflow ---
-# Derived from the tree, never a hand-kept roster: a roster is what rotted.
-# `local/` is gitignored scratch, not CI's business. Process substitution
-# (not a pipeline) so err's counter survives the loop.
+# every *.test.sh needs a workflow step; derived from the tree, not a list
 
-# Emit only the shell CI actually runs: the text after an inline `run:`,
-# and the body lines of a `run: |` / `run: >` block scalar. Two shapes
-# both have to hold. Reading the whole YAML body accepts any MENTION — a
-# step `name:`, an `on: push: paths:` filter, a `# TODO re-enable
-# ./x.test.sh` comment — each of which passed while the real step was
-# deleted. Reading only lines matching `run:` misses the block scalar,
-# which is the bug that widening was meant to fix. So: strip `#` to end of
-# line (a whole-line comment collapses to whitespace and contributes
-# nothing), then track the block. A block scalar's body is indented past
-# the column of its own `run` key, which is what ends the block on the
-# next sibling key or list item.
+# emits only real run: shell (inline + block scalar), never a YAML mention
+# (a step name, a path filter, a stale TODO) that isn't actually run
 run_commands() {
   awk '
     { sub(/#.*/, "", $0) }
@@ -281,16 +196,7 @@ else
              | sed 's|^\./||' | sort)
 fi
 
-# --- Deploy links: every shipped file must resolve through ~/.claude ---
-# Definitions only run once ~/.claude points at them, so a file that exists
-# here and is unreachable there is shipped in name only. Four reference
-# files sat unlinked for weeks that way — SKILL.md cited them and the
-# runtime could not load them. Derived from the tree for the same reason
-# the CI check above is.
-#
-# WARN, never err: this is machine-local deploy state, not a property of
-# the commit, and CI has no ~/.claude at all. Skipped whole when the tree
-# is undeployed, so a fresh clone and CI both stay silent.
+# every shipped file must resolve via ~/.claude; WARN: local deploy state
 
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
@@ -304,14 +210,7 @@ real_path() {  # realpath is not on stock macOS; readlink -f is not on bash 3.2 
     printf '%s/%s\n' "$(pwd -P)" "$p" )
 }
 
-# --- Doc mirror: a docs/ heading that also names a skill section ---
-# The doc copy of a rule is the one nothing enforces, so it is the one a
-# fixing wave misses while the skill moves on — the observed shape behind a
-# repeating class of corrective wave. Three such sections (`## Why it
-# exists`, `## Governing principle: …`) were deleted when the decision logs
-# moved to docs/decisions/; this is what stops them growing back. WARN, not
-# ERROR: a generic heading can collide honestly, and doc rot should not
-# block a merge.
+# a docs/ heading duplicating a skill section is the copy nothing enforces
 skill_heads=$(grep -h '^## ' skills/*/SKILL.md 2>/dev/null | sort -u)
 for f in docs/*.md docs/decisions/*.md; do
   [ -e "$f" ] || continue

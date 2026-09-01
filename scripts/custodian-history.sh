@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# custodian-history — cited, incremental index over gates.jsonl across the looper repos.
-#
-# Grafts the ctx (ctxrs/ctx) pattern onto looper's own structured log: one
-# canonical store, queried for ranked cited matches, ingested incrementally
-# rather than re-scanned. Substrate is JSONL + jq — no SQLite, no binary.
+# custodian-history — cited, incremental index over gates.jsonl, all repos.
+# One canonical JSONL store (no SQLite), queried for ranked cited matches,
+# grafting the ctx pattern onto looper structured log.
 #
 # Subcommands:
 #   ingest            append only gates.jsonl lines not already indexed
@@ -21,20 +19,14 @@ REPOS=(linklater tuffgal tuffgal-action agents-of-shield-if-shield-is-ai rss-rea
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
 
-# Portable file mtime in epoch seconds. macOS/BSD stat speaks `-f %m`; GNU
-# coreutils speaks `-c %Y`. Trap (this broke CI on ubuntu): under GNU, `stat -f`
-# selects FILESYSTEM status and `%m` is the MOUNT POINT, so `stat -f %m` SUCCEEDS
-# with a non-epoch ("/") — a plain `stat -f %m || stat -c %Y` fallback never
-# reaches the GNU form. So probe which flavor this host speaks once, up front.
+# probe stat flavor once: GNU stat -f wrongly reads fs status, not mtime
 if stat -c %Y / >/dev/null 2>&1; then
   file_mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }   # GNU coreutils
 else
   file_mtime() { stat -f %m "$1" 2>/dev/null || echo 0; }   # BSD / macOS
 fi
 
-# Resolve the files a run touched, from commit SHAs named in its summaries.
-# SHA-based (not branch-ref) so it still resolves after the branch is merged +
-# deleted. Best-effort: no git, no repo, or no resolvable SHA ⇒ [] (never invented).
+# SHA-based, not branch-ref, so it resolves after the branch is deleted
 resolve_files() {  # repo_root gates_path -> JSON array on stdout
   local rr="$1" gp="$2"
   command -v git >/dev/null 2>&1 || { echo '[]'; return; }
@@ -57,13 +49,7 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
 ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
-  # `|| cand=""` so set -e cannot abort ahead of the check below: it did,
-  # and the terminal got mktemp's own line with no script name, no refusal
-  # word, and rc=1 where the empty shape gives 2 for the same failure.
-  # Both shapes land here because "no temp file" is true of both, and a
-  # nonzero mktemp explains itself on stderr. The explicit template is what
-  # makes TMPDIR the input the message names: a bare `mktemp` ignores
-  # TMPDIR on BSD and allocates under /var/folders.
+  # || cand="" so set -e cannot abort before the named-failure check below
   cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
   new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
   [ -n "$cand" ] && [ -n "$new" ] || {
@@ -76,9 +62,8 @@ ingest() {
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }
     while IFS= read -r gates; do
       branch=${gates#"$rr/local/loops/"}; branch=${branch%/gates.jsonl}
+      # numeric guard: a non-integer here aborts jq --argjson under set -e
       mtime=$(file_mtime "$gates"); [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
-      # ^ numeric guard: mtime feeds `jq --argjson`, which aborts the script under
-      #   set -euo pipefail on any non-integer (the exact GNU-stat failure above).
       files_json=$(resolve_files "$rr" "$gates")
       jq -c \
         --arg repo "$repo" --arg branch "$branch" \
@@ -95,14 +80,7 @@ ingest() {
           mtime: $mtime,
           cite: ($cbase + ":" + (input_line_number|tostring))
         }
-        # Era-detection keys: copy verified_by/outcome into the record ONLY when the
-        # SOURCE line carried them, so key-absence in the index faithfully mirrors
-        # key-absence in source. This is load-bearing: the guardrail replays legacy
-        # exemption (custodian-guardrails.sh) keys on the ABSENCE of verified_by, so a
-        # blanket `// null` default would forge the key onto pre-schema lines and flip
-        # them modern on the next `rebuild` — flooding false G2/G3 violations. Keep it
-        # conditional so the exemption survives rebuild (custodian-guardrails.test.sh
-        # proves this with a rebuild-simulation case).
+        # copied only if source has the key: feeds the legacy exemption
         + (if has("verified_by") then {verified_by} else {} end)
         + (if has("outcome")     then {outcome}     else {} end)' "$gates" >> "$cand"
     done < <(find "$rr/local/loops" -name gates.jsonl 2>/dev/null)
@@ -114,9 +92,7 @@ ingest() {
   ' > "$new"
   n=$(grep -c . "$new" || true)
   cat "$new" >> "$INDEX"
-  # `|| true`, never `|| echo 0`: grep -c prints its own 0 and THEN exits 1
-  # on no match, so the fallback appended a second 0 and the summary read
-  # "index now 0\n0 line(s)" — split across two lines on a first ingest
+  # || true, not || echo 0: grep -c already prints 0 before exiting 1
   echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
   rm -f "$cand" "$new"
 }

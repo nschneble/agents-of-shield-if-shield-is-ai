@@ -1,37 +1,7 @@
 #!/usr/bin/env bash
-# custodian-mutation-kill — asks each check suite the question it never
-# asks itself: would you go red if the rule you guard were broken?
-#
-# Every suite here is gated on passing. None is gated on being ABLE to
-# fail, and the two are not the same property. The G1 predicate in
-# scripts/custodian-guardrails.sh joins two conditions with `or`, and
-# three separate mutations of that line — flipping the operator, dropping
-# either side — all left its 18-assertion suite green, because the
-# fixtures never separate the two conditions. The rule G1 guards is
-# loop-de-looper's hardest one: no verdict without a run.
-#
-# A target need not itself gate: doc-bloat-scan.sh always exits 0, so a
-# broken lexer costs a silent report and its suite is the only red left.
-#
-# Mutants are DECLARED, never generated. A generator needs an
-# equivalence oracle to know which mutants change behaviour at all, and
-# an LLM standing in for that oracle is exactly the say-so this repo
-# refuses everywhere else. A hand-written operator mutant on a jq
-# predicate needs no oracle: the author asserts it changes meaning, and
-# a surviving mutant is a fixture gap either way.
-#
-# THE NO-OP ARM IS LOAD-BEARING. A mutation whose pattern does not match
-# leaves the file untouched, the suite passes, and a naive harness scores
-# that as "killed" — a green that means the opposite of what it says. A
-# first pass at this check reported three such false kills after its own
-# tree copy silently failed. So: every mutant must change the file, and
-# the unmutated baseline must pass, before any verdict is taken.
-#
-# Exit 0 every declared mutant was killed · 1 a mutant SURVIVED or did
-# not apply · 2 unusable input: a missing/unreadable table, a mutant
-# naming an absent script, a baseline already red, or a run in which no
-# declared mutant executed at all.
-#
+# custodian-mutation-kill — plants declared mutants, requires the paired
+# suite go red. Mutants are hand-written, never generated (no LLM oracle).
+# Rationale + perl gotchas: docs/decisions/looper-custodian.md decision 25.
 # Usage: custodian-mutation-kill.sh [--target NAME] [--list]
 set -uo pipefail
 
@@ -44,10 +14,7 @@ needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --target) needs_value --target "$#"; ONLY="$2"; shift 2;;
-    # --root and --table exist so the suite can point this at fixtures.
-    # Without them its own test would have to mutate the real checks to
-    # test the mutator, and a harness that can only be exercised against
-    # live rules is one nobody exercises.
+    # --root/--table let the suite target fixtures instead of live rules
     --root)   needs_value --root "$#";   repo_root="$2"; shift 2;;
     --table)  needs_value --table "$#";  TABLE="$2"; shift 2;;
     --list)   LIST=1; shift;;
@@ -66,33 +33,11 @@ done
 # The perl expr runs with -0pi, so \Q..\E fixed strings are the norm and
 # the pattern must be unique in the file.
 #
-# GOTCHA: \Q suppresses metacharacters but NOT interpolation, and it does
-# quote a backslash — so a pattern containing `$foo` silently matches
-# nothing, and escaping it as `\$foo` matches a literal backslash instead.
-# Anchor on a fragment without sigils. The DID NOT APPLY arm is what
-# surfaces this rather than scoring it green.
-#
-# GOTCHA: `s///` without /g takes the FIRST match in a slurped file, and
-# custodian-guardrails.sh quotes its own predicates in comments above
-# them. A pattern matching both mutated the comment and left the rule
-# intact — a mutant that applies, changes a byte, and challenges nothing.
-# Anchor on the `def` so the predicate is the only candidate.
-#
-# GOTCHA: the replacement side interpolates, so a `\{` carried over from
-# the pattern collapses and yields broken awk — a kill by syntax error,
-# green for the wrong reason. Anchor short of the first backslash.
-#
-# NOT EVERY SURVIVOR IS A GAP. `select(.lineno > $e.lineno)` → `>=` in
-# custodian-phase-order.sh survives, and no fixture can kill it: line
-# numbers are unique per record, so the two forms select identically.
-# That is an equivalent mutant, and declaring it would park a permanent
-# red on a suite with nothing to fix. Dropped deliberately — a survivor
-# is a fixture gap only when some input can tell the two apart.
+# perl + equivalent-mutant gotchas: looper-custodian.md decision 25
+# gotcha: the replacement side interpolates too, a stray `\{` breaks awk
 
-# GOTCHA: validated here, not inside mutants() — that runs in a command
-# substitution, where `exit 2` ends only the subshell and leaves the
-# caller iterating an empty table. `-s` alone tests size, not
-# readability, so a mode-000 table passed it and swept clean.
+# checked here, not in mutants(): exit 2 there ends only the subshell
+# -s tests size, not readability; head -c1 catches a mode-000 table too
 if [ -n "$TABLE" ]; then
   if [ ! -s "$TABLE" ] || ! head -c 1 "$TABLE" >/dev/null 2>&1; then
     echo "empty or unreadable table: $TABLE" >&2; exit 2
@@ -176,28 +121,20 @@ temp_root=$(mktemp -d "${TMPDIR:-/tmp}/looper-mutkill.XXXXXX") \
 [ -d "$temp_root" ] || { echo "FATAL: mktemp -d gave no directory" >&2; exit 2; }
 trap 'rm -rf "$temp_root"' EXIT
 
-# One pristine copy, made once and verified. `cp -R` and `cp -a` differ
-# across shells and aliases, and a failed copy is silent, so assert it.
+# one pristine copy, made once; `cp -a` failures are silent, so assert it
 pristine="$temp_root/pristine"
 mkdir -p "$pristine"
 /bin/cp -a "$repo_root/scripts" "$pristine/scripts" 2>/dev/null \
   || { echo "FATAL: could not copy scripts/ into the sandbox" >&2; exit 2; }
-# Assert the copy actually landed, without naming a specific file: a
-# silently-empty sandbox makes every suite "pass" and every mutant read
-# as killed.
+# an empty sandbox would make every suite pass and every mutant "killed"
 copied=$(find "$pristine/scripts" -name '*.sh' -type f 2>/dev/null | grep -c . || true)
 [ -d "$pristine/scripts" ] && [ "$copied" -gt 0 ] \
   || { echo "FATAL: sandbox copy landed no scripts; refusing to score" >&2; exit 2; }
 /bin/cp -a "$repo_root/skills" "$pristine/skills" 2>/dev/null || true
 [ -d "$repo_root/local" ] && /bin/cp -a "$repo_root/local" "$pristine/local" 2>/dev/null
-# hooks/ and a git root: without them loop-receipts.test.sh and
-# loop-state-audit.test.sh baseline RED in here (one resolves
-# ../hooks/, the other runs `git -C ..`), so no mutant could ever be
-# declared for those scripts — a whole area silently unscoreable.
+# without hooks/ + git, loop-receipts/loop-state-audit baseline RED here
 [ -d "$repo_root/hooks" ] && /bin/cp -a "$repo_root/hooks" "$pristine/hooks" 2>/dev/null
-# agents/ for the same reason: scripts/skill-body-ceilings.tsv carries rows
-# naming agents/*.md, and a row whose file is absent is exit 2, so the whole
-# ceiling suite baselines RED in here and scores nothing.
+# agents/ too: a ceilings-tsv row naming a missing agents/*.md exits 2
 [ -d "$repo_root/agents" ] && /bin/cp -a "$repo_root/agents" "$pristine/agents" 2>/dev/null
 if [ ! -d "$pristine/.git" ] && command -v git >/dev/null; then
   ( cd "$pristine" && git init -q . \
@@ -212,8 +149,7 @@ run_suite() { # suite name, tree root — returns the suite's status
 echo "custodian-mutation-kill — declared mutants over the check suites"
 echo
 
-# Baseline: every suite in play must pass unmutated, or a later red says
-# nothing about the mutant.
+# every suite must pass unmutated first, or a later red proves nothing
 baselined=""
 while IFS='|' read -r _ _ suite _; do
   case " $baselined " in *" $suite "*) continue ;; esac
@@ -262,10 +198,7 @@ $(mutants)
 EOF
 
 echo
-# A run that exercised nothing is not a pass. Three shapes reached the
-# tally with every counter at zero — a --target naming no mutant, a
-# whitespace-only table, an unreadable one — and each printed a clean
-# sweep. The suites are only scored if at least one mutant actually ran.
+# exercising nothing isn't a pass: a bad --target once faked a clean sweep
 if [ $((killed + survived + noop)) -eq 0 ]; then
   echo "NOTHING MUTATED  no declared mutant ran, so no suite was scored."
   [ -n "$ONLY" ] && echo "                 --target '$ONLY' matches no declared mutant."

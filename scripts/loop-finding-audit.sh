@@ -1,37 +1,8 @@
 #!/usr/bin/env bash
-# loop-finding-audit — asserts a run only spent corrective waves on
-# findings it can justify.
-#
-# The drift this catches is not lost state, it is lost purpose: a run
-# that ships the ask in wave 1 and then spends nine waves on findings
-# nobody requested. Every one of those waves is individually defensible,
-# which is exactly why prose rules do not stop it — each corrective has
-# a real defect behind it, cited at a real line. What it does not have
-# is a claim on THIS run.
-#
-# So the check is admissibility, not correctness. A gating finding must
-# name the severity class that lets it block (SKILL.md `## Finding
-# severity floor`) and the thing it protects — a goal-contract ask, or a
-# line this run changed. Findings that can name neither are real and get
-# batched; they just do not get a wave.
-#
-# ASSERTS THE RUN'S OWN RECORDS ONLY. It says nothing about whether a
-# finding was correct, whether the fix worked, or whether the class was
-# chosen honestly. A clean result means every corrective the snapshot
-# counted was paid for by a logged, justified gating finding — no more.
-#
-# Over the ~100-line bar, and the header is the first thing to trim if
-# it needs to come down — same posture as loop-state-audit.sh. The code
-# is five comparison arms at a dozen lines each; splitting them out
-# would put an arm and the rule it enforces in different files.
-#
-# No `-e`: several arms end on a `[ ... ] && var=...` whose false branch
-# is a normal outcome, and errexit would abort the audit on the first
-# one that did not fire. Every risky command is guarded explicitly.
-#
-# Usage: loop-finding-audit.sh [--branch NAME] [--dir PATH]
-#                              [--max-per-wave N] [--interim-agents N]
-# Exit:  0 clean · 1 violation · 2 could not run
+# loop-finding-audit — asserts corrective waves are paid for by justified
+# gating findings (admissibility, not correctness), from the run's own
+# records only. No -e: several arms treat a false test as a normal branch.
+# Usage: loop-finding-audit.sh [--branch N] [--dir P] ...  Exit 0/1/2
 set -uo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -40,8 +11,7 @@ DIR=""
 MAX_PER_WAVE=1
 INTERIM_AGENTS=3
 
-# a value-taking flag given no value must not fall through to `$2`
-# unbound. Usage errors exit 2; the contract reserves 1 for violations.
+# exit 2 for usage errors: 1 is reserved for violations
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -66,9 +36,7 @@ case "$MAX_PER_WAVE$INTERIM_AGENTS" in *[!0-9]*) echo "counts must be non-negati
 GATES="$DIR/gates.jsonl"
 STATE="$DIR/run-state.json"
 
-# the five classes that may block a wave. Kept here rather than derived
-# from the SKILL so a spec reword cannot silently widen the gate; the
-# list moving is a code change with a test, which is the point.
+# hardcoded, not derived from the skill: a reword can't silently widen this
 CLASSES='["correctness-regression","security","data-loss","a11y-regression","false-user-string"]'
 
 violations=0
@@ -91,10 +59,7 @@ jq -e . "$GATES" >/dev/null 2>&1 \
 state_ok=0
 if [ -s "$STATE" ] && jq -e . "$STATE" >/dev/null 2>&1; then state_ok=1; fi
 
-# --- Arm 1: a gating claim carries its justification. ------------------
-# `gates: true` is the orchestrator asserting this finding earns a
-# corrective. Both fields or it is not a gating finding, whatever the
-# reviewing agent called it.
+# arm 1: a gating claim (gates:true) needs both fields, however labeled
 checked=$((checked + 1))
 while IFS= read -r line; do
   [ -n "$line" ] || continue
@@ -105,10 +70,7 @@ done < <(jq -r --argjson classes "$CLASSES" '
   | "wave \(.wave) \(.agent // "?") — gated_by=\(.gated_by // "null") contract_ref=\(.contract_ref // "null")"
 ' "$GATES")
 
-# --- Arm 2: a contract_ref resolves to something real. ----------------
-# Either an ask id the snapshot actually declares, or a citation into
-# the run's own diff. An id naming no ask is the failure mode worth
-# catching: it reads as justified and protects nothing.
+# arm 2: contract_ref must resolve to a real ask or a real diff citation
 checked=$((checked + 1))
 refs=$(jq -r 'select(.gates == true) | select(.contract_ref != null and .contract_ref != "") | "\(.wave)\t\(.contract_ref)"' "$GATES")
 if [ -n "$refs" ]; then
@@ -131,19 +93,7 @@ if [ -n "$refs" ]; then
   done <<< "$refs"
 fi
 
-# --- Arm 3: every corrective was paid for. ----------------------------
-# The load-bearing arm: one justified gating finding per corrective,
-# minimum. Justification is counted from the log, never the snapshot —
-# the snapshot cannot be trusted to describe its own spending.
-#
-# Spending is counted from BOTH and the larger wins, because each source
-# is blind where the other sees. The snapshot's counter is the only
-# record of a corrective numbered as an ordinary queue wave, which the
-# log cannot distinguish from real queue work. The log's `-corrective-`
-# labels are the only record that survives an under-reported counter,
-# and nothing else in this repo reconciles that counter — the sibling
-# state audit never reads it. Trusting the counter alone let ten
-# labelled correctives against `corrective_waves: 0` audit clean.
+# arm 3: spending is max(log labels, counter); see skill's budget section
 checked=$((checked + 1))
 labelled=$(jq -r '.wave | tostring | select(test("-corrective-"))' "$GATES" | sort -u | grep -c . || true)
 paid=$(jq -s --argjson classes "$CLASSES" '
@@ -156,10 +106,7 @@ if [ "$state_ok" -eq 1 ]; then
   counted=$(jq -r '.counters.corrective_waves // 0' "$STATE" 2>/dev/null)
 fi
 case "$counted" in
-  # a snapshot that cannot be read, or whose counter is not a number,
-  # leaves this arm on the log's evidence alone. Say so — an arm running
-  # on half its sources has not settled the question, and exit 0 has to
-  # keep meaning fully checked.
+  # an unreadable/non-numeric counter leaves this arm on log evidence alone
   ''|*[!0-9]*)
     [ "$state_ok" -eq 1 ] \
       && skip "corrective spending: run-state.json counter '$counted' is not a count; counting labelled correctives only" \
@@ -170,10 +117,7 @@ esac
 [ "$spent" -le "$paid" ] \
   || flag "$spent corrective wave(s) spent, $paid justified gating finding(s) logged"
 
-# --- Arm 4: one corrective per wave. ----------------------------------
-# Labels of the form `<N>-corrective-<M>` are the only spending this arm
-# can see; a corrective numbered as a plain queue wave hides from it,
-# which is why arm 3 counts from the snapshot instead of here.
+# arm 4: only sees `<N>-corrective-<M>` labels, not arm 3's snapshot count
 checked=$((checked + 1))
 while IFS=$'\t' read -r count parent; do
   [ -n "$parent" ] || continue
@@ -183,9 +127,7 @@ done < <(jq -r '.wave | tostring | select(test("-corrective-"))' "$GATES" \
          | sort -u | sed 's/-corrective-.*//' | sort | uniq -c \
          | awk '{printf "%s\t%s\n", $1, $2}')
 
-# --- Arm 5: an interim crew pass is domain-matched, not the full crew.
-# The last labelled pass is the final crew and runs all seven; a
-# `cleanup` pass is likewise terminal. Everything before them is interim.
+# arm 5: interim crew is capped; the final crew/cleanup pass isn't
 checked=$((checked + 1))
 final_label=$(jq -r 'select(.kind == "crew") | .wave | tostring' "$GATES" | tail -1)
 while IFS=$'\t' read -r count wave; do
@@ -197,12 +139,7 @@ while IFS=$'\t' read -r count wave; do
 done < <(jq -r 'select(.kind == "crew" and .ran != false) | "\(.wave)\t\(.agent)"' "$GATES" \
          | sort -u | cut -f1 | uniq -c | awk '{printf "%s\t%s\n", $1, $2}')
 
-# --- kind is a closed enum -----------------------------------------------
-# Every other arm selects on `.kind == "crew"`, so a line spelled
-# `crew-interim` or `crew-final-all-seven` is not a stricter label — it is a
-# line no arm can see. One real run logged 31 spellings across ~50 lines and
-# its crew coverage was invisible for all but the exact `crew` ones. The
-# variant belongs in `pass` (references/state-schemas.md).
+# arm 6: kind is a closed enum; a spelling variant hides from crew arms
 checked=$((checked + 1))
 while IFS= read -r bad_kind; do
   [ -n "$bad_kind" ] || continue
@@ -214,10 +151,7 @@ echo
 for note in ${notes+"${notes[@]}"}; do echo "  $note"; done
 [ ${#notes[@]} -eq 0 ] || echo
 
-# Violations outrank incompleteness: an unjustified corrective is
-# actionable now, a skipped arm is only a reason to go looking. Exit 0
-# means every arm ran AND agreed, so a caller gating a run on this code
-# never reads a half-run audit as a clean one.
+# violations outrank incompleteness; exit 0 means every arm ran and agreed
 if [ "$violations" -gt 0 ]; then
   echo "FINDING AUDIT: $violations violation(s) across $checked check(s)"
   exit 1

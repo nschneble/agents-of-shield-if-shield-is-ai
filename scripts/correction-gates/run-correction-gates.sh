@@ -1,17 +1,7 @@
 #!/usr/bin/env bash
-# run-correction-gates — execute every registered correction-gate as one
-# verify step (issue #40 E-greenlight-2). This is the compile step's
-# RUNTIME. The format-scope pilot proved a single recorded correction can
-# be compiled into an executable gate; this runner generalizes that to a
-# REGISTRY — this directory, where each subdir holding a spec.md is one
-# compiled correction — so ANY recorded correction becomes a check
-# looper-verify runs. A recall-only correction (the C1/C25 gap: recall !=
-# enforcement) then cannot re-violate for ANY entry, not just format-scope.
-#
-# Adding a correction is dropping a directory: the runner discovers specs
-# and runs each spec's own `exec:` line, so it does not change as the
-# registry grows. See ./README.md for the check-spec schema and the
-# recorded-correction -> executable-gate compile procedure.
+# run-correction-gates — runs every registered correction-gate (a subdir
+# with spec.md) as one verify step; adding a correction means adding a
+# directory. Schema + compile procedure: ./README.md (issue #40).
 #
 # The runner exports a fixed wave-context contract the exec lines read:
 #   CG_DIR          repo working root the wave built in (absolute)
@@ -19,9 +9,7 @@
 #   CG_TOUCHED_FILE wave's declared touched files, one per line (may be "")
 #   CG_CHANGED_FILE explicit changed-file list, one per line (may be "")
 #
-# A spec's exec: runs via `bash -c` from its entry dir. Specs are
-# repo-committed and reviewed, not untrusted input — same trust posture as
-# any in-tree script.
+# exec: runs via bash -c from its entry dir; specs are in-tree, reviewed
 #
 # Usage:
 #   run-correction-gates.sh [--registry DIR] [--dir DIR] [--range REF]
@@ -60,9 +48,7 @@ export CG_RANGE="$RANGE"
 export CG_TOUCHED_FILE=""; [ -n "$TOUCHED_FILE" ] && CG_TOUCHED_FILE="$(abspath "$TOUCHED_FILE")"
 export CG_CHANGED_FILE=""; [ -n "$CHANGED_FILE" ] && CG_CHANGED_FILE="$(abspath "$CHANGED_FILE")"
 
-# read one top-level frontmatter scalar verbatim (no quote stripping, so an
-# exec: line keeps its embedded quotes). Frontmatter = between the first
-# two `---` fences.
+# frontmatter scalar, verbatim: no quote-strip, so exec: keeps its quotes
 spec_field() { # spec-file key
   awk -v k="$2" '
     /^---[[:space:]]*$/ { n++; if (n>=2) exit; next }

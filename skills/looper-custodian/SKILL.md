@@ -1,6 +1,6 @@
 ---
 name: looper-custodian
-description: Scheduled cross-run, cross-repo housekeeping for the looper system. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", or "looper-custodian history <query>".
+description: Scheduled cross-run, cross-repo housekeeping for the looper system. Trigger when the user says "run the custodian", "custodian cleanup", "looper housekeeping", on the weekly cron, "looper-custodian resume [<date>]", "looper-custodian apply #<issue>", "looper-custodian apply #<issue> --dry-run", "looper-custodian undo", "looper-custodian history <query>", or "looper-custodian shadow".
 ---
 
 Scheduled maintenance layer for the looper system. `looper-learn` learns per-run; `the-turncoat` streamlines on demand; neither runs **across runs and across repos on a cadence**. Custodian is that layer: weekly GC + memory audit + cross-repo mining + external research, surfaced as a GitHub issue you approve from.
@@ -26,10 +26,11 @@ So the line is sharp:
 | `/looper-custodian apply #<issue> --dry-run`                                       | **Phase D preview**: prints the EXACT before/after of each ticked item and writes nothing. Consent then approves a _previewed_ diff, not a _described_ one                                                                                                                         |
 | `/looper-custodian undo`                                                           | **restore** the most recent Phase D snapshot, reverting the last `apply`. Idempotent — a no-op on an already-clean tree                                                                                                                                                            |
 | `/looper-custodian history <query> [--agent\|--verdict\|--kind\|--file\|--repo …]` | **read-only lookup** over the cross-run history index — ranked, cited matches from `gates.jsonl` across repos. Writes nothing. `--rebuild` re-derives the index from source. Never on the cron                                                                                     |
+| `/looper-custodian shadow [<namespace>]`                                           | **trust check on Phase B itself**: runs the memory audit against a namespace with nothing left to find and grades whether it proposed anything anyway. Read-only, on demand, never on the cron. `references/fabrication-shadow-test.md`                                            |
 
 Phase D is NEVER part of the scheduled run. The cron only ever proposes. `--dry-run` and `undo` are human-triggered like `apply` itself.
 
-Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo` and `history` are sibling verbs (`history` read-only, takes a query arg + filter flags).
+Invocation grammar follows the looper `noun-verb [arg] [--flag]` convention (`docs/looper-skills.md` → `## Subcommand grammar`): `apply` is the verb, `#<issue>` the arg, `--dry-run` the flag; `undo`, `history`, and `shadow` are sibling verbs (the last two read-only; `history` takes a query arg + filter flags, `shadow` an optional namespace).
 
 ## Repos (explicit, not auto-discovered)
 
@@ -80,7 +81,7 @@ Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.
 ### Phase B — memory audit (auto report, propose-only edits)
 
 - **Deterministic enumeration FIRST.** The orchestrator itself globs each repo's memory dir to build the explicit file list and records `files_total`. Enumeration is NEVER delegated — a subagent's `bash find`/`grep` can silently fail (path quoting, cwd resets) and under-audit without anyone noticing. The orchestrator owns the list; only the per-file _reading_ may be delegated.
-- **Coverage accounting is mandatory.** Track `files_audited` vs `files_total`. If `files_audited < files_total`, the phase verdict is **`partial — N/M audited`**, NEVER "clean". A clean bill is only valid at full coverage. Partial coverage names the unread files and recommends a rerun — a tidy "no findings" that silently skipped 37 files is the exact failure this rule exists to prevent.
+- **Coverage accounting is mandatory, on BOTH axes.** Track `files_audited` vs `files_total` AND `citations_resolved` vs `citations_total`. If either is short, the phase verdict is **`partial`** with the short axis named and counted — `partial — N/M audited` on the file axis, the citation counts on the other (`references/report-issue.md` spells both) — NEVER "clean". A clean bill is only valid at full coverage on both. Partial coverage names the unread files or the files holding unresolved citations and recommends a rerun — a tidy "no findings" that silently skipped 37 files is the exact failure this rule exists to prevent, and the file axis alone cannot catch its second form: a namespace can read "16/16 files, fully covered, clean" while every citation inside one of them went unchecked. An unresolvable citation is reported `UNRESOLVED`, never passed over as if it had been checked (`references/phase-detail.md` `## Phase B`).
 - Detect five conditions:
   - **Duplicates** — two files cover the same fact (same `name` intent, overlapping body). Propose: merge into one, keep the richer.
   - **Contradictions** — a later memory states the opposite of an earlier one (e.g. a feedback memory reversed by a newer correction). Propose: retire the superseded one, leave a `[[link]]` breadcrumb in the survivor.
@@ -175,6 +176,7 @@ The artifact paths, the log line's schema, and what each artifact is authoritati
 - Does NOT treat a branch with no receipts log as an execution-evidence failure — receipts start when the hook is installed and every archived run predates it, so absence is NOT EVALUABLE and the Phase A sweep never passes `--strict`.
 - Does NOT reach beyond the explicit repo list.
 - Does NOT record a result it didn't produce — unavailable tool ⇒ `ran: false`, no invented digest or verdict.
+- Does NOT delegate a citation check to an agent that cannot search — a Read-only auditor can show a reference MOVED but never that it is GONE, so a delegated audit carries a Read + Grep grant scoped to verification, and a citation it cannot settle is reported `UNRESOLVED` rather than counted clean.
 - Does NOT commit applied edits silently — they go through the normal review/commit path.
 - Does NOT open an issue on a quiet week.
 - Does NOT publish the report with cross-repo branch/PR names, crew agent code names, or `~/.claude` absolute paths in the body — the target repo is public and the auto-mode classifier blocks it (an unattended cron can't clear that prompt), so the body is sanitized by default and the specifics stay in the local `custodian-log.jsonl`.

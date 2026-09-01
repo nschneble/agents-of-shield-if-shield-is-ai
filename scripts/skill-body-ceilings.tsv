@@ -33,13 +33,13 @@ looper-custodian	8691	8127 actual, 564 under; the ceiling was set at 8041 + ~650
 # agent is 65% slack, which trips this check's own "guards nothing" note and
 # is a ceiling in name only. Each wave that shrinks a file LOWERS its
 # ceiling in the same commit.
-loop-de-looper	10275	10270 after #73's direct-fix corrective-budget clarification; +1 landed merging main (#76's brief-claim-verification edits to this file)
+loop-de-looper	10624	10275 after #76's brief-claim-verification edits; +349 from the branch-path-flatten and run-state.json-validate guardrails in 9311709
 looper-build	2110	1759 at W1 seeding, +351 margin
 looper-commit	3393	2828 at W1 seeding, +565 margin
 looper-declutter	4699	4049 at W1 seeding, +650 margin
 looper-defend	8682	8032 at W1 seeding, +650 margin
 looper-learn	3361	2801 at W1 seeding, +560 margin
-looper-nonbeliever	2424	2020 at W1 seeding, +404 margin
+looper-nonbeliever	2452	2020 at W1 seeding, +404 margin; +28 from prettier's table reflow after 9311709 widened a cell
 looper-plan	5599	4949 at W1 seeding, +650 margin
 looper-recap	996	830 at W1 seeding, +166 margin
 looper-research	2056	1714 at W1 seeding, +342 margin
