@@ -48,12 +48,18 @@ A namespace qualifies on all four:
   distillation already covers, cross-links, dated narratives whose supporting
   measurement has since moved.
 - **Independently re-resolved, by you, now.** Read every file and resolve
-  every citation against the right root. A prior run's "full coverage, clean"
+  every citation against the right root — resolve meaning existence-plus-search
+  for the symbol, not merely opening the file that cites it. Reading alone can
+  show a reference MOVED; only a search can show it is GONE, and a fixture is
+  qualified on the second claim. A prior run's "full coverage, clean"
   verdict does NOT qualify a fixture. That verdict is a self-report, and the
   first qualification pass under this procedure falsified one: a namespace
   the 2026-08-31 run called fully covered still held a live dead-symbol
   citation. Had it been used unqualified, the shadow-test would have graded a
-  real finding as a fabrication and reported a false FAIL.
+  real finding as a fabrication and reported a false FAIL. That miss has a
+  diagnosed cause, now fixed: the delegation rule said Read tool only, so the
+  auditor could not run the search its own staleness rule required
+  (`skills/looper-custodian/SKILL.md` `## What looper-custodian does NOT do`).
 - **Adjudications pre-registered.** Any item you judged NOT a finding gets
   written down before the audit runs, with the rule you judged it by. The
   common one: a past-tense dated incident narrative is not stale so long as
@@ -82,17 +88,23 @@ the report. Same rules, same enumeration discipline, no softening:
 
 1. Glob the namespace to an explicit absolute file list; record the count. The
    orchestrator owns the list — enumeration is never delegated.
-2. Read every file with the Read tool.
+2. Read every file with the Read tool, and resolve its citations with Grep —
+   the same verification-scoped grant Phase B's delegation carries, and for the
+   same reason: an arm that cannot search cannot reach a negative finding, so
+   its silence would grade as a PASS it never earned.
 3. Judge the five conditions exactly as `skills/looper-custodian/SKILL.md`
    `### Phase B` states them, quoting evidence verbatim.
 4. Emit proposals in the report's checkbox form, or emit none.
-5. Record files audited against files total. Short coverage voids the arm for
-   the same reason it forbids a clean verdict in a real run.
+5. Record files audited against files total, and citations resolved against
+   citations total. Short coverage on either axis voids the arm for the same
+   reason it forbids a clean verdict in a real run.
 
 At this size no delegation is warranted, so running the audit inline IS the
 real Phase B path, not a stand-in. **Where a Task tool is available, dispatch
-each arm to a fresh Read-only subagent that gets the file list and Phase B's
-rules and NOT the expected set.** That is the blind form. Running it in a
+each arm to a fresh subagent holding Read + Grep and nothing else, which gets
+the file list and Phase B's rules and NOT the expected set.** Blind is about
+what the arm knows, never about what it can check — withhold the expected set,
+never the search. That is the blind form. Running it in a
 context that already knows the answer is the degraded form: still worth
 running, but a self-graded pass is weaker evidence, and the record says which
 was used so the two are never confused.
