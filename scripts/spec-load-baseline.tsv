@@ -79,8 +79,12 @@
 # looper-nonbeliever/SKILL.md. Same growth the skill-body-ceiling check
 # caught on loop-de-looper's own ceiling; this is that same commit's cost
 # on the other side of the accounting.
+#
+# +159 pre-flight: prettier reflowed looper-nonbeliever's table once
+# 9311709's addition widened a cell, padding every row to match. No
+# content changed, only column width.
 orchestrator-run	23088	1898
-pre-flight	2293	2617
+pre-flight	2452	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
 custodian-run	18937	6385

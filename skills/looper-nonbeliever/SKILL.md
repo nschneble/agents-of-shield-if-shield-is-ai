@@ -22,13 +22,13 @@ Skeptic gate. Runs ONCE, before `looper-scope`. Input = raw goal + intended appr
 
 Generate challenges across four axes. For each, the orchestrator answers or folds.
 
-| Axis              | Challenge it raises                                                             | Verdict on fold                              |
-| ----------------- | ------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Redundancy**    | "Skill/agent X already does this. Why a new wave queue?"                        | can't name what the run adds → NOTES         |
-| **Contradiction** | "CLAUDE.md rule R says the opposite. Why proceed?" — OR the goal's own source document contradicts itself (an exit-criteria section requiring what a scope-exclusion section rules out) | hard conflict, no override → STOP |
-| **Authority**     | "This decides scope/palette/architecture — the user's call."                    | decision belongs to user → STOP              |
-| **Approach**      | "A directive routes this to specialist S. Why self-check?"                      | judgment substituted for gate → STOP         |
-| **Speculation**   | "Goal builds for a need not yet arrived — why now, not the wave that needs it?" | speculative, no live need → NOTES (defer it) |
+| Axis              | Challenge it raises                                                                                                                                                                     | Verdict on fold                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Redundancy**    | "Skill/agent X already does this. Why a new wave queue?"                                                                                                                                | can't name what the run adds → NOTES         |
+| **Contradiction** | "CLAUDE.md rule R says the opposite. Why proceed?" — OR the goal's own source document contradicts itself (an exit-criteria section requiring what a scope-exclusion section rules out) | hard conflict, no override → STOP            |
+| **Authority**     | "This decides scope/palette/architecture — the user's call."                                                                                                                            | decision belongs to user → STOP              |
+| **Approach**      | "A directive routes this to specialist S. Why self-check?"                                                                                                                              | judgment substituted for gate → STOP         |
+| **Speculation**   | "Goal builds for a need not yet arrived — why now, not the wave that needs it?"                                                                                                         | speculative, no live need → NOTES (defer it) |
 
 Cite the conflicting source VERBATIM — rule text, skill description, directive line, or the two contradicting lines of the goal document itself. A challenge you can't trace to a real line is noise; drop it.
 
