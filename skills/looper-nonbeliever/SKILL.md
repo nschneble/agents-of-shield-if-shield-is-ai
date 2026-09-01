@@ -25,12 +25,14 @@ Generate challenges across four axes. For each, the orchestrator answers or fold
 | Axis              | Challenge it raises                                                             | Verdict on fold                              |
 | ----------------- | ------------------------------------------------------------------------------- | -------------------------------------------- |
 | **Redundancy**    | "Skill/agent X already does this. Why a new wave queue?"                        | can't name what the run adds → NOTES         |
-| **Contradiction** | "CLAUDE.md rule R says the opposite. Why proceed?"                              | hard conflict, no override → STOP            |
+| **Contradiction** | "CLAUDE.md rule R says the opposite. Why proceed?" — OR the goal's own source document contradicts itself (an exit-criteria section requiring what a scope-exclusion section rules out) | hard conflict, no override → STOP |
 | **Authority**     | "This decides scope/palette/architecture — the user's call."                    | decision belongs to user → STOP              |
 | **Approach**      | "A directive routes this to specialist S. Why self-check?"                      | judgment substituted for gate → STOP         |
 | **Speculation**   | "Goal builds for a need not yet arrived — why now, not the wave that needs it?" | speculative, no live need → NOTES (defer it) |
 
-Cite the conflicting source VERBATIM — rule text, skill description, directive line. A challenge you can't trace to a real line is noise; drop it.
+Cite the conflicting source VERBATIM — rule text, skill description, directive line, or the two contradicting lines of the goal document itself. A challenge you can't trace to a real line is noise; drop it.
+
+When the goal comes from a written brief/spec, read its exit-criteria (or "done when") list against its own out-of-scope list before proceeding — a criterion requiring a feature the same document explicitly excludes is a self-contradiction the Contradiction axis exists to catch, not just an external-rule conflict. Caught late once (a phase brief's exit check 18 required linking to a route its own "What this phase is not" section ruled out issues out of scope for) — the wave that discovered it had already run 10 waves deep.
 
 **Every challenge carries a recommended resolution.** An objection with no proposed fix just stalls the orchestrator into inventing one from scratch. For each challenge, after raising it, state the move you'd recommend if the orchestrator can't defend the run as-is — drop the redundant wave, route this decision to the user, add the missing gate, defer the speculative piece to the wave that needs it. The recommendation is advisory like the rest of the pass — the orchestrator can answer the challenge instead of taking it — but it's never absent.
 
