@@ -26,6 +26,8 @@ jobs:
         run: ./scripts/custodian-phase-order.test.sh
       - name: Custodian log recall check (both directions)
         run: ./scripts/custodian-log-recall.test.sh
+      - name: Custodian fingerprint pre-filter (both directions)
+        run: ./scripts/custodian-fingerprint-cache.test.sh
       - name: Mutation-kill harness (both directions)
         run: ./scripts/custodian-mutation-kill.test.sh
       - name: Every declared mutant is killed by its suite
