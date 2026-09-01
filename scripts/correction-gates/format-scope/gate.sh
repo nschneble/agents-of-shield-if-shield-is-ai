@@ -1,39 +1,8 @@
 #!/usr/bin/env bash
-# format-scope gate — the "scope prettier to the wave's touched files"
-# correction, compiled to an executable check. Provenance and the compile
-# trail live in ./spec.md; this file is just the runnable assertion. Given
-# the wave's declared touched-file list it FAILS (exit 1) on either failure
-# mode of a full-tree `npm run format`:
-#
-#   A  touched-unclean — a file the wave declared it touched is not
-#      prettier-clean, so the wave would ship unformatted scope.
-#   B  out-of-scope clean change — a file the wave changed but did NOT
-#      declare is prettier-clean. Either a full-tree format reformatted it
-#      (drift to revert) OR it is a real edit the wave never declared
-#      (declare it). Both are out of scope for a wave that only claimed the
-#      touched set, so the fix is the same: declare it or revert it.
-#
-# Scope (one class, deliberately narrow): B flags ANY changed file outside
-# the declared set that is prettier-clean — on a clean OR a dirty tree.
-# That is a real false-positive surface (a legitimate undeclared clean edit
-# trips it), which is why the message names BOTH causes, not just "drift".
-# A changed out-of-scope file that is NOT clean is some other change this
-# gate does not adjudicate — scope review owns it. Deciding "pure prettier
-# reformat vs a real edit?" needs a content diff and is the generalization
-# this entry defers, not a bug in the check.
-#
-# Self-contained: pure bash + prettier, no hosted tool. prettier is found
-# via $PRETTIER / --prettier (an executable) or, in a target repo,
-# node <dir>/node_modules/.bin/prettier — the sandbox-safe `node <bin>`
-# form (npx and npm run are denied). Since the gate cannot install
-# prettier, ./prettier-version pins the version and the pre-flight CHECKS
-# it: exit 2 if prettier cannot run at all or reports another version, so
-# a missing or wrong install is an ENV error, not every touched file
-# misread as unclean. Two prettier versions disagree about the same file,
-# so an unchecked binary makes the verdict the caller's, not the gate's.
-# Exit codes read as prettier's own:
-# 0 clean, 1 style issues, >=2 unsupported/parse (a file prettier cannot
-# handle is a note, never a violation — the out-of-glob carve-out).
+# format-scope gate — the scope-prettier-to-touched-files correction,
+# compiled to an executable check. Provenance + compile trail: ./spec.md.
+# Fails on either failure mode of a full-tree npm run format: a declared
+# touched file that is not clean (A), or an undeclared clean change (B).
 #
 # Usage:
 #   gate.sh [--dir DIR] [--range REF] [--changed FILE] [--prettier CMD]
@@ -82,8 +51,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# absolutize inputs that live outside DIR before we cd into it, so paths
-# inside the list files stay DIR-relative and prettier resolves DIR config
+# absolutize before cd: keeps list-file paths DIR-relative for prettier
 abspath() { case "$1" in /*) printf '%s' "$1";; *) printf '%s/%s' "$(pwd)" "$1";; esac; }
 [ -n "$CHANGED_FILE" ] && CHANGED_FILE="$(abspath "$CHANGED_FILE")"
 [ -n "$TOUCHED_FILE" ] && TOUCHED_FILE="$(abspath "$TOUCHED_FILE")"
@@ -113,9 +81,7 @@ run_prettier() {  # forwards to prettier, returns its own exit code
   else node "./node_modules/.bin/prettier" "$@"; fi
 }
 
-# pre-flight: prettier must be runnable AND be the pinned version, else
-# every --check misreads as unclean or answers for another formatter. A
-# missing/broken/wrong install is an ENV error (2), not a violation.
+# pre-flight: wrong/missing prettier is an ENV error (2), never a violation
 [ -r "$PIN_FILE" ] || { echo "missing prettier pin: $PIN_FILE" >&2; exit 2; }
 pin=$(tr -d '[:space:]' < "$PIN_FILE")
 [ -n "$pin" ] || { echo "empty prettier pin: $PIN_FILE" >&2; exit 2; }
@@ -146,8 +112,7 @@ for f in "${touched[@]}"; do
   esac
 done
 
-# B — a changed file outside the touched set that is prettier-clean is
-# either full-tree drift or an undeclared edit; both are out of scope
+# B: an untouched changed file that is clean: drift or an undeclared edit
 for f in ${changed[@]+"${changed[@]}"}; do
   in_touched "$f" && continue
   [ -e "$f" ] || continue

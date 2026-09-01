@@ -1,29 +1,8 @@
 #!/usr/bin/env bash
-# custodian-log-recall — asserts that every log line the custodian spec
-# REQUIRES a run to write has actually been written by some run.
-#
-# scripts/custodian-phase-order.sh asks whether the lines a run DID log
-# came in the right order. It can only interrogate lines that exist, so a
-# prescribed line nobody ever emits is invisible to it: the log reads
-# clean because the missing line leaves no trace. This is the other
-# direction — recall, not order.
-#
-# It found its own reason for existing. The Phase E usage-window gate
-# (skills/looper-custodian/references/usage-window-gates.md) requires a
-# re-probe after deep-research returns, logged as `action "window cost"`,
-# and calls that line what turns the candidate cap "from a conservative
-# guess into a calibrated number". Across every archived run the string
-# appears zero times while five runs recorded deep-research returning.
-# The calibrated number never had a measurement behind it.
-#
-# The four verdicts, the exit contract, why triggers are declared rather
-# than mined from the spec, and the three limits a clean result does NOT
-# buy all live in one place:
-# skills/looper-custodian/references/log-recall-check.md
-#
-# Pure bash + jq, no third-party tool, no external store.
-#
-# Usage: custodian-log-recall.sh [--spec PATH] [--logs-root PATH] [--log PATH]
+# custodian-log-recall — asserts every spec-prescribed log line has
+# actually been written (recall, not order; phase-order.sh checks order).
+# Full contract: skills/looper-custodian/references/log-recall-check.md
+# Usage: custodian-log-recall.sh [--spec P] [--logs-root P] [--log P]
 set -euo pipefail
 
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
@@ -49,28 +28,22 @@ done
 
 [ -s "$SPEC" ] || { echo "empty or missing spec: $SPEC" >&2; exit 2; }
 
-# When is each prescribed line due? A jq boolean over one log record.
-# Keep these narrow: a trigger that over-fires manufactures violations.
+# each trigger is a jq boolean, kept narrow or it over-fires violations
 trigger_for() {
   case "$1" in
     "window cost")
-      # deep-research RETURNED. The exclusions matter: several runs logged
-      # the phrase while recording that it never ran (not installed, not
-      # invokable, not nestable, policy-barred), and those owe no re-probe.
+      # excludes runs that logged deep-research as never having run at all
       printf '%s' '(.phase == "E")
         and ((.action // "") | test("deep-research"))
         and (((.action // "") | test("not run|NOT RUN|not invokable|not installed|not nestable|bars deep-research")) | not)' ;;
-    "deferred (usage-window)")
-      # a probe actually at or over the threshold, in either window
+    "deferred (usage-window)")  # a probe at/over threshold, either window
       printf '%s' '(((.action // "") + " " + (.detail // ""))
         | test("0\\.9[5-9]|1\\.00|9[5-9]%|100%|rejected"))' ;;
     *) return 1 ;;
   esac
 }
 
-# Prescribed vocabulary, harvested from the spec in the one grammatical
-# form it quotes: action "<string>". References are searched too, since
-# extraction moves prose without changing what it requires.
+# harvested as action "<string>"; references/ searched too (extraction)
 spec_dir=$(dirname "$SPEC")
 prescribed=$(
   { grep -ohE 'action "[^"]+"' "$SPEC"
@@ -84,16 +57,13 @@ if [ -n "$SINGLE_LOG" ]; then
   [ -s "$SINGLE_LOG" ] || { echo "empty or missing log: $SINGLE_LOG" >&2; exit 2; }
   logs="$SINGLE_LOG"
 else
-  # `|| true`: find exits nonzero on a missing root, and under `set -e`
-  # that aborts with 1 — the status the contract reserves for violations.
-  # An unreadable corpus is unusable input, which is exit 2 below.
+  # || true: find's nonzero on a missing root would abort under set -e
   logs=$(find "$CUSTODIAN_HOME" -name custodian-log.jsonl -type f 2>/dev/null | sort || true)
   [ -n "$logs" ] || { echo "no custodian-log.jsonl under $CUSTODIAN_HOME" >&2; exit 2; }
 fi
 log_count=$(printf '%s\n' "$logs" | grep -c .)
 
-# Count logs in which a jq predicate holds for at least one record. Raw
-# input with `fromjson?` so a malformed line cannot abort the sweep.
+# fromjson? guards one malformed line from aborting the sweep
 logs_matching() {
   local predicate="$1" hits=0 log
   while IFS= read -r log; do
@@ -109,10 +79,7 @@ EOF
   printf '%s' "$hits"
 }
 
-# A corpus with no parseable record cannot evidence anything, and
-# scoring it 0 reports silence as conformance. custodian-phase-order.sh
-# refuses the same shape with NOTHING CHECKED; callers read the exit
-# code, not the prose, so this has to be an exit and not a printed line.
+# a corpus with no parseable record proves nothing: exit, don't print
 records=$(logs_matching 'true')
 if [ "${records:-0}" -eq 0 ]; then
   echo "NOTHING CHECKED  no parseable phase record in any of $log_count log(s), so"

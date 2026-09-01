@@ -1,28 +1,8 @@
 #!/usr/bin/env bash
-# format-scope-replay — score the format-scope gate against the loop's
-# own history (issue #40 E-greenlight-1). Replays two predicates over
-# local/custodian/history-index.jsonl (the Sefz trace-as-query pattern
-# custodian-guardrails.sh already mines):
-#
-#   class      a crew/gate record about prettier / format-glob SCOPE —
-#              the recurring correction in its memory-only form (no gate).
-#   violation  a class record reporting an ACTUAL format-scope failure the
-#              scoped gate catches at build time: `prettier --check` fails,
-#              or a full-tree `npm run format` that no-oped the file.
-#
-# Baseline is memory-only recall: the correction lived as prose across >=2
-# memories (feedback-format-drift-not-wave-scope + its consolidated sibling
-# feedback-format-glob-vs-prettier-check), and its violations were caught
-# LATE by crew — one recurred across a corrective wave because a full-tree
-# `npm run format` no-oped an out-of-glob .css. The gate goes RED at
-# verify time and stays red until the touched file is clean, so that
-# recurrence is impossible under it. Reports would-have-caught / class /
-# total, grouped by branch.
-#
-# Read-only, pure bash + jq. Exit 0 (a report, not a gate); 2 if the index
-# is missing. The predicate is published here so the count is reproducible
-# — issue #40's hand-count used an unpublished query; the direction, not
-# the exact N, is the test.
+# format-scope-replay — scores the format-scope gate against loop history
+# (issue #40 E-greenlight-1); replays two predicates over the history
+# index (Sefz trace-as-query pattern). Read-only report, not a gate.
+# Provenance + predicate rationale: ./spec.md.
 #
 # Usage: format-scope-replay.sh [--index PATH]
 set -euo pipefail

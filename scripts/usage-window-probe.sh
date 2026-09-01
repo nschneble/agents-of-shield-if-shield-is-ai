@@ -1,36 +1,26 @@
 #!/usr/bin/env bash
-# usage-window-probe.sh — read the REAL Claude Code subscription rate-limit window.
+# usage-window-probe.sh — reads the real Claude Code rate-limit window via
+# anthropic-ratelimit-unified-* response headers (not ccusage, not the
+# Console Usage API). Emits one JSON line; read_ok:false means unguarded,
+# never 0%. Costs one max_tokens:1 haiku call; call only at wave boundaries
 #
 # Emits one JSON line the looper usage-window guard can parse:
 #   {"read_ok":true,"source":"keychain",
 #    "five_hour":{"utilization":0.06,"status":"allowed","reset":1784258400},
 #    "weekly":{"utilization":0.01,"status":"allowed","reset":1784498400},
 #    "representative":"five_hour"}
-# On any failure it emits {"read_ok":false,"reason":"<why>"} and exits 0 — the guard
-# treats read_ok:false as "unguarded this wave, and say so" ([[feedback-task-tool-availability]]),
-# never as 0%.
-#
-# The signal is a first-party observable: anthropic-ratelimit-unified-* response headers
-# off a real /v1/messages call — the same window Claude Code's statusline renders and the
-# host actually enforces. NOT ccusage (cost axis) and NOT the Console Usage/Cost API
-# (historical org billing, wrong account type).
-#
-# The token is never printed. Cost: one max_tokens:1 haiku call per probe — a sliver of
-# the very window it protects, so call it at the wave boundary, not in a tight loop.
+# On failure: {"read_ok":false,"reason":"<why>"}, exit 0.
 set -uo pipefail
 
 emit_unreadable() { printf '{"read_ok":false,"reason":"%s"}\n' "$1"; exit 0; }
 
-# --- 1. Locate the OAuth credential blob -------------------------------------
-# macOS: Keychain service "Claude Code-credentials". Other hosts: dotfile fallback.
+# 1. locate OAuth credentials: macOS keychain, else a dotfile fallback
 cred_json=""
 source="keychain"
-# USER is often unset under launchd/cron — the exact headless context this guard runs in.
-# Heal it so `set -u` can't abort before we reach the read_ok:false contract.
+# USER is often unset under launchd/cron; heal it before set -u can abort
 kc_user="${USER:-$(id -un 2>/dev/null || echo "")}"
 if command -v security >/dev/null 2>&1 && [ -n "$kc_user" ]; then
-  # A locked/ACL-gated keychain can block on a GUI prompt a headless run can't answer.
-  # perl's alarm caps that at 8s (perl ships on macOS); fall back to a plain read otherwise.
+  # a locked keychain can block on a GUI prompt; perl alarm caps that at 8s
   if command -v perl >/dev/null 2>&1; then
     cred_json=$(perl -e 'alarm shift; exec @ARGV' 8 \
       security find-generic-password -s "Claude Code-credentials" -a "$kc_user" -w 2>/dev/null || true)
@@ -45,7 +35,7 @@ if [ -z "$cred_json" ]; then
 fi
 [ -z "$cred_json" ] && emit_unreadable "no_credentials"
 
-# --- 2. Extract access token + expiry, check freshness -----------------------
+# 2. extract access token + expiry, check freshness
 parsed=$(printf '%s' "$cred_json" | python3 -c '
 import json,sys
 try:
@@ -59,11 +49,10 @@ exp_ms=${parsed##* }
 [ -z "$token" ] && emit_unreadable "no_access_token"
 
 now_ms=$(python3 -c 'import time;print(int(time.time()*1000))')
-# Refresh is the Claude Code client's job, not ours. If the token is expired (or within
-# 60s of it), degrade rather than fire a doomed probe.
+# refresh is the client's job; degrade rather than fire a doomed probe
 if [ "${exp_ms:-0}" -le $((now_ms + 60000)) ]; then emit_unreadable "token_expired"; fi
 
-# --- 3. Probe /v1/messages, capture response headers only --------------------
+# 3. probe /v1/messages, capture response headers only
 hdrs=$(curl -sS --max-time 20 -D - -o /dev/null https://api.anthropic.com/v1/messages \
   -H "Authorization: Bearer $token" \
   -H "anthropic-beta: oauth-2025-04-20" \
@@ -72,7 +61,7 @@ hdrs=$(curl -sS --max-time 20 -D - -o /dev/null https://api.anthropic.com/v1/mes
   -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"."}]}' \
   2>/dev/null) || emit_unreadable "probe_failed"
 
-# --- 4. Parse the unified rate-limit headers into the guard's JSON -----------
+# 4. parse the unified rate-limit headers into the guard's JSON
 printf '%s' "$hdrs" | SRC="$source" python3 -c '
 import sys,os,json
 h={}

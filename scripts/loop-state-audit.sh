@@ -1,35 +1,7 @@
 #!/usr/bin/env bash
-# loop-state-audit — asserts a run's run-state.json still agrees with the
-# append-only records beside it.
-#
-# The asymmetry it exploits: of the three files under
-# `local/loops/<branch>/`, two are append-only and one is overwritten.
-# `gates.jsonl` and `wave-N.jsonl` accumulate; `run-state.json` is
-# rewritten wholesale after every wave (SKILL.md `## State tracking`).
-# Only the overwritten one can silently lose a wave's worth of position,
-# and when it does the logs still hold the truth — nothing was reading
-# them. Observed on the branch this check was written for: two waves
-# shipped, both journals complete, snapshot still reading zero counters
-# and no PR.
-#
-# So the logs are the oracle and the snapshot is the claim. A field is
-# only compared when the logs can settle it; anything they cannot type
-# is reported NOT EVALUABLE rather than guessed, and excluded from the
-# comparison it would otherwise poison.
-#
-# ASSERTS SNAPSHOT AGAINST LOCAL RECORDS ONLY. It says nothing about
-# whether the run is progressing, whether a wave's work is correct, or
-# whether the PR matches — the PR arm needs the network and is opt-in
-# behind --pr for that reason. A clean result means the snapshot is a
-# faithful summary of what the logs already recorded, no more.
-#
-# Over the ~100-line bar at 152, and the bulk is arithmetic rather than
-# slack: seven comparison arms cost three lines each, and splitting the
-# oracles from the arms they feed would put the derivation and its
-# comparison in different files with nothing holding them in step —
-# the exact failure this check exists to catch. Trim the header before
-# reaching for the code.
-#
+# loop-state-audit — asserts run-state.json agrees with the append-only
+# records beside it (gates.jsonl, wave-N.jsonl); logs are the oracle. A
+# field the logs can't settle reports NOT EVALUABLE, never guessed.
 # Usage: loop-state-audit.sh [--branch NAME] [--dir PATH] [--pr]
 set -euo pipefail
 
@@ -38,10 +10,7 @@ BRANCH=""
 DIR=""
 CHECK_PR=0
 
-# a value-taking flag given no value must not fall through to `$2`
-# unbound: under `set -u` that aborts with status 1, which the exit
-# contract reserves for "drift found". Usage errors exit 2, matching
-# custodian-phase-order.sh and custodian-guardrails.sh.
+# exit 2 for usage errors: 1 is reserved for "drift found"
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -76,18 +45,7 @@ echo
 jq -e . "$STATE" >/dev/null 2>&1 \
   || { echo "unparseable snapshot: $STATE" >&2; echo "NOTHING CHECKED"; exit 2; }
 
-# --- Oracle 1: the per-wave journals. A wave counts as shipped when its
-#     LIVE segment carries a done `commit` line. Live means below the
-#     last `_declared` (state-schemas.md `## wave-N.jsonl line shapes`):
-#     lines above it are audit trail from a superseded dispatch, and a
-#     `commit` up there reports a wave that was later retried.
-#
-#     A journal holding ANY unparseable line is typed NOT EVALUABLE
-#     instead. The schema's discard rules turn on where the damage sits
-#     within the line — a torn declaration voids its segment, fused
-#     completion wreckage does not — and that is a judgement this audit
-#     deliberately does not make. Reporting the wave as untypeable costs
-#     one line of output; guessing it costs the count's meaning. ---
+# oracle 1: shipped = a done commit below the last _declared line
 shipped_waves=()
 declared_waves=()
 retry_dispatches=0
@@ -112,32 +70,22 @@ for j in "$DIR"/wave-*.jsonl; do
   fi
 done
 
-# --- Oracle 2: gates.jsonl, append-only, for the crew cadence. ---
+# oracle 2: gates.jsonl for the crew cadence
 gates="$DIR/gates.jsonl"
 gates_last_crew=""
 if [ -s "$gates" ] && jq -e . "$gates" >/dev/null 2>&1; then
-  # numbers only: a crew line may carry `wave: null`, and a max over
-  # mixed types returns whichever the type ordering happens to rank
-  # last — a string like "9d" outranking every real wave number
+  # numbers only: max() over mixed types could rank a string above real
   gates_last_crew=$(jq -s '[.[] | select(.kind == "crew") | .wave | numbers] | max // empty' "$gates")
 fi
 
-# --- Schema probe. These records have a documented shape and older runs
-#     predate it: queue entries keyed `n` with a prose `status`, no
-#     `last_crew_wave`, no journals at all. Compared field-by-field a
-#     legacy snapshot reports as drift on every arm, which is this
-#     check's own failure mode wearing its output — a disagreement about
-#     SCHEMA read as a disagreement about POSITION. So each oracle is
-#     asked whether it can speak to this snapshot before it is believed
-#     over it. ---
+# schema probe: a legacy snapshot must not read as drift on every arm
 queue_len=$(jq -r '.queue | if type == "array" then length else 0 end' "$STATE")
 queue_modern=$(jq -r '[.queue[]? | select(has("wave"))] | length' "$STATE")
 legacy_queue=0
 [ "$queue_len" -gt 0 ] && [ "$queue_modern" -eq 0 ] && legacy_queue=1
 has_lcw=$(jq -r 'has("last_crew_wave")' "$STATE")
 
-# --- Compare. Each arm prints its own line whether it agrees or not:
-#     a silent pass is indistinguishable from an arm that never ran. ---
+# each arm prints even on agreement: silence looks like it never ran
 cmp_field() { # label, snapshot value, oracle value, oracle name
   compared=$((compared + 1))
   if [ "$2" = "$3" ]; then
@@ -152,15 +100,9 @@ if [ ${#unevaluable[@]} -gt 0 ]; then
   notes+=("NOT EVALUABLE  wave(s) ${unevaluable[*]}: journal carries an unparseable line, so the wave cannot be typed — excluded from every count below")
 fi
 
-# waves_shipped, only when every journal was typeable: one unreadable
-# journal makes the oracle a floor rather than a count, and a floor
-# compared as a count reports drift that may not exist
+# compared only if every journal is typeable, else the floor reads as drift
 if [ "$journals" -eq 0 ]; then
-  # absent journals are not zero waves. state-schemas.md reads an absent
-  # file as "first dispatch", but a whole dir without one is either a run
-  # predating the journal contract or a run whose journals are gone, and
-  # nothing here can tell those apart. Both make the oracle mute, and a
-  # mute oracle that returns 0 would report every shipped wave as drift.
+  # absent journals aren't zero waves: a mute oracle at 0 would fake drift
   notes+=("NOT EVALUABLE  the four journal-derived arms: no wave-N.jsonl in this dir, so the journals cannot settle position — a run predating the journal contract, or one that lost them")
   skipped_arms=$((skipped_arms + 4))
 elif [ ${#unevaluable[@]} -eq 0 ]; then
@@ -193,22 +135,11 @@ else
   skipped_arms=$((skipped_arms + 1))
 fi
 
-# every queue entry marked shipped must name a commit that resolves —
-# a sha the snapshot invented, or one lost to a reset, is drift the
-# counters alone cannot show.
-#
-# REPO_ROOT has to be the repo that OWNS this run dir, which is not the
-# repo this script lives in whenever a caller sweeps other checkouts
-# (looper-custodian Phase A does exactly that). Ask git whether it is a
-# repo at all first: without the guard every sha reads as unresolvable
-# and a misconfigured root reports as five fabricated drifts, which is a
-# worse lie than declining to answer.
+# a shipped entry's commit must resolve, or it's drift the counters miss
+# REPO_ROOT may not own this dir (a sweep over other checkouts, e.g. A)
+# check it's a repo first, or a misconfigured root fabricates five drifts
 if [ "$legacy_queue" -eq 1 ]; then
-  # a legacy queue keys entries `n` and writes `status` as prose, so
-  # `select(.status == "shipped")` matches nothing and BOTH sha arms
-  # would pass having examined no entry at all. A vacuous pass reads
-  # exactly like a real one in the headline, which is the reading this
-  # whole check exists to make impossible.
+  # a legacy queue's prose status matches nothing; sha arms vacuously pass
   notes+=("NOT EVALUABLE  the two sha arms: $queue_len queue entry(s), none carrying a \`wave\` key — a snapshot predating the documented queue shape, so its shipped entries cannot be selected")
   skipped_arms=$((skipped_arms + 2))
 elif git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
@@ -229,12 +160,7 @@ if [ "$legacy_queue" -eq 0 ]; then
   cmp_field "shipped entries have sha" "$missing_sha" "0" "snapshot"
 fi
 
-# --- The PR arm is opt-in because it is the only one that leaves the
-#     machine. Off by default so the check stays runnable offline and
-#     its suite stays hermetic; a proxy for "a PR exists" derived from
-#     the push state was considered and rejected, since a gate that
-#     infers a remote fact from a local one is the shape that has cost
-#     this repo whole corrective waves. Ask GitHub or do not ask. ---
+# PR arm is opt-in (only one leaving the machine): ask GitHub, don't guess
 if [ "$CHECK_PR" -eq 1 ]; then
   if live=$(gh pr list --head "$BRANCH" --state all --json number --jq '.[0].number // "none"' 2>/dev/null); then
     cmp_field "pr.number" "$(jq -r '.pr.number // "none"' "$STATE")" "$live" "gh"
@@ -253,14 +179,7 @@ if [ "$compared" -eq 0 ]; then
   exit 2
 fi
 
-# Exit 0 has to mean FULLY checked and clean, not merely "nothing I got
-# round to comparing disagreed". A resume branches on this code to
-# decide whether to trust the snapshot, and a run whose four position
-# arms were skipped has not earned that trust however green the arms
-# that did run look. So an incomplete audit exits 2 with the skipped
-# arms, alongside the inputs it could not read at all. Drift still wins
-# over incompleteness: a disagreement the audit DID settle is
-# actionable now, and saying so beats reporting the gap around it.
+# exit 0 means fully checked and clean; resume trusts the snapshot on it
 if [ "$drift" -gt 0 ]; then
   echo "STATE DRIFT: $drift of $compared field(s) disagree with the records"
   exit 1

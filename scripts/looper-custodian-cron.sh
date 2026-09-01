@@ -1,84 +1,8 @@
 #!/bin/zsh
-# looper-custodian weekly maintenance run (launchd-driven).
-#
-# Hosted LOCALLY, not via cloud /schedule: phases C/A/B read local-only state
-# (local/loops scratch, ~/.claude memory, gates.jsonl across local repos) that
-# an isolated cloud session cannot reach.
-#
-# Runs headless with no --dangerously-skip-permissions: an unattended job
-# cannot answer a prompt, so it relies on ~/.claude/settings.json's allowlist
-# to clear every tool call this run makes instead of skipping the check
-# entirely. This is bounded: the scheduled run is PROPOSE-ONLY. C ingests the
-# history index (derived cache), A rm's gitignored scratch (only after C has
-# indexed it — ingest-guard), B is read-only, E hits the web, and the run
-# ends by OPENING a GitHub issue. No tracked-file edits happen on this path.
-# Destructive memory/agent edits are Phase D (/looper-custodian apply), which
-# is human-triggered and never scheduled. The destructive-git guard hook
-# still blocks history rewrites. A tool call the allowlist doesn't cover
-# fails closed (no prompt to answer, so the call itself never executes) —
-# but `claude -p` still exits 0 on that run, and the denial is otherwise
-# invisible: it never appears anywhere in `--output-format text`'s output.
-# The wrapper runs `--output-format json` for exactly this reason and reads
-# the response's `permission_denials` array on every attempt that exits 0
-# (permission_denials(), below) — a non-empty result fires a SEPARATE loud
-# alert (alert_permission_denied) layered on top of whatever the run's own
-# outcome was; it does not change that outcome, since the denied call
-# already failed closed and the run may have otherwise completed cleanly.
-#
-# The claude call gets MAX_ATTEMPTS tries with backoff — the 2026-07-06 and
-# 2026-07-13 runs both died to a transient "API Error: Connection closed
-# mid-response" and nobody noticed for two weeks. If every attempt fails, the
-# failure is made loud: macOS notification + a "Custodian run FAILED" GitHub
-# issue. No set -e: claude's exit code is handled explicitly so a failed
-# attempt reaches the retry/alert path instead of killing the script.
-#
-# Phase E (deep-research) runs as a harness-backgrounded workflow; in -p mode
-# the CLI blocks at end-of-turn waiting for it, capped by
-# CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS. The 2026-07-20 run hit the old 600s
-# default mid-research: the harness terminated Phase E, and because a
-# ceiling-kill still exits 0, the wrapper counted it a clean success — so the
-# report issue was never opened and ~1.4M tokens of research were silently
-# thrown away. Two guards now:
-#   1. The ceiling is raised to give a normal Phase E room to finish
-#      so Phase F runs. How much room that buys is unmeasured — see
-#      the comment on the export below, and decision 15.
-#   2. A ceiling-kill is DETECTED (marker in the run log), never retried
-#      (a retry re-runs C/A/B and re-hits the ceiling), and turned into a
-#      loud, RESUMABLE state: a resume.json breadcrumb + a "Custodian
-#      INCOMPLETE" issue. /looper-custodian resume <date> then replays only
-#      the unlogged tail (Phase E → report), reusing C/A/B. Each attempt runs
-#      under a known --session-id so resume can find the killed workflow's
-#      on-disk findings (resumeFromRunId is same-session only; the transcript
-#      journal is the cross-session handle).
-#
-# A session-limit hit mid-run ("You've hit your session limit · resets 2pm",
-# 2026-07-27) is a third failure mode: retries into the same dead window all
-# die identically, so it's detected like a ceiling-kill, breadcrumbed, and the
-# wrapper sleeps until the window's real reset epoch (usage-window-probe.sh)
-# before running the resume path once. Only if that also fails does it alert.
-#
-# Those three all react AFTER a session was spent. The run-start gate below
-# fires first: the skill's usage-window probe guards only Phase E, so a
-# weekly tick landing in an already-hot window burns C/A/B before anything
-# looks. This wrapper therefore probes BEFORE launching claude at all,
-# against the same 95% default the Phase E gate uses.
-#   hot on the 5-hour window   => wait out the reset, launch once, and
-#                                 defer if it is still hot after the wait
-#   hot on the WEEKLY window   => defer straight away, without the wait: a
-#                                 7-day window cannot roll inside the 6h
-#                                 wait cap, so waiting would burn the
-#                                 morning and defer anyway
-#   unread window              => launch unguarded and log it; unread is
-#                                 not 0%
-# Either defer path is as loud as a failure (notification + "Custodian
-# INCOMPLETE" issue), because the original sin these alert paths exist for
-# is a Monday that quietly did nothing.
-#
-# Exit codes: 0 ran (or resumed) cleanly; 2 REPO could not be entered, so
-# nothing ran; 3 bg-wait ceiling cut the run short, resumable; 4 session
-# limit hit and the post-reset resume also failed; 5 the run-start
-# usage-window gate deferred the run before any phase ran; anything else
-# is claude's own exit from the last attempt.
+# looper-custodian weekly maintenance run (launchd-driven, local state).
+# Headless, allowlist-gated, propose-only; survives transient API errors,
+# a bg-wait ceiling-kill, or a session-limit hit via resume.json.
+# Exit 0-5, one per failure mode. Rationale: decisions/looper-custodian.md
 set -uo pipefail
 
 # overridable because a prepend beats any stub dir handed in via PATH

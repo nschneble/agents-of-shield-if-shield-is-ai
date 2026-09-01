@@ -1,63 +1,8 @@
 #!/usr/bin/env bash
-# custodian-skill-lint — self-contained SKILL.md linter for the looper skills.
-#
-# Ports the published Agent Skills spec lint schemas into pure bash + awk + grep
-# — no third-party tools, no tokenizer deps (`[[no-third-party-hosted-tool-reliance]]`:
-# mine the check tables, don't adopt the linters). Runs over this repo's tracked
-# `skills/` tree (and root context files) and, as a propose-only custodian signal,
-# routes structural findings into Phase B of the weekly run. It never edits a file.
-#
-# ── Provenance of the checked rules ────────────────────────────────────────────
-# Frontmatter schema + budgets are the Agent Skills open standard, fetched from
-# https://agentskills.io/specification on 2026-07-27 (corroborated by the Claude
-# Code skills docs). The canonical rules encoded below:
-#   required frontmatter:  name, description
-#   optional frontmatter:  license, compatibility, metadata, allowed-tools  (exactly 4)
-#   name:         1-64 chars, lowercase a-z/0-9/hyphen, no leading/trailing/`--`, == dir
-#   description:  1-1024 chars, non-empty
-#   compatibility: <=500 chars if present
-#   progressive disclosure budgets (ADVISORY): ~100-token discovery (name+description),
-#     <5000-token activation body (recommended), keep SKILL.md <500 lines, reference
-#     files small, AGENTS.md/CLAUDE.md context files kept lean (<150 lines, converged
-#     community guidance).
-# The full Phase E research artifacts backing this port are under
-# local/custodian/2026-07-27/ (issue #29, finding E-1).
-#
-# ── Two tiers ──────────────────────────────────────────────────────────────────
-# STRUCTURAL (violations, exit 1): frontmatter allowlist + required fields, name
-#   pattern/length/dir-match, empty/over-length description, broken internal links
-#   (relative file refs + intra-skill `[[wiki-links]]`), a reference FILE nested
-#   deeper than one level (references/a/b/c.md), and a false-positive-averse
-#   secret-leak scan.
-# ADVISORY (INFO, exit stays 0): the token/line budgets above, plus one reference
-#   file CROSS-LINKING another (`adv-reference-chain`) — a prose mention, not a
-#   load path, so it is an extraction judgement like the budgets, while the
-#   depth check above measures a path fact (docs/decisions/looper-custodian.md decision 29).
-#   Token counts are APPROXIMATE — chars/4, the standard rough BPE proxy (see
-#   `est_file_tokens`).
-#   For markdown/code-ish prose the real BPE tokenizer runs slightly HOTTER than
-#   chars/4 (shorter sub-word tokens), so this proxy UNDER-reports — anything it
-#   flags as over-budget is over-budget for real (conservative in the flag
-#   direction); it may miss a marginal case, which is fine for an advisory. These
-#   findings inform EXTRACTION decisions (split a fat body into references), never
-#   prose smoothing — the looper's war-story prose is deliberate (project memory
-#   `[[project-skill-slimming-yields]]`). They are NEVER violations and never
-#   change the exit code.
-#
-# Description checks are strictly MECHANICAL (present, length bounds, first-person
-# opener, a trigger-cue presence heuristic) — no editorial judgement, and edits
-# are out of scope: the linter reports, a human disposes.
-#
-# ── Known limitations ───────────────────────────────────────────────────────────
-# A `[[wiki-link]]` shown inside a fenced code block is NOT exempted from the
-# intra-skill link check — a documented example slug is resolved like a live link.
-# Not worth a fence parser for a hypothetical; noted so a future false positive is
-# understood, not chased. (Frontmatter scalars are read single-line only — see the
-# `frontmatter_value` note.)
-#
-# Mirrors scripts/custodian-history.sh conventions: set -euo pipefail, env-override
-# paths, subcommand dispatch, usage-on-stderr exit 2. Grep/awk that may legitimately
-# return non-zero (no match) are guarded so pipefail never turns a clean scan fatal.
+# custodian-skill-lint — self-contained SKILL.md linter, looper skills.
+# Ports the Agent Skills open spec's frontmatter/budget rules into bash +
+# awk + grep; read-only, exit 1 on structural violations only. Provenance:
+# docs/decisions/looper-custodian.md (decisions 28-29)
 #
 # Usage:
 #   custodian-skill-lint.sh [lint] [<skill-dir|SKILL.md|context.md> ...]
@@ -286,7 +231,7 @@ lint_skill() {
     fm_ok=0
   fi
 
-  # ── Frontmatter-DEPENDENT checks: run only when the block parses cleanly ──────
+  # checks below need a cleanly-parsed frontmatter block
   if [ "$fm_ok" -eq 1 ]; then
     # Frontmatter allowlist + required fields.
     local key seen_name=0 seen_desc=0
@@ -337,10 +282,7 @@ lint_skill() {
     fi
   fi
 
-  # ── Frontmatter-INDEPENDENT checks: run regardless of a malformed fence ───────
-
-  # Body/link/wiki scans read SKILL.md directly (no parsed keys), so they cover a
-  # malformed-but-present fence too — they only need the file itself to exist.
+  # body/link/wiki scans read the file directly; a bad fence doesn't block them
   if [ -f "$f" ]; then
     # Body budgets (advisory).
     local btok blines

@@ -1,27 +1,8 @@
 #!/usr/bin/env bash
-# no-ai-attribution gate — the "no AI-attribution markers anywhere in this
-# repo" correction, compiled to an executable check. Provenance and the
-# compile trail live in ./spec.md; this file is just the runnable
-# assertion. It is the SECOND registry entry, deliberately a different
-# correction CLASS from format-scope (commit/PR-surface hygiene, not file
-# formatting) so the registry is demonstrably generic — not format-scope
-# compiled twice.
-#
-# FAILS (exit 1) if any AI-attribution marker appears in the scanned commit
-# message(s) or an optional PR body:
-#   - a `Co-Authored-By: Claude ...` (or @anthropic) trailer
-#   - a `Generated with [Claude Code]` footer (with or without the emoji)
-#   - a claude.ai/code link
-# These are the exact tells the correction bans; a full list of variants is
-# in ./spec.md.
-#
-# Position: this is a COMMIT/PR-surface gate — it reads git history and
-# a staged body, so it runs at commit/PR time (looper-commit), not the
-# working-tree pre-commit slot format-scope uses. That the two entries sit
-# at different points is the "compare-ref must be a parameter, not baked
-# in" generalization made concrete: --range is the position.
-#
-# Self-contained: pure bash + git + grep, no hosted tool.
+# no-ai-attribution gate — the no-AI-attribution-markers correction,
+# compiled to an executable check. Provenance + marker list: ./spec.md.
+# Runs at commit/PR time (looper-commit), reading git history + a staged
+# body — a different surface + position than format-scope, deliberately.
 #
 # Usage:
 #   gate.sh [--dir DIR] [--range REF] [--body FILE]
@@ -58,7 +39,7 @@ abspath() { case "$1" in /*) printf '%s' "$1";; *) printf '%s/%s' "$(pwd)" "$1";
 [ -d "$DIR" ] || { echo "no such dir: $DIR" >&2; exit 2; }
 cd "$DIR"
 
-# marker alternation — the banned tells, matched case-insensitively
+# the banned tells, matched case-insensitively
 RE='co-authored-by:.*(claude|anthropic)'
 RE="$RE"'|generated with \[?claude'
 RE="$RE"'|🤖 generated with'

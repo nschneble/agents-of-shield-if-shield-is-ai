@@ -1,33 +1,8 @@
 #!/usr/bin/env bash
-# spec-load — what each entry point pays in spec tokens before it reads a
-# line of the code under work.
-#
-# The looper's dominant cost is not any one large file, it is fixed spec
-# load multiplied by dispatch count: the executor pulls in its agent
-# definition plus every step skill on EVERY wave, and a crew pass pulls in
-# an agent definition per reviewer. Both are invisible to
-# scripts/skill-body-ceiling.sh, which asks whether one file grew, never
-# what a dispatch costs.
-#
-# So this measures a different thing: per entry point, the sum of what that
-# dispatch loads. The always-total is the floor no run of that shape can get
-# under; the conditional tail is what only some wave shapes pay.
-#
-# Measures with the repo's own proxy (whole-file chars/4), the one
-# scripts/skill-body-ceiling.sh and scripts/custodian-skill-lint.sh already
-# report, so the three cannot drift into an argument about arithmetic.
-#
-# A manifest row naming a missing file is exit 2, never a skipped row. A
-# rename that quietly drops a file from the sum reads as a saving, and an
-# instrument that reports a saving it did not measure is worse than none.
-#
-# Exit 0 measured clean (or every entry at/under baseline) · 1 an entry
-# grew past its recorded baseline · 2 unusable input (missing or unreadable
-# manifest, no readable row, a row naming a file that does not exist, a
-# malformed baseline).
-#
-# Usage: spec-load.sh [--manifest PATH] [--root PATH] [--entry NAME]
-#                     [--baseline PATH] [--write-baseline PATH]
+# spec-load — what each entry point pays in spec tokens per dispatch,
+# not per file (skill-body-ceiling.sh's blind spot). Same chars/4 proxy
+# as skill-body-ceiling.sh + custodian-skill-lint.sh, so all three agree.
+# Usage: spec-load.sh [--manifest P] [--baseline P] [--write-baseline P]
 set -uo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -55,8 +30,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$MANIFEST" ] || MANIFEST="$repo_root/scripts/spec-load-manifest.tsv"
-# -s tests size, not readability; a mode-000 file passes it and then yields
-# no rows, which would read as a clean sweep
+# -s tests size, not readability; mode-000 would pass, yielding no rows
 if [ ! -s "$MANIFEST" ] || ! head -c 1 "$MANIFEST" >/dev/null 2>&1; then
   echo "empty or unreadable manifest: $MANIFEST" >&2; exit 2
 fi
@@ -65,8 +39,7 @@ est_tokens() { # file -> approx tokens, the lint's proxy
   local c; c=$(wc -c < "$1" 2>/dev/null | tr -d ' '); echo $(( ${c:-0} / 4 ));
 }
 
-# Read the manifest once into parallel arrays. Entry order is manifest
-# order, so the report reads in the order a run actually pays these.
+# entry order is manifest order, so the report matches how a run pays these
 entries=()
 declare -a always_total cond_total row_count
 declare -a crew_costs
@@ -132,10 +105,7 @@ for e in "${entries[@]}"; do
   i=$((i + 1))
 done
 
-# The crew is the one entry point whose per-dispatch cost is a RANGE, not a
-# scalar: interim passes are domain-matched, so which reviewers fire is a
-# property of the diff. Reporting one number here would be the invented
-# precision the turncoat's cost rule warns about.
+# crew cost is a RANGE: domain matching decides which reviewers fire
 if [ -z "$ONLY_ENTRY" ] && [ "${#crew_costs[@]}" -gt 0 ]; then
   sorted=$(printf '%s\n' "${crew_costs[@]}" | sort -n)
   n=${#crew_costs[@]}

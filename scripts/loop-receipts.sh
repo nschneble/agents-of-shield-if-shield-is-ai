@@ -1,35 +1,7 @@
 #!/usr/bin/env bash
-# loop-receipts — checks a wave's `verified_by: "executable"` claim
-# against the runtime's own record of what ran.
-#
-# G3 in scripts/custodian-guardrails.sh asks whether a committed wave
-# carries a gate line whose `verified_by` equals "executable". That field
-# is prose the audited agent typed, so G3 is asking the agent to grade
-# itself. This asks the receipts log instead, which hooks/record-execution-
-# receipt.sh writes and no agent authors.
-#
-# WHAT A RECEIPT PROVES, EXACTLY. The runtime exposes no exit code to a
-# PostToolUse hook (`tool_response` carries interrupted/isImage/
-# noOutputExpected/stderr/stdout, nothing more). The event fires on tool
-# SUCCESS — a failure routes to PostToolUseFailure, which nothing
-# subscribes to — so a receipt's EXISTENCE is the success signal and
-# `interrupted` is the one qualifier. This check asserts exactly that and
-# no more. An earlier version counted `exit_code == 0`, a key no receipt
-# ever carries, which made this arm unreachable and fired a false
-# VIOLATION on every real branch.
-#
-# WHY THIS IS A SEPARATE CHECK AND NOT A REWRITE OF G3. Receipts start
-# the day the hook is installed; every archived run predates them.
-# Swapping G3's predicate would turn 419 historical `executable` lines
-# into violations overnight — the same false-positive flood the legacy
-# `verified_by`-absent exemption exists to prevent. So a branch with no
-# receipts log is NOT EVALUABLE here, never a violation, exactly as a
-# pre-schema line is exempt there. When receipts cover a meaningful span,
-# G3 can be retired into this.
-#
-# Exit 0 every claim checked resolved, or nothing was evaluable · 1 a
-# claim had no matching receipt · 2 unusable input.
-#
+# loop-receipts — checks a wave's verified_by:"executable" claim against
+# the runtime's own receipts log, since that gate field is the audited
+# agent's own say-so. No receipts log = NOT EVALUABLE, never a violation.
 # Usage: loop-receipts.sh --dir local/loops/<branch> [--strict]
 set -uo pipefail
 
@@ -39,10 +11,7 @@ needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir)    needs_value --dir "$#"; DIR="$2"; shift 2;;
-    # treat an unevaluable branch as a failure instead of a skip. Off by
-    # default so the check can be wired everywhere before receipts exist
-    # everywhere; on for a branch that is supposed to be covered.
-    --strict) STRICT=1; shift;;
+    --strict) STRICT=1; shift;;  # unevaluable fails instead of skipping
     -h|--help)
       echo "usage: $0 --dir local/loops/<branch> [--strict]" >&2
       echo "  checks a wave's executable claim against the runtime's receipts" >&2
@@ -59,9 +28,7 @@ gates="$DIR/gates.jsonl"
 receipts="$DIR/receipts.jsonl"
 [ -s "$gates" ] || { echo "no gate lines at $gates" >&2; exit 2; }
 
-# raw input with `fromjson?` so one malformed line cannot abort the
-# sweep and silently retire every claim behind it — the shape
-# custodian-log-recall.sh already uses
+# fromjson? guards one malformed line (custodian-log-recall.sh's shape)
 count_matching() { # file, jq predicate
   jq -Rn "[inputs | fromjson? // empty | select($2)] | length" "$1" 2>/dev/null || printf '0'
 }
@@ -86,10 +53,7 @@ if [ ! -s "$receipts" ]; then
   exit 1
 fi
 
-# One uninterrupted receipt is the bar. Matching a specific claim to a
-# specific command would need the wave to name the command it ran, which
-# no gate line does today; asserting more than the data supports is the
-# failure mode this file was written against.
+# one uninterrupted receipt is the bar: no gate line names its command
 passing=$(count_matching "$receipts" '(.interrupted // false) != true')
 total=$(count_matching "$receipts" 'true')
 echo "  receipts: $total recorded, $passing uninterrupted"

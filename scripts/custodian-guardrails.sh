@@ -1,54 +1,15 @@
 #!/usr/bin/env bash
-# custodian-guardrails — replayable trace queries over the looper history index.
-#
-# The Sefz pattern (arXiv 2605.13044): a natural-language skill guardrail becomes
-# a reachability query over an annotated execution trace, so violation-checking is
-# a deterministic graph/predicate query rather than a judgement. Our trace is
-# `gates.jsonl`, rolled up cross-repo into `local/custodian/history-index.jsonl`
-# (the same store Phase C mines). This runner encodes three of the loop's own
-# "never/always" guardrails as `jq` predicates and replays them over that index.
-#
-# Guardrails:
-#   G1  no verdict without a run
-#       loop-de-looper `## Gate artifacts` hard rule:
-#       task_tool_available:false ⇒ ran:false ⇒ no verdict.
-#       Violation: a line carries a verdict while ran==false OR task_tool_available==false.
-#   G2  provenance on every ran verdict-bearing gate
-#       The provenance lint is owned by skills/loop-de-looper/references/state-schemas.md
-#       (`## Provenance lint`) — REUSED here verbatim, not re-encoded, so there is one
-#       source of truth. Its crew-or-specialist scope + diamantaire-outcome check apply.
-#   G3  no committed wave without execution evidence
-#       Issue #29 cap-overflow item ("execution-evidence log assertion"): every wave
-#       that shipped a commit must have >=1 gate line with verified_by=="executable".
-#
-# Legacy exemption (HARD RULE): lines from runs predating the verified_by/outcome
-# schema are EXEMPT — counted + reported separately, NEVER violations. Provenance,
-# stated straight: state-schemas.md's legacy note prescribes a TEMPORAL, per-FILE
-# exemption (a whole pre-schema gates.jsonl predates the fields). This replay runs
-# over the cross-repo history-index.jsonl, which MIXES eras line by line, so it needs
-# a per-LINE era test — this repo's own extension of that note, NOT something
-# state-schemas.md prescribes. Era is detected by field ABSENCE: custodian-history.sh's
-# ingest writer copies verified_by/outcome into a record ONLY when the source line
-# carried them, so a record with NO `verified_by` key is a pre-schema line. This is
-# load-bearing — the writer must preserve that absence so the exemption survives
-# `history --rebuild` (custodian-history.sh + custodian-guardrails.test.sh). Without
-# it, a naive replay floods hundreds of false G2/G3 violations on archived runs.
-#
-# Reads the cross-repo index (survives Phase A reaps); pure bash + jq, no third-party
-# tools, no SQLite. Per-violation output cites the record's `cite` field verbatim.
-# Exit 0 clean, exit 1 if any guardrail has >=1 violation.
-#
-# Usage: custodian-guardrails.sh [--index PATH]
+# custodian-guardrails — replays G1/G2/G3 (Sefz pattern, arXiv 2605.13044) as
+# jq predicates over the cross-repo history index, with a per-line legacy
+# exemption for pre-schema records. Rationale: decisions/looper-custodian.md
+# decision 18. Usage: custodian-guardrails.sh [--index PATH]
 set -euo pipefail
 
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="${INDEX:-$CUSTODIAN_HOME/history-index.jsonl}"
 
-# a value-taking flag given no value must not fall through to `$2` unbound:
-# under `set -u` that aborts with status 1, which the header reserves for
-# "violations found". Usage errors exit 2 here and in
-# custodian-phase-order.sh.
+# exit 2 for usage errors, since exit 1 means "violations found" here
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
@@ -65,34 +26,19 @@ done
 
 [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
 
-# One object out, not rendered text: the verdict below reads `.total`
-# from this JSON, so a newline inside an indexed field cannot inject a
-# counterfeit total.
+# one JSON object out, so an indexed field can't inject a fake total
 analysis=$(jq -n --arg index "$INDEX" '
-  # --- era gate: a line predates the schema iff it has no verified_by key ---
   def legacy: (has("verified_by") | not);
 
-  # --- G1: no verdict without a run (loop-de-looper ## Gate artifacts) ---
-  def g1_applicable: (.verdict != null);          # subject only to verdict-bearing lines
+  def g1_applicable: (.verdict != null);
   def g1_violation:  ((.ran == false) or (.task_tool_available == false));
 
-  # --- G2: the provenance lint from state-schemas.md ## Provenance lint ---
-  # Same predicate, single source of truth — reused, not forked. The quote below is
-  # re-indented for standalone reading (the doc aligns its continuation under a
-  # jq -c prefix), so it is token-identical, not byte-identical to the doc.
-  # custodian-guardrails.test.sh asserts the runner G2 selects EXACTLY what that
-  # canonical lint selects, so any drift in either fails loudly.
-  # select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"))
-  # | select(.verified_by == null
-  #          or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null))
+  # reuses the state-schemas.md provenance lint; drift-checked by the tests
   def g2_applicable: (.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"));
   def g2_violation:  (.verified_by == null
                       or (.kind == "crew" and .agent == "the-diamantaire" and .outcome == null));
 
-  # --- G3: a wave "shipped a commit" iff it shows post-build activity ---
-  # crew/review/ship gate lines run AFTER build+commit; a commit-SHA named in a
-  # summary is direct evidence. (files[] is NOT used: the indexer resolves it once
-  # per run, so it is branch-uniform and cannot distinguish which wave committed.)
+  # files[] not used: indexer resolves it once per run, not per wave
   def committed_line:
     (((.kind // "") | test("crew|ship|review"))
      or ((.summary // "") | test("\\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\\b")));
@@ -149,7 +95,6 @@ analysis=$(jq -n --arg index "$INDEX" '
 
 printf '%s\n' "$analysis" | jq -r '.report[]'
 
-# verdict off the computed field, never off the rendered report — the
-# shape scripts/custodian-skill-lint.sh:429-430 already uses.
+# verdict off the computed field, never the rendered report (skill-lint's shape)
 violations=$(printf '%s\n' "$analysis" | jq -r '.total')
 [ "$violations" -eq 0 ]
