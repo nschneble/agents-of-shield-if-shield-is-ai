@@ -89,7 +89,14 @@
 # dispatch; what it SAVES (skipping LLM re-audit of unchanged citations)
 # is a per-citation conditional cost this instrument does not model,
 # same blind spot W4's note names for dispatch counts generally.
-orchestrator-run	23088	1898
+#
+# +751 orchestrator-run for two brief-authoring/direct-edit guardrails:
+# re-verify (don't reword) a brief's technical claim once it's wrong
+# (protocol-detail.md Step 2a), and route a security-relevant direct edit
+# through a targeted review pass regardless of size or timing (SKILL.md
+# Corrective budget, mirrored in "does NOT"). Same growth
+# skill-body-ceiling.sh caught on loop-de-looper's own ceiling.
+orchestrator-run	23839	1898
 pre-flight	2452	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0
