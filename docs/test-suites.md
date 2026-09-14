@@ -539,6 +539,46 @@ git repo with two real commits for the execution-order proxy arm — inverting
 the two shas is how the RED half of that arm is reached. Nothing reads
 gitignored `local/`.
 
+## loop-unanimity-audit
+
+Both-directions test for the unanimous-verdict backing audit.
+
+The audit's whole output is a count, and a count of 0 is the answer nobody can
+check by eye. So every exclusion arm is paired with the fixture it excludes,
+and the positive control comes first:
+
+- THE POSITIVE CONTROL LEADS, AND ITS MUTATION FOLLOWS. Three reviewers, all
+  clean, all `llm` — found, exit 1. Flip one line to `verified_by:
+"executable"` and the whole group clears, exit 0. Without that pair, "5 of 96"
+  would rest on nobody having watched the detector fire.
+- AN EXCLUSION IS NOT A CLEAN RESULT. Four different reasons drop a group
+  before it can be a finding — one reviewer, the same agent twice, a rollup
+  line (`ALL-SIX-ENUMERATED`, `the-chemist/the-improver`), and a legacy-era
+  record with no `verified_by` key at all. Each is asserted on its own counter
+  in the report, not just on the exit code, because all four exit 0 and only
+  the counters say which one happened.
+- LEGACY-ERA IS THE ONE THAT COSTS THE MOST IF IT LEAKS. 33 real groups sit in
+  it against 5 findings, so an arm asserts the modern-era count stays 0 when
+  the fixture predates the field. Making findings ignore the era reddens it.
+- THE CREW PREDICATE IS A SUBSTRING MATCH ON PURPOSE. `crew-final` and
+  `final-crew` are asserted to count, because the index holds a dozen crew
+  spellings and `== "crew"` would make most historical crew coverage invisible
+  — the failure `state-schemas.md` documents. A paired arm asserts
+  `executor-handback` does NOT count, so the substring is not just permissive.
+- A NOT-RAN LINE IS DROPPED BUT STILL REPORTED. Two arms: the finding shows
+  `2 reviewer(s) ran of 3 crew line(s) logged`, and the corpus line reports the
+  drop. Two of the five real findings are unanimities of a minority, so a
+  suite that let the drop go unprinted would hide the most interesting half of
+  the result.
+- DEDUP NEEDS A COUNTER, NOT A GROUP COUNT. Feeding the same wave through both
+  corpus arms yields one group whether or not dedup runs, so the first version
+  of that arm survived deleting `unique_by`. It now asserts `2 deduped · 2
+crew` against 4 input lines, and deleting `unique_by` reddens it.
+
+Self-contained: every fixture is written by the suite into a temp dir, and the
+census arm is pointed at a temp root. Nothing reads gitignored `local/` or the
+real history index.
+
 ## guard-destructive-git
 
 Both-directions test for the PreToolUse guard.

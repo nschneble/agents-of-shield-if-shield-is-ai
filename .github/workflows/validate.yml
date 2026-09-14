@@ -48,6 +48,8 @@ jobs:
         run: ./scripts/loop-finding-audit.test.sh
       - name: Wave-queue DAG invariant audit (both directions)
         run: ./scripts/wave-queue-dag-audit.test.sh
+      - name: Unanimous-verdict backing audit (both directions)
+        run: ./scripts/loop-unanimity-audit.test.sh
       - name: Doc-bloat detector (both directions)
         run: ./scripts/doc-bloat-scan.test.sh
       - name: Correction-gates runner (both directions)

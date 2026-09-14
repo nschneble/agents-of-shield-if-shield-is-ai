@@ -106,6 +106,13 @@ probe-reason-renamed|usage-window-probe.sh|usage-window-probe.test.sh|s/\Qemit_u
 probe-status-from-bare-header|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q"status":h.get(f"anthropic-ratelimit-unified-{prefix}-status")\E/"status":h.get("anthropic-ratelimit-unified-status")/
 probe-representative-hardcoded|usage-window-probe.sh|usage-window-probe.test.sh|s/\Qh.get("anthropic-ratelimit-unified-representative-claim")\E/"five_hour"/
 probe-expiry-skew-dropped|usage-window-probe.sh|usage-window-probe.test.sh|s/\Q+ 60000))\E/+ 0))/
+unanimity-crew-exact-match|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qtostring | test("crew")\E/tostring == "crew"/
+unanimity-ran-gate-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qselect(.ran == true)\E/select(.ran != false)/
+unanimity-era-gate-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qmap(select(.all_modern))\E/map(select(true))/
+unanimity-rollup-slash-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s!\Qor ((.agent | tostring) | test("/"));\E!;!
+unanimity-t1-accepts-executable|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q(vb == null) or (vb == "llm")\E/(vb == null) or (vb == "llm") or (vb == "executable")/
+unanimity-dedup-key-collapses|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qunique_by(.cite\E/unique_by(.kind/
+unanimity-blockers-any-count|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s!\Qall_clean: all(.[]; (.blockers // 0) == 0)\E!all_clean: all(.[]; (.blockers // 0) >= 0)!
 TABLE
 }
 
