@@ -116,6 +116,29 @@ run
 [ "$rc" -eq 1 ] && saw 'VIOLATION dependency edges ordered'
 check_that "a self-edge violates strict ordering (got $rc)" $?
 
+# the shape carn/phase/1a persists: several entries, multi-edge, one empty
+snap '{"queue":[{"wave":1,"depends_on":[]},{"wave":2,"depends_on":[1]},
+ {"wave":3,"depends_on":[1]},{"wave":4,"depends_on":[1,2]},
+ {"wave":5,"depends_on":[2,3,4]}]}'
+run
+[ "$rc" -eq 2 ] && saw 'ok     dependency edges ordered' && ! saw 'VIOLATION'
+check_that "a real multi-edge array graph evaluates and passes (got $rc)" $?
+
+snap '{"queue":[{"wave":1,"depends_on":"none"},{"wave":2,"depends_on":"wave 1"}]}'
+run
+[ "$rc" -eq 2 ] && saw 'SKIP   dependency edges ordered' && saw '2 entry(s)' \
+  && ! saw 'VIOLATION' && ! saw 'jq: error'
+check_that "a string-valued depends_on declines, never crashes (got $rc)" $?
+
+# the crash's real cost was the batch: everything after it vanished
+prose="$temp_dir/prose.json"
+printf '%s' '{"queue":[{"wave":1,"depends_on":"none"}]}' > "$prose"
+snap "$modern"
+out=$("$check" "$prose" "$state" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'QUEUE INVARIANT' \
+  && printf '%s\n' "$out" | grep -q 'ok     every ask is claimed by a wave'
+check_that "a snapshot after a prose-edge one is still read (got $rc)" $?
+
 # --- schema eras decline, they do not fail ------------------------------
 snap '{"queue":[],"goal_contract":[{"id":1}]}'
 run
@@ -208,6 +231,24 @@ out=$("$check" --nope "$state" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'unknown flag'
 check_that "an unknown flag exits 2 (got $rc)" $?
 
+# --- --census: the corpus is discovered, never named ---------------------
+census="$temp_dir/census"
+mkdir -p "$census/repo-a/local/loops/main" "$census/repo-b/local/loops/phase/1a" \
+  "$census/repo-c/elsewhere" || die_temp "cannot build $census"
+for d in repo-a/local/loops/main repo-b/local/loops/phase/1a repo-c/elsewhere; do
+  printf '%s' "$modern" > "$census/$d/run-state.json"
+done
+out=$("$check" --census "$census" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && saw '2 snapshot(s)' && saw 'repo-b/local/loops/phase/1a'
+check_that "--census finds nested local/loops snapshots (got $rc)" $?
+
+saw 'repo-a/local/loops/main' && ! saw 'repo-c/elsewhere'
+check_that "--census ignores a run-state.json outside local/loops" $?
+
+out=$("$check" --census "$temp_dir/repo" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'found no local/loops snapshot'
+check_that "a census root with no snapshot exits 2, not clean (got $rc)" $?
+
 # --- a clean snapshot beside a declining one still reports both ---------
 good="$temp_dir/good.json"; printf '%s' "$modern" > "$good"
 snap '{"queue":[]}'
@@ -216,7 +257,7 @@ out=$("$check" "$good" "$state" 2>&1); rc=$?
   && printf '%s\n' "$out" | grep -q '0 of 5 arm(s) violated'
 check_that "a batch reports every snapshot and the whole arm count (got $rc)" $?
 
-EXPECTED_CHECKS=29
+EXPECTED_CHECKS=35
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

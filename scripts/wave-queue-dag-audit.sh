@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # wave-queue-dag-audit — checks a run-state.json wave queue against the
-# DAG/topological-sort invariant (SPOQ, arxiv 2606.03115). The dependency
-# edges scope prints are never persisted, so that half reports NOT
-# EVALUABLE; a schema era the arm cannot read declines, never fails.
-# Usage: wave-queue-dag-audit.sh [--git REPO] [run-state.json ...]
+# DAG/topological-sort invariant (SPOQ, arxiv 2606.03115). Most snapshots
+# persist no dependency edges, so that half reports NOT EVALUABLE on them;
+# a schema era the arm cannot read declines, never fails.
+# Usage: wave-queue-dag-audit.sh [--census ROOT] [--git REPO] [state ...]
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 GIT_REPO=""
+CENSUS_ROOT=""
 paths=()
 
 # exit 2 for usage errors: 1 is reserved for "invariant violated"
@@ -15,16 +16,31 @@ needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --census) needs_value --census "$#"; CENSUS_ROOT="$2"; shift 2;;
     --git) needs_value --git "$#"; GIT_REPO="$2"; shift 2;;
     -h|--help)
-      echo "usage: $0 [--git REPO] [run-state.json ...]" >&2
+      echo "usage: $0 [--census ROOT] [--git REPO] [run-state.json ...]" >&2
       echo "  checks queue[] wave numbering + ask coverage; --git adds the" >&2
-      echo "  execution-order proxy arm over shipped commits" >&2
+      echo "  execution-order proxy arm over shipped commits; --census finds" >&2
+      echo "  every local/loops snapshot under ROOT instead of naming repos" >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   paths+=("$1"); shift;;
   esac
 done
+
+if [ -n "$CENSUS_ROOT" ]; then
+  [ -d "$CENSUS_ROOT" ] || { echo "--census needs a directory: $CENSUS_ROOT" >&2; exit 2; }
+  census_hits=0
+  while IFS= read -r snapshot; do
+    [ -n "$snapshot" ] || continue
+    paths+=("$snapshot")
+    census_hits=$((census_hits + 1))
+  done < <(find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
+                -path '*/local/loops/*' -name run-state.json -print 2>/dev/null | sort)
+  [ "$census_hits" -gt 0 ] \
+    || { echo "--census found no local/loops snapshot under $CENSUS_ROOT" >&2; exit 2; }
+fi
 
 if [ ${#paths[@]} -eq 0 ]; then
   branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
@@ -38,7 +54,7 @@ skipped_arms=0
 snapshots_read=0
 
 echo "wave-queue-dag-audit — ${#paths[@]} snapshot(s)"
-echo "  DEPENDENCY-EDGE ORDERING IS NOT CHECKABLE ON THIS SCHEMA, see each report"
+echo "  DEPENDENCY-EDGE ORDERING IS CHECKABLE ONLY WHERE PERSISTED, see each report"
 echo
 
 arm() { # label, observed, want
@@ -119,18 +135,26 @@ for state in "${paths[@]}"; do
     arm "every closes id is a declared ask" "$dangling" "0"
   fi
 
-  # not a stub: the else arm is real, no snapshot has ever carried the field
+  # not a stub: some snapshots persist arrays here, some persist prose
   edges=$(jq -r '[.queue[]? | select(has("depends_on") or has("dependsOn")
                                      or has("depends") or has("blocked_by"))] | length' "$state")
   if [ "$edges" -eq 0 ]; then
     na "dependency edges ordered" \
       "NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints \`depends on:\` as prose only"
   else
-    bad_edge=$(jq -r '
-      [.queue[]? | . as $t | (.depends_on // .dependsOn // .depends // .blocked_by // [])[]
-       | select(($t.wave | type) != "number" or (. | type) != "number" or . >= $t.wave)]
-      | length' "$state")
-    arm "dependency edges ordered" "$bad_edge" "0"
+    unreadable=$(jq -r '
+      [.queue[]? | (.depends_on // .dependsOn // .depends // .blocked_by // [])
+       | select(type != "array")] | length' "$state")
+    if [ "$unreadable" -gt 0 ]; then
+      decline "dependency edges ordered" \
+        "$unreadable entry(s) carry a non-array edge value — a shape this arm cannot read"
+    else
+      bad_edge=$(jq -r '
+        [.queue[]? | . as $t | (.depends_on // .dependsOn // .depends // .blocked_by // [])[]
+         | select(($t.wave | type) != "number" or (. | type) != "number" or . >= $t.wave)]
+        | length' "$state")
+      arm "dependency edges ordered" "$bad_edge" "0"
+    fi
   fi
 
   # proxy arm: a correct topological order shows up as waves landing in order

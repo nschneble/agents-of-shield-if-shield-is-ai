@@ -494,11 +494,12 @@ Both-directions test for the wave-queue DAG invariant audit.
 The audit has three possible outcomes per arm — ok, VIOLATION, and a decline —
 and the whole suite exists because two pairs of those are easy to confuse.
 
-- A DECLINE IS NOT A PASS. Four of the seven real snapshots on disk predate
-  the documented `queue[]` shape, in three separate eras: entries keyed `n`
-  with values like `"8a"`, an empty `queue[]` with the wave records in
-  top-level `wave_N` keys, and a `goal_contract` that is a bare array of
-  integer-id asks rather than `{asks: […]}`. Each has an arm, because an audit
+- A DECLINE IS NOT A PASS. Eight of the sixteen real snapshots on disk predate
+  the documented `queue[]` shape, in four separate eras: no `queue` key at all,
+  entries keyed `id: "wave-1"`, entries keyed `n` with values like `"8a"`, and
+  an empty `queue[]` with the wave records in top-level `wave_N` keys beside a
+  `goal_contract` that is a bare array of integer-id asks rather than
+  `{asks: […]}`. Each has an arm, because an audit
   that read the schema gap as lost position would report 17 false violations
   on one real `linklater` snapshot — confirmed by deleting the guard and
   watching exactly that happen.
@@ -506,17 +507,29 @@ and the whole suite exists because two pairs of those are easy to confuse.
   1 for a real disagreement, 2 for an arm that could not be settled. A
   snapshot that both violates and declines exits 1, because a disagreement is
   actionable and a gap is only a reason to go looking. That pair has an arm.
-- THE STANDING NOT-EVALUABLE IS NOT A DECLINE. The dependency-edge arm can
-  never be settled on today's schema — scope prints `depends on:` as prose and
-  nothing persists it (`docs/wave-queue-dag-audit-findings.md`) — so counting
-  it as a declined arm would make every clean run exit 2 and drain the code of
-  signal. It prints `n/a` and stays out of both tallies, and an arm asserts
-  that a fully conforming snapshot exits 0 with no INCOMPLETE.
-- THE EDGE ARM STILL REALLY EVALUATES. It is not a stub waiting on a schema:
-  given a snapshot carrying `depends_on`, it checks strict source-before-target
-  and rejects a self-edge. Three arms — earlier-wave edge, later-wave edge,
-  self-edge — since an arm nobody watched fire is indistinguishable from an
-  arm that returns "no edges" forever.
+- THE STANDING NOT-EVALUABLE IS NOT A DECLINE. Fourteen of the sixteen real
+  snapshots persist no dependency edge — the schema does not ask for one, and
+  scope prints `depends on:` as prose (`docs/wave-queue-dag-audit-findings.md`)
+  — so counting the absence as a declined arm would make most clean runs exit 2
+  and drain the code of signal. It prints `n/a` and stays out of both tallies,
+  and an arm asserts that a fully conforming snapshot exits 0 with no
+  INCOMPLETE.
+- THE EDGE ARM REALLY EVALUATES, AND REAL DATA REACHES IT. `carn/phase/1a`
+  persists `depends_on` as arrays on all five entries; the arm checks strict
+  source-before-target and rejects a self-edge. Four arms — earlier-wave edge,
+  later-wave edge, self-edge, and the five-entry multi-edge graph that snapshot
+  actually carries — since an arm nobody watched fire is indistinguishable from
+  an arm that returns "no edges" forever.
+- A FIELD IN THE WRONG TYPE DECLINES, IT DOES NOT CRASH. `carn/phase/1c`
+  persists the same key as prose (`"none"`, `"wave 1"`), which iterated as an
+  array exits 5 — outside the script's own 0/1/2 contract — and in a batch run
+  silently drops every snapshot after it. Two arms: the prose value declines,
+  and a good snapshot listed after a prose one is still reported.
+- THE CORPUS IS DISCOVERED, NOT LISTED. `--census ROOT` walks for
+  `*/local/loops/*/run-state.json`, because a hand-written list of repos
+  silently omits the next one. Three arms: nested snapshots are found, a
+  `run-state.json` outside `local/loops` is not, and a root with no snapshot
+  exits 2 instead of quietly auditing something else.
 - THE ARM COUNT IN THE HEADLINE IS ASSERTED. It is what separates "five arms
   agreed" from "one arm ran". Deleting the contiguity arm from the audit
   reddens six assertions, three of them count assertions.

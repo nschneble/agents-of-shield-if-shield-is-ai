@@ -6,56 +6,154 @@ abstract describes "wave-based topological dispatch that computes parallel execu
 dependency graphs". `scripts/wave-queue-dag-audit.sh` is that check. This is its output against every
 wave-queue snapshot on disk on 2026-09-14, and the verdict.
 
+The corpus is discovered, never listed: `./scripts/wave-queue-dag-audit.sh --census ~/Developer/Repos`
+walks for `*/local/loops/*/run-state.json` and audits whatever it finds. A first pass at this audit named
+four repos by hand and missed a fifth entirely — `carn`, which turned out to hold 9 of the 16 snapshots and
+every violation below. A hand-written repo list is a census that goes stale the day a new repo runs the
+loop, which is why the script does the walking now.
+
 ## Verdict
 
-**The checkable half holds; the headline half is not checkable, and that is itself the finding.**
+**Both halves are checkable on real data, and the assignment half is violated — five times, all in `carn`.**
 
 The invariant has two halves. One says every dependency edge orders its source wave strictly before its
 target. The other says every task gets a wave number, with no gaps and nothing left unassigned.
 
 What is audited is the PERSISTED queue — `run-state.json`'s `queue[]` — not `looper-scope`'s own report,
-which is prose and is not kept. That distinction is the whole reason the two halves land differently.
+which is prose and is not kept.
 
-- **Assignment half: PASS, 13 arms over 3 conforming snapshots, 0 violations.** Every wave numbered,
-  no number reused, no gap in `1..N`, every goal-contract ask claimed by some wave, and no `closes` id
-  naming an ask the contract never declared.
-- **Ordering half: NOT EVALUABLE against any real data.** `looper-scope` emits `depends on: <wave M | none>`
-  as a column of its section-3 prose report (`skills/looper-scope/SKILL.md`), and nothing persists it.
-  `run-state.json`'s `queue[]` is `{wave, candidate, status, commit, closes}`
-  (`skills/loop-de-looper/references/state-schemas.md`) — there is no dependency field, and a `grep` for
-  one across every `local/` in this repo, `linklater`, `tuffgal` and `rss-reader` returns nothing. The
-  scope report itself is not archived either: no `gates.jsonl` survives on disk (the custodian's Phase A
-  reaps them) and `local/custodian/history-index.jsonl` keeps `wave` but no edges.
+- **Assignment half: 5 violations over 37 settled arms across 16 snapshots, exit 1.** Four snapshots
+  disagree with the invariant, and each disagreement is real:
+  - `carn/phase/1b` — the contract declares `A1` and `A2`; all eight waves close `A1`, so `A2` is claimed
+    by nothing.
+  - `carn/phase/1c` — same shape, two waves, `A2` unclaimed.
+  - `carn/phase/1d` — two violations. Wave numbers run `1..19, 21..24`: **wave 20 is missing**. And two
+    entries close `round-2-item-1`, an id the contract never declares.
+  - `carn/phase/1e` — one entry carries `wave: "9b"`, a string where the shape wants a number.
+- **Ordering half: EVALUABLE, on the 2 of 16 snapshots that persist an edge field — and it passes where
+  the field is well formed.** `carn/phase/1a` carries `depends_on` on all five entries (`[]`, `[1]`, `[1]`,
+  `[1,2]`, `[2,3,4]`); the arm evaluates that graph and finds no edge pointing at its own wave or later.
+  `carn/phase/1c` carries the same key as prose (`"none"`, `"wave 1"`), which is a schema the arm cannot
+  read, so it declines there rather than guessing.
 
-So the system's dependency graph exists only in the prose of a report that is read once and discarded.
-No dependency graph was fabricated to validate against; the audit probes for the field, finds none, and
-says so on every snapshot.
+The other fourteen snapshots carry no edge field at all, and on those the arm still reports NOT EVALUABLE:
+`looper-scope` emits `depends on: <wave M | none>` as a column of its section-3 prose report
+(`skills/looper-scope/SKILL.md`), the documented `queue[]` shape is `{wave, candidate, status, commit, closes}`
+(`skills/loop-de-looper/references/state-schemas.md`), and nothing in the writer persists the edges. So the
+field is real but incidental — two runs wrote it because their orchestrator chose to, not because the
+schema asks for it, and one of those two wrote prose.
 
-**One real proxy for the ordering half does pass.** A correct topological order shows up downstream as
-waves landing in wave order, and that is checkable from git. `rss-reader`'s three shipped waves each have
-a resolvable sha, and each is an ancestor of the next — so on the one historical run with enough shipped
-waves to test, execution did realize the declared wave order. It is a consequence of the invariant, not
-the invariant, and the audit labels it as its own arm rather than folding it into the ordering verdict.
+Nor is scope's report archived: twelve `gates.jsonl` files survive on disk (seven of them in `carn`), and
+no dependency edge appears in any of them — the two `depends` hits inside them are English in a finding's
+text. `local/custodian/history-index.jsonl` keeps `wave` but no edges.
 
-**The other finding is schema drift, not a violation.** Four of the seven snapshots predate the documented
-queue shape, in three distinct eras — `linklater/main-v160-review` keys entries `n` with values like `"8a"`
-and `"1c"`, and the three `tuffgal` runs carry `queue: []` with their wave records in top-level `wave_N`
-keys and a `goal_contract` that is a bare array of integer-id asks. The audit declines on each rather than
-reporting the gap as lost position. Removing that guard makes the `linklater` snapshot report 17 false
-violations, which is what the suite's legacy arms exist to catch.
+**The git proxy for the ordering half passes on every run that can answer it.** A correct topological order
+shows up downstream as waves landing in wave order, which is checkable from git ancestry. Six snapshots have
+at least two shipped waves with resolvable shas — `carn/phase/{1a,1b,1c,1d,1e}` and
+`rss-reader/theme-palette-logo` — and all six pass. It is a consequence of the invariant, not the invariant,
+and the audit labels it as its own arm rather than folding it into the ordering verdict.
 
-## Output — all seven snapshots
+**Schema drift is not a violation.** Eight of the sixteen snapshots predate the documented queue shape, in
+four distinct eras — `carn/fix/3-pin-ssh-channel-close-kill` has no `queue` key at all and keys its records
+under `waves`; `carn/phase-1d` keys entries `id: "wave-1"`; `linklater/main-v160-review` keys entries `n`
+with values like `"8a"` and `"1c"`; and `carn/phase/{1f,1f-leftovers}` plus the three `tuffgal` runs carry
+`queue: []` with their wave records in top-level `wave_N` keys and a `goal_contract` that is a bare array of
+integer-id asks. The audit declines on each rather than reporting the gap as lost position — 45 arms
+declined in all. Removing that guard makes the `linklater` snapshot report 17 false violations, which is
+what the suite's legacy arms exist to catch.
+
+**A prose-era edge value declines too, and that guard is load-tested.** Before it existed, `carn/phase/1c`'s
+string `depends_on` crashed the audit — `jq: error … Cannot iterate over string ("none")`, exit 5, a code
+the script's own 0/1/2 contract does not define — and in a batch run every snapshot after it was dropped
+with no summary line at all. That is how the first pass at this audit reported a clean corpus: it never read
+past the crash, and never ran against `carn` to begin with.
+
+## Output — all sixteen snapshots
 
 ```
-wave-queue-dag-audit — 7 snapshot(s)
-  DEPENDENCY-EDGE ORDERING IS NOT CHECKABLE ON THIS SCHEMA, see each report
+wave-queue-dag-audit — 16 snapshot(s)
+  DEPENDENCY-EDGE ORDERING IS CHECKABLE ONLY WHERE PERSISTED, see each report
 
-  local/loops/investigate-custodian-89-research-findings/run-state.json
+  /Users/nickschneble/Developer/Repos/agents-of-shield-if-shield-is-ai/local/loops/investigate-custodian-89-research-findings/run-state.json
     ok     every entry has a wave number      0
     ok     no wave number used twice          0
     ok     waves are 1..N with no gaps        0
     ok     every ask is claimed by a wave     0
     ok     every closes id is a declared ask  0
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/fix/3-pin-ssh-channel-close-kill/run-state.json
+    SKIP   wave numbering (3 arms)            no queue[] array in this snapshot
+    SKIP   ask assignment (2 arms)            no queue entry carries `closes` — asks are not mapped to waves here
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase-1d/run-state.json
+    SKIP   wave numbering (3 arms)            1 entry(s), none carrying a numeric `wave` — pre-queue-shape snapshot
+    SKIP   ask assignment (2 arms)            no queue entry carries `closes` — asks are not mapped to waves here
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1a/run-state.json
+    ok     every entry has a wave number      0
+    ok     no wave number used twice          0
+    ok     waves are 1..N with no gaps        0
+    SKIP   ask assignment (2 arms)            no queue entry carries `closes` — asks are not mapped to waves here
+    ok     dependency edges ordered           0
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1b/run-state.json
+    ok     every entry has a wave number      0
+    ok     no wave number used twice          0
+    ok     waves are 1..N with no gaps        0
+    VIOLATION every ask is claimed by a wave  got 1 · want 0
+    ok     every closes id is a declared ask  0
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1c/run-state.json
+    ok     every entry has a wave number      0
+    ok     no wave number used twice          0
+    ok     waves are 1..N with no gaps        0
+    VIOLATION every ask is claimed by a wave  got 1 · want 0
+    ok     every closes id is a declared ask  0
+    SKIP   dependency edges ordered           2 entry(s) carry a non-array edge value — a shape this arm cannot read
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1d/run-state.json
+    ok     every entry has a wave number      0
+    ok     no wave number used twice          0
+    VIOLATION waves are 1..N with no gaps     got 1 · want 0
+    ok     every ask is claimed by a wave     0
+    VIOLATION every closes id is a declared ask got 1 · want 0
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1e/run-state.json
+    VIOLATION every entry has a wave number   got 1 · want 0
+    ok     no wave number used twice          0
+    ok     waves are 1..N with no gaps        0
+    ok     every ask is claimed by a wave     0
+    ok     every closes id is a declared ask  0
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1f-leftovers/run-state.json
+    SKIP   wave numbering (3 arms)            queue[] is empty — a snapshot keeping its wave records elsewhere
+    SKIP   ask assignment (2 arms)            no queue entry carries `closes` — asks are not mapped to waves here
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1f/run-state.json
+    SKIP   wave numbering (3 arms)            queue[] is empty — a snapshot keeping its wave records elsewhere
+    SKIP   ask assignment (2 arms)            no queue entry carries `closes` — asks are not mapped to waves here
+    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
+    n/a    execution realizes wave order      not requested — pass --git REPO
+
+  /Users/nickschneble/Developer/Repos/linklater/local/loops/main-v160-review/run-state.json
+    SKIP   wave numbering (3 arms)            17 entry(s), none carrying a numeric `wave` — pre-queue-shape snapshot
+    SKIP   ask assignment (2 arms)            snapshot declares no goal-contract asks
     n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
     n/a    execution realizes wave order      not requested — pass --git REPO
 
@@ -65,12 +163,6 @@ wave-queue-dag-audit — 7 snapshot(s)
     ok     waves are 1..N with no gaps        0
     ok     every ask is claimed by a wave     0
     ok     every closes id is a declared ask  0
-    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
-    n/a    execution realizes wave order      not requested — pass --git REPO
-
-  /Users/nickschneble/Developer/Repos/linklater/local/loops/main-v160-review/run-state.json
-    SKIP   wave numbering (3 arms)            17 entry(s), none carrying a numeric `wave` — pre-queue-shape snapshot
-    SKIP   ask assignment (2 arms)            snapshot declares no goal-contract asks
     n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
     n/a    execution realizes wave order      not requested — pass --git REPO
 
@@ -100,31 +192,42 @@ wave-queue-dag-audit — 7 snapshot(s)
     n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
     n/a    execution realizes wave order      not requested — pass --git REPO
 
-QUEUE INVARIANT: 0 of 13 arm(s) violated — INCOMPLETE, 22 arm(s) declined
-exit=2
+QUEUE INVARIANT: 5 of 37 arm(s) violated across 16 snapshot(s)
+exit=1
 ```
 
-Exit 2 is the honest code here: nothing disagreed, and 22 arms could not be settled because four
-snapshots predate the shape they would read.
+Exit 1 is the honest code here: five arms disagreed. Forty-five further arms could not be settled, because
+eight snapshots predate the shape they would read — but a violation outranks incompleteness, so the summary
+line reports the disagreement rather than the gap.
 
 ## Output — the git execution-order proxy
 
+The proxy arm needs a repo, so it runs one repo at a time
+(`--census ~/Developer/Repos/<repo> --git ~/Developer/Repos/<repo>`). Six snapshots can answer it and all
+six pass:
+
 ```
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1a/run-state.json
+    ok     execution realizes wave order      0
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1b/run-state.json
+    ok     execution realizes wave order      0
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1c/run-state.json
+    ok     execution realizes wave order      0
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1d/run-state.json
+    ok     execution realizes wave order      0
+  /Users/nickschneble/Developer/Repos/carn/local/loops/phase/1e/run-state.json
+    ok     execution realizes wave order      0
   /Users/nickschneble/Developer/Repos/rss-reader/local/loops/theme-palette-logo/run-state.json
-    ok     every entry has a wave number      0
-    ok     no wave number used twice          0
-    ok     waves are 1..N with no gaps        0
-    SKIP   ask assignment (2 arms)            snapshot declares no goal-contract asks
-    n/a    dependency edges ordered           NOT EVALUABLE — no entry carries depends_on/dependsOn/depends/blocked_by; scope prints `depends on:` as prose only
     ok     execution realizes wave order      0
 ```
 
-`linklater/main` declines the same arm with `1 shipped wave(s) with a resolvable sha — needs 2`, and this
-repo's own run is `pending` on all five waves. `rss-reader` is the only snapshot on disk that can answer it.
+The rest decline for want of shipped waves: `linklater/main` and this repo's own run have one resolvable
+sha each and the arm needs two; the remaining eight have none.
 
-## What would make the ordering half checkable
+## What would make the ordering half checkable everywhere
 
-Persisting `depends_on: [<wave>, …]` on each `queue[]` entry when the orchestrator writes the queue. The
-audit's arm 6 already evaluates that field the moment any snapshot carries it — strict source-before-target,
-which also rejects a self-edge — so the gap is in the writer, not the check. Whether it is worth adding is
-a separate scope decision, not one this audit makes.
+Persisting `depends_on: [<wave>, …]` on each `queue[]` entry when the orchestrator writes the queue —
+as an array of wave numbers, which is what `carn/phase/1a` already does and what the arm reads. Two runs
+have written the field unprompted and one of those two wrote prose into it, so the gap is not that the
+idea is untried; it is that the schema does not ask, and an unasked-for field arrives in whatever shape
+the writer felt like. Whether to ask for it is a scope decision, not one this audit makes.
