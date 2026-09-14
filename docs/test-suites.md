@@ -487,6 +487,45 @@ asserted alongside it. Both because this suite is now what guarantees every
 other suite reaches CI, and a guarantor that can false-green through its own
 accountant guarantees nothing.
 
+## wave-queue-dag-audit
+
+Both-directions test for the wave-queue DAG invariant audit.
+
+The audit has three possible outcomes per arm — ok, VIOLATION, and a decline —
+and the whole suite exists because two pairs of those are easy to confuse.
+
+- A DECLINE IS NOT A PASS. Four of the seven real snapshots on disk predate
+  the documented `queue[]` shape, in three separate eras: entries keyed `n`
+  with values like `"8a"`, an empty `queue[]` with the wave records in
+  top-level `wave_N` keys, and a `goal_contract` that is a bare array of
+  integer-id asks rather than `{asks: […]}`. Each has an arm, because an audit
+  that read the schema gap as lost position would report 17 false violations
+  on one real `linklater` snapshot — confirmed by deleting the guard and
+  watching exactly that happen.
+- A DECLINE IS NOT A VIOLATION EITHER, so the exit code has to separate them:
+  1 for a real disagreement, 2 for an arm that could not be settled. A
+  snapshot that both violates and declines exits 1, because a disagreement is
+  actionable and a gap is only a reason to go looking. That pair has an arm.
+- THE STANDING NOT-EVALUABLE IS NOT A DECLINE. The dependency-edge arm can
+  never be settled on today's schema — scope prints `depends on:` as prose and
+  nothing persists it (`docs/wave-queue-dag-audit-findings.md`) — so counting
+  it as a declined arm would make every clean run exit 2 and drain the code of
+  signal. It prints `n/a` and stays out of both tallies, and an arm asserts
+  that a fully conforming snapshot exits 0 with no INCOMPLETE.
+- THE EDGE ARM STILL REALLY EVALUATES. It is not a stub waiting on a schema:
+  given a snapshot carrying `depends_on`, it checks strict source-before-target
+  and rejects a self-edge. Three arms — earlier-wave edge, later-wave edge,
+  self-edge — since an arm nobody watched fire is indistinguishable from an
+  arm that returns "no edges" forever.
+- THE ARM COUNT IN THE HEADLINE IS ASSERTED. It is what separates "five arms
+  agreed" from "one arm ran". Deleting the contiguity arm from the audit
+  reddens six assertions, three of them count assertions.
+
+Self-contained: every fixture is written by the suite, including a throwaway
+git repo with two real commits for the execution-order proxy arm — inverting
+the two shas is how the RED half of that arm is reached. Nothing reads
+gitignored `local/`.
+
 ## guard-destructive-git
 
 Both-directions test for the PreToolUse guard.
