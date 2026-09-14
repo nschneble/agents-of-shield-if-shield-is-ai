@@ -33,11 +33,24 @@ Neither reaches the question:
   `feature-dyslexic-font-accessibility` w4 and
   `fix/collapse-run-scheduled-story-params` w1 — but as committed waves lacking
   execution evidence, which is a different claim about the same lines. It says
-  nothing about who agreed with whom. The two it cannot see at all are
-  `issue-72-verify-brief-claims` w1 and `fix/58-1-dedup-readjsonbaseline` w1,
-  which its committed-wave predicate never selects. So the strictly new
-  detections are two; the other three are a second, sharper reading of waves
-  already known to be unbacked.
+  nothing about who agreed with whom.
+
+  **The two it misses, it misses for a sharper reason than not selecting
+  them.** `issue-72-verify-brief-claims` w1 and
+  `fix/58-1-dedup-readjsonbaseline` w1 both carry crew lines, so G3's
+  committed-wave predicate selects both. It clears them because G3 groups
+  every line for a wave, not only the reviewers', and each of those waves
+  carries an `executor-handback` line with `verified_by: "executable"` — the
+  executor's own claim about its own build. So one line asserting that
+  somebody ran something satisfies a wave-level predicate in which not one
+  reviewer ran anything.
+
+  That is a more direct answer to the question this audit was scoped to than
+  a selection gap would have been: G3 does look, and what it accepts as
+  execution evidence for a crew pass is a non-reviewer's self-report. The
+  strictly new detections are still two; the other three are a second, sharper
+  reading of waves already known to be unbacked.
+
 - **`loop-receipts` only audits a claim that was made.** A wave claiming
   nothing has nothing for it to check.
 
@@ -57,6 +70,11 @@ of:
 history index plus every live `local/loops/*/gates.jsonl`, deduped on `cite`.
 
 ## The replay
+
+Transcript of one run, 2026-09-14. The census arm reads every live
+`local/loops/*/gates.jsonl`, this run's own included, so re-running it later
+returns larger totals; the five findings are stable because all five branches
+are reaped and cannot grow.
 
 ```
 corpus:   index 1397 line(s) · census 314 line(s) from 12 file(s)
@@ -111,22 +129,38 @@ gate log alone.
   settles, and counts all-flagging groups (4) separately without asserting the
   flags match. Nothing in the schema would let it.
 - **The index carries no `pass` field on any of its 1397 records**, so its
-  groups are wave-coarse and merge interim with final. That makes unanimity
-  HARDER to reach, not easier, so the count under-reports. Only the 27 groups
-  from live files have a real pass.
+  groups are wave-coarse and merge interim with final. That cuts both ways and
+  the direction of the net error is not knowable from the index. Merging makes
+  the all-clean arm harder to satisfy, since one flagging line anywhere in the
+  wave disqualifies the group. It makes the `agents >= 2` arm EASIER: two
+  passes that each had a single reviewer merge into a two-agent group and
+  qualify as a unanimity between reviewers who never reviewed the same work.
+  An index with no `pass` cannot tell the two cases apart, so no claim about
+  over- or under-reporting is made here. Only the 27 groups from live files
+  have a real pass.
 - **33 legacy-era groups are excluded, not cleared.** Their records predate
   `verified_by`. They are unevidenced either way, and folding them in would
   report 38 rather than 5 — turning a schema gap into the bulk of the finding.
-- **`verified_by` is free text** — 61 distinct values across the index, mostly
-  one-off prose like `orchestrator, ran the suite`. T1 is the strict reading
-  (only `llm`/null counts as unbacked) and is the one the verdict uses. T2,
-  which counts any non-`executable` value as unbacked, finds 40. The two groups
-  in the gap are `agents-of-shield-if-shield-is-ai/outstanding-refactors` wave
-  `final` and `.../reduce-reuse-recycle` wave `W0`, whose lines carry prose
-  asserting execution (`orchestrator ran readlink on the live symlink`,
-  `orchestrator git log -S'no_probe' main..HEAD`). Both branches are reaped, so
-  no receipt corroborates either; `reduce-reuse-recycle` is also where G2's one
-  violation sits.
+- **`verified_by` is free text** — 60 distinct non-null values across the index
+  (61 if `null` is counted as a value), mostly one-off prose like
+  `orchestrator, ran the suite`. T1 is the strict reading (only `llm`/null
+  counts as unbacked) and is the one the verdict uses. T2, which counts any
+  non-`executable` value as unbacked, finds 40. The two groups in the gap are
+  `agents-of-shield-if-shield-is-ai/reduce-reuse-recycle` wave `W0`, whose
+  lines carry prose asserting execution (`orchestrator ran readlink on the
+live symlink`), and `carn/phase/1d` wave 16 pass `post-build`, where
+  `the-stickler` and `the-auditor` both wrote the bare word `manual`.
+  `reduce-reuse-recycle` is reaped and is also where G2's one violation sits;
+  `carn/phase/1d` is not reaped and does carry a `receipts.jsonl`, so that one
+  is the only group in the gap a receipt could actually settle.
+
+  `agents-of-shield-if-shield-is-ai/outstanding-refactors` wave `final` is NOT
+  one of the two, and an earlier revision of this file named it as one. Its
+  lines include `agent: null` rollup entries, so the group is excluded before
+  either bucket sees it — and the second evidence string quoted there,
+  `orchestrator git log -S'no_probe' main..HEAD`, belongs to that excluded
+  group rather than to a group in the gap.
+
 - **The field is self-reported.** T1 trusts a reviewer saying `llm`, which is
   a reviewer accurately confessing. A reviewer typing `executable` without
   running anything is outside what this audit, or G3, can see; only receipts

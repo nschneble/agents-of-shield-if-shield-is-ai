@@ -59,7 +59,8 @@ under `waves`; `carn/phase-1d` keys entries `id: "wave-1"`; `linklater/main-v160
 with values like `"8a"` and `"1c"`; and `carn/phase/{1f,1f-leftovers}` plus the three `tuffgal` runs carry
 `queue: []` with their wave records in top-level `wave_N` keys and a `goal_contract` that is a bare array of
 integer-id asks. The audit declines on each rather than reporting the gap as lost position — 45 arms
-declined in all. Removing that guard makes the `linklater` snapshot report 17 false violations, which is
+declined in all. Removing that guard makes the `linklater` snapshot fail its every-entry-has-a-wave-number
+arm — one violated arm of three, carrying a count of 17 entries, not 17 separate violations — which is
 what the suite's legacy arms exist to catch.
 
 **A prose-era edge value declines too, and that guard is load-tested.** Before it existed, `carn/phase/1c`'s

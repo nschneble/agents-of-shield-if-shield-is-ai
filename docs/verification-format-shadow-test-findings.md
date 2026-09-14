@@ -7,40 +7,60 @@ DISAGREE_CONCERN — in place of free-text reviewer pushback.
 
 Neither format is adopted here. Both are applied after the fact to work this system already shipped,
 and scored against what the original step actually concluded. Everything below is reconstructed from
-records on disk as of 2026-09-14 across `~/Developer/Repos` — 88 wave journals and 12 `gates.jsonl`
-logs in five repos. Every figure names the command that produces it.
+records on disk across `~/Developer/Repos`:
+
+```
+find ~/Developer/Repos -path '*/local/loops/*' -name 'wave-*.jsonl' | wc -l   # 90
+find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl | wc -l      # 12
+```
+
+That corpus is live and includes this run's own records, so both counts grow while the run does.
+Every figure below either names the command that produces it or scopes that command to a fixed set of
+waves, and where a figure is a transcript of one replay it says so.
 
 ## Verdicts
 
-**E-2, structured verification: CONFIRMED, narrowly, and not as a blanket rule.** On four real review
-steps that reached a conclusion about code no test exercised, the structured format agreed with all
-four verdicts and added something to two of them. In one it supplied a missing premise the original
-conclusion needed and did not have; in another it added nothing at all. Its value is not accuracy —
-it is that the PREMISES field forces the reviewer to enumerate the inputs on a path instead of
-reasoning inside a window it drew itself, and in both cases where the original was incomplete, the
-window was the defect. It pays where a claim spans several paths or several inputs and does not pay
-where one grep settles the question, so the rule worth having is conditional, not universal.
+**E-2, structured verification: CONFIRMED very narrowly, for one field, and with a demonstrated
+failure mode of its own.** On four real review steps that reached a conclusion about code no test
+exercised, the structured format agreed with all four verdicts. What it added is thinner than an
+earlier revision of this document claimed, and is set out in [the scorecard](#scorecard): one blind
+case gained a genuine but modest strengthening, one blind case gained a correct new premise attached
+to a conclusion that turned out to be false, the held-out case gained nothing, and the case that
+gained most was contaminated. Its value is not accuracy — it is that the PREMISES field forces the
+reviewer to enumerate the inputs on a path instead of reasoning inside a window it drew itself, and
+that field is the only part of the template this evidence supports. The rest of the template is where
+case 3 went wrong: it dressed one under-powered probe as a proof, and made a wrong conclusion look
+derived. It pays where a claim spans several paths or several inputs and does not pay where one grep
+settles the question, so the rule worth having is conditional, not universal — and it is not a
+substitute for executing the thing.
 
 **E-5, three-tag findings: NOT CONFIRMED.** This system already has a three-token discrete finding
 field, `outcome` (`refute` / `batch` / `promote`), already scoped per-reviewer with no aggregation.
-Across 122 crew lines, 33 carry a legal token, 13 carry an off-schema one, and 76 carry none —
+Across 126 crew lines, 33 carry a legal token, 13 carry an off-schema one, and 80 carry none —
 because unlike `kind`, the `outcome` enum is documented and not enforced. Retagging 13 real findings
-from one reviewer, 9 flipped tag depending on which proposition you first invent for them to be about,
-2 fit no tag at all, and the 2 that mapped without strain were the ones contradicting something the
-executor had actually written down. The binding constraint here is an unenforced field, not a missing
-vocabulary.
+from one reviewer, 2 fit no tag at all, and the 2 that mapped without strain were the ones
+contradicting something the executor had actually written down. The binding constraint here is an
+unenforced field, not a missing vocabulary.
 
 ## Method, and what is being tested
 
 Both papers were fetched, not recalled.
 
 E-2 sources arxiv 2603.01896 (Ugare & Chandra, _Agentic Code Reasoning_,
-https://arxiv.org/abs/2603.01896). Its template has five fields: DEFINITIONS, PREMISES, EXECUTION
-TRACES, COUNTEREXAMPLE-OR-PROOF, FORMAL CONCLUSION. The claimed 78% → 88% / 93% band is for one task,
-patch equivalence, defined as "executing the repository's test suite produces identical pass/fail
-outcomes for both patches" — 170 curated pairs and 200 real-world pairs. The EXECUTION TRACES field
-is filled **per test**. The paper also states it scores "only the final binary answer", not whether
-the reasoning steps are themselves correct.
+https://arxiv.org/abs/2603.01896). Its patch-equivalence template has six fields: DEFINITIONS,
+PREMISES, ANALYSIS OF TEST BEHAVIOR, COUNTEREXAMPLE, FORMAL CONCLUSION, ANSWER. The claimed
+78% → 88% / 93% band is for one task, patch equivalence, defined as "Two patches are equivalent
+modulo tests if and only if executing the repository's test suite (F2P ∪ P2P) produces identical
+pass/fail outcomes for both patches" — 170 curated pairs and 200 real-world pairs. The third field is
+filled **per test**. The paper also states it scores "only the final binary answer", not whether the
+reasoning steps are themselves correct.
+
+**The four case write-ups below rename two of those fields**, and say so here rather than in a
+footnote: ANALYSIS OF TEST BEHAVIOR appears as EXECUTION TRACES, and COUNTEREXAMPLE as
+COUNTEREXAMPLE-OR-PROOF. ANSWER is dropped as redundant with FORMAL CONCLUSION outside a benchmark.
+The first rename is not cosmetic — "analysis of test behavior" is anchored on tests by name, which
+makes applying it to steps with no tests a larger re-siting than the section below originally
+admitted.
 
 E-5 sources arxiv 2608.18167 (Qiu & Gill, _Adversarial Review: Structured Disagreement for Grounded
 Agentic Code Review_, https://arxiv.org/abs/2608.18167). The three tag names are verbatim. In the
@@ -50,9 +70,9 @@ two halves: over-decomposition, where the critic confirms weak signals into thin
 and yielding-to-rebuttal, where the critic drops a real bug on a confident rebuttal carrying no code
 evidence.
 
-Both proposals re-site their source. E-2's trace field is anchored on an existing test suite, and is
-here applied to steps that have none. E-5's tags move from critic-tags-reviewer to
-reviewer-tags-artifact. The verdicts above are verdicts on the re-sited formats, because the re-sited
+Both proposals re-site their source. E-2's third field is anchored on an existing test suite — by
+name, not merely by context — and is here applied to steps that have none. E-5's tags move from
+critic-tags-reviewer to reviewer-tags-artifact. The verdicts above are verdicts on the re-sited formats, because the re-sited
 formats are what E-2 and E-5 propose. Where the re-siting is what breaks, the report says so.
 
 Nothing in E-5 is aggregated across reviewers, and nothing below builds or proposes aggregation. The
@@ -143,8 +163,9 @@ one of three warnings:
 
 **DEFINITIONS.** D2: a file is VISIBLE to the scan iff bytes from it can reach the awk finder.
 
-**PREMISES.** All from `scripts/doc-bloat-scan.sh`, unchanged since `c680461` (2026-08-20) and so the
-same file the review reasoned about.
+**PREMISES.** All from `scripts/doc-bloat-scan.sh` in `agents-of-shield-if-shield-is-ai`, unchanged
+since that repo's `c680461` (2026-08-20) and so the same file the review reasoned about. The scan
+lives in this repo; the fixture it cannot see lives in `carn`.
 
 - P1. `EXT_RE='\.(ts|tsx|js|jsx|mjs|cjs|c|h|cc|cpp|hpp|hh|go|java|swift|rs|kt|kts|scala|cs|m|mm)$'`
   — anchored at end of record.
@@ -200,6 +221,9 @@ raw newline or control byte.
 **PREMISES.** Enumerate every attacker-controlled input on the path to the sink, not only the one the
 warning names.
 
+- P0. The file carries **four** `${error}` interpolation sinks at `375c2b1` — `server.ts:74`, `:118`,
+  `:129` and `:135`. Only `:118` is traced below. That narrowing was not stated when the trace was
+  written and is not justified by anything in the warning, which names no line.
 - P1. The sink is `src/ssh/server.ts:118`, `console.error(\`ssh: ${ip} running ${service} failed,
   ${error}\`)`, in the `.catch`on`handleExec`.
 - P2. `service` comes from `commandPattern`, one of two literals or a fixed string.
@@ -222,36 +246,86 @@ warning names.
 | `spawnGit` → `signal.reason`           | a DOMException with fixed text                       |
 | `spawnGit` → `spawn()` sync throw      | **yes** — the raw `gitProtocol` value, via P4 and P5 |
 
-**COUNTEREXAMPLE-OR-PROOF.** The fourth path is a counterexample to the warning's stated reason but
-not to its conclusion, and settling which needs P5's escaping behavior pinned rather than assumed. A
-probe on node v26.8.2 with a payload of `version=2`, a newline, a fake log line and two SGR escapes:
+**COUNTEREXAMPLE-OR-PROOF.** The fourth path is a counterexample to the warning's stated reason, and
+whether it is also one to its conclusion turns on P5's escaping behavior. The original probe, on node
+v26.8.2 with a payload of `version=2`, a newline, a fake log line and two SGR escapes:
 
 ```
 TypeError [ERR_INVALID_ARG_VALUE]: The property 'options.env['GIT_PROTOCOL']' must be
 a string without null bytes. Received 'version=2\nFAKE-LOG-LINE\x1B[31mred\x1B[0m\x00'
 ```
 
-Raw newlines in the message: 0. Raw ESC bytes: 0. `util.inspect` escapes both, and truncates its
-inspection at 128 characters.
+Raw newlines in the message: 0. Raw ESC bytes: 0. That probe's payload is 36 characters, and **the
+result does not generalize past 76.**
 
-**FORMAL CONCLUSION.** The sink is not injectable, so the review's verdict is right. Its stated
-reason does not support it: the input that reaches the sink is not the repo name, and is not
-charset-validated at all. What makes the path safe is `util.inspect`'s escaping — a premise the
-original never had to articulate, and which nothing in the repo pins.
+**CORRECTION — the conclusion this section originally drew is false.** Re-probed across payload
+lengths on the same node build. `n=64` gives a 76-character value and `n=65` a 77-character one:
 
-Outcome: **agrees on the verdict, contradicts the reason, and adds the premise the verdict rests on.**
+```
+node -e 'const f=p=>{try{require("child_process").spawn("git",["--version"],{env:{GIT_PROTOCOL:p}})}
+catch(e){return e.message}};
+for(const n of [64,65,66,300]){const p="version=2\nF"+"A".repeat(n)+"\x00";
+console.log(p.length,(f(p).match(/\n/g)||[]).length)}'      # 76 0 · 77 1 · 78 1 · 312 1
+```
+
+Once the inspected string **both** contains a `\n` **and** reaches 77 characters — counting the NUL
+that triggers the throw — `util.inspect` stops rendering it as one quoted literal and renders it as a
+multi-line concatenation, breaking at each escaped newline. Every one of those breaks is a REAL
+newline in the error message. The boundary is exactly 77 and does not move with where the newline
+sits: a value whose only newline is its last character behaves the same as one whose newline is its
+first. A payload carrying three newlines produces three. A payload carrying none produces zero at any
+length tested up to 2000. The escaping is per character and never lapses, so the attacker's own `\n`
+and ESC bytes stay escaped; what changes is that `util.inspect` adds newlines of its own, at
+positions the attacker chooses by padding:
+
+```
+... Received 'a\n' +
+  'FAKE-LINE-ONE\n' +
+  'FAKE-LINE-TWOccc…\x00'
+```
+
+Two things follow. Under D3 as written — a sink is injectable iff attacker-controlled input reaches
+it carrying a raw newline — **the sink is injectable**, and the section's stated conclusion is wrong.
+Under the concern class the warning was actually about, log line forgery, it is not: every injected
+line is bracketed by `  '` and `\n' +`, so an attacker can start a new physical line in the operator
+log but cannot control how it begins or ends. The honest reading is that D3 was drawn too coarsely
+for the question and the trace then answered D3 rather than the question.
+
+A 300-character payload with no newline in it produces zero raw newlines, which is why the wave's own
+adversarial check — an unseen 300-char payload — passed. The payload was longer than the threshold
+and missed the other half of the condition. A single probe that varies one dimension is not a proof
+however formally it is laid out, and the template's COUNTEREXAMPLE-OR-PROOF heading is what made this
+one read as settled.
+
+**FORMAL CONCLUSION.** The review's verdict is right about log injection and its stated reason does
+not support it: the input that reaches the sink is not the repo name, and is not charset-validated at
+all. What the structured trace contributes that survives is P4 — a second, wholly unvalidated
+attacker-controlled input the warning never named. What it contributes that does not survive is the
+proof it attached to it.
+
+Outcome: **agrees on the verdict, contradicts the reason, adds one correct premise, and asserts one
+false one.**
 
 ### Scorecard
 
-| Case                     | Blind    | Verdict | Reason          | What the format added                            |
-| ------------------------ | -------- | ------- | --------------- | ------------------------------------------------ |
-| 1 — semaphore window     | no       | agrees  | agrees          | two cases outside the window, both later real    |
-| 2 — invisible fixture    | yes      | agrees  | agrees          | the cost to the rule that depends on the tool    |
-| 3 — reachable `${error}` | yes      | agrees  | **contradicts** | the second input, and the premise doing the work |
-| 4 — unimported `db.ts`   | held out | agrees  | agrees          | **nothing** — see below                          |
+| Case                     | Blind    | Verdict | Reason          | What the format added                                               | Holds up           |
+| ------------------------ | -------- | ------- | --------------- | ------------------------------------------------------------------- | ------------------ |
+| 1 — semaphore window     | no       | agrees  | agrees          | two cases outside the window, both later real                       | yes, but not blind |
+| 2 — invisible fixture    | yes      | agrees  | agrees          | invisibility by both entry paths, and two real candidates behind it | yes                |
+| 3 — reachable `${error}` | yes      | agrees  | **contradicts** | a second unvalidated input (holds) + an escaping proof (**false**)  | half               |
+| 4 — unimported `db.ts`   | held out | agrees  | agrees          | **nothing** — see below                                             | n/a                |
 
 Four for four on verdicts. The format did not overturn a single conclusion, which is the honest
-headline: on this evidence it is not a defect-finder.
+headline: on this evidence it is not a defect-finder. Case 3's row carries one asterisk the column
+cannot hold — the trace agrees with the REVIEW's verdict, that operator logs are not forgeable here,
+while contradicting its own D3, under which the sink is injectable. The review was right and the
+template's definition was too coarse to say so.
+
+The "what it added" column is the one that matters and it is thin. Exactly one blind case — case 2 —
+produced an addition that is both new and correct, and it is a strengthening of a claim the free-text
+warning already made rather than a correction of it. Case 3 produced one correct new premise and one
+false conclusion in the same section. Case 4 produced nothing. The case that produced most, case 1,
+had read the answer during research and says so.
 
 ### The held-out case, which narrows the claim
 
@@ -270,30 +344,40 @@ claim holds and the structured format contributes nothing the original sentence 
 That is the useful negative result. The format earns its cost where a claim spans several paths or
 several inputs — case 1's nine paths, case 3's four throw sites and two attacker-controlled inputs —
 and earns nothing where the claim is a single graph fact one grep settles. A blanket "structure every
-execution-free verification" would spend the format on cases 2 and 4 to buy the frame correction in
-cases 1 and 3.
+execution-free verification" would spend the format on case 4 to buy the frame corrections in cases 1
+and 3.
 
-What it changed in the two cases where it paid was the FRAME — case 1's window excluded the two cases
-that mattered, case 3's reason named the wrong input. Both failures are the same shape, and it is the
+What it changed in cases 1 and 3 was the FRAME — case 1's window excluded the two cases that
+mattered, case 3's reason named the wrong input. Both failures are the same shape, and it is the
 shape the PREMISES field exists to prevent: a free-text reviewer reasons inside a boundary it drew
 itself and never has to say where the boundary is, while the template makes the boundary a field
-somebody else can read.
+somebody else can read. That is the whole of what this evidence supports, and it is one field of six.
+
+**The rest of the template did harm in the one case where it was load-bearing.** Case 3's
+COUNTEREXAMPLE-OR-PROOF section ran one probe, at one payload length, and wrote its result as a
+settled fact under a heading that says "proof". The claim was false at any payload of 77 characters
+or more. A free-text reviewer writing "I checked a short payload and saw no raw newlines" would have
+been easier to doubt. Structure is not evidence, and a template that supplies a slot labelled PROOF
+invites filling it with the strongest available reading of whatever was actually run. The PREMISES
+field ran the other way in the same case: it is what surfaced `gitProtocol`, which is real.
 
 Two caveats bound all of this. The paper scores a binary answer against ground truth and reports
 accuracy; there is no binary ground truth here, so these cases are scored three ways — agrees, adds,
 contradicts — and no accuracy number is claimed or comparable. And four cases from one repo is not a
-sample; it is four cases.
+sample; it is four cases, of which one was contaminated, one was half wrong, and one was blind and
+productive.
 
 ## E-5: three-tag findings on one reviewer, three waves
 
-the-chemist, over the three shipped waves of this run — the A5 wave (`e859fc5`), the A1 wave
+the-chemist, over the first three shipped waves of this run — the A5 wave (`e859fc5`), the A1 wave
 (`ea69348`) and the A6 wave (`f78c19e`). Four gate lines and 13 batched findings, all verbatim on
-disk:
+disk. Both commands below are scoped to those three waves; unscoped they select the whole run, which
+kept going after this was written:
 
 ```
-jq -r 'select(.agent=="the-chemist") | [.wave,.pass,.blockers] | @tsv' \
+jq -r 'select(.agent=="the-chemist" and (.wave|IN(1,2,3))) | [.wave,.pass,.blockers] | @tsv' \
   local/loops/investigate-custodian-89-research-findings/gates.jsonl
-jq -r '[.cleanup_batch[] | select(.agent=="the-chemist")] | length' \
+jq -r '[.cleanup_batch[] | select(.agent=="the-chemist" and (.wave|IN(1,2,3)))] | length' \
   local/loops/investigate-custodian-89-research-findings/run-state.json
 ```
 
@@ -301,12 +385,12 @@ Every finding below gets exactly one tag, or `NO FIT` with the reason.
 
 ### The retag
 
-**The tags need an object, and there isn't one.** In the source paper the object is fixed: the critic
-tags the reviewer's flag, so AGREE and DISAGREE have something specific to be about. Re-sited onto a
-crew reviewer, the object has to be supplied. The 13 findings split 10 `test-coverage` to 3 `docs`
-(`jq -r '.cleanup_batch[] | select(.agent=="the-chemist") | .class'`), and that split is exactly the
-line the ambiguity falls on. Nine of the ten coverage findings change tag depending on which object is
-chosen:
+**The tags need an object, and nothing states one.** In the source paper the object is fixed: the
+critic tags the reviewer's flag, so AGREE and DISAGREE have something specific to be about. Re-sited
+onto a crew reviewer, the object has to be supplied. The 13 findings split 10 `test-coverage` to 3
+`docs` (`jq -r '.cleanup_batch[] | select(.agent=="the-chemist" and (.wave|IN(1,2,3))) | .class'`),
+and that split is where the difficulty shows. Nine of the ten coverage findings take a different tag
+under each of two candidate objects:
 
 - **Object A, "the change is correct."** All nine become AGREE — which is true, the chemist's verdict
   on two of those waves was `CLEAN` with 0 blockers — and the entire content of the finding is lost.
@@ -314,13 +398,25 @@ chosen:
 - **Object B, "the change is adequately tested."** All nine become DISAGREE_EVIDENCE — and now the
   reviewer's own `CLEAN` wave verdict is contradicted by its own tags.
 
-The three `docs` findings do not suffer this. Each contradicts a proposition the executor actually
-wrote down — a count, a date argument, a median — so the object is supplied by the artifact and the
-tag lands without a choice being made first.
+**That flip is weaker evidence than it looks, and the reason is worth stating.** Object A is not the
+chemist's object. "The change is correct" is `the-diamantaire`'s domain; the chemist was dispatched
+on test coverage. Restricted to objects inside the reviewer's own assigned domain, nothing flips —
+all nine land on DISAGREE_EVIDENCE and stay there. The ambiguity is manufactured by offering a
+reviewer a proposition from a different reviewer's remit, which is a thing this system's dispatch
+never does.
 
-Neither object is stated anywhere in this system, and nothing supplies one for a finding about code.
-A crew reviewer receives a diff and a domain, not a proposition. That is the central finding for E-5,
-and it is structural, not stylistic.
+So the sharper and smaller version of the claim: the crew's domain assignment already supplies a de
+facto object, which is why the tags are usable at all here. What is missing is any place that states
+it. A crew reviewer receives a diff and a domain, not a proposition, so nothing stops a later reader
+— or a tagger — from resolving the tag against the wrong object, and nothing in the record would show
+that it had happened. That is structural, not stylistic, and it is a smaller finding than an earlier
+revision of this document claimed.
+
+The three `docs` findings do not depend on any of this. Each contradicts a proposition the executor
+actually wrote down — a count, a date argument, a median — so the object comes from the artifact
+rather than from a choice. Having an object is not the same as having a tag that fits, though: one of
+those three, finding 12, has an unambiguous object and still takes NO FIT below, for a reason that
+has nothing to do with objects.
 
 Tagging under Object B, which is the reading that preserves the finding text:
 
@@ -358,15 +454,19 @@ on it.
 valuable finding of that wave: the A6 doc's threshold "was fixed before the TALLY but after the
 deciding evidence was already read", and an unregistered scoring bucket added at write-up time is what
 flips the verdict from threshold-met to threshold-not-met. It is an epistemic objection to the
-reliability of a document's own reasoning — DISAGREE_CONCERN's exact territory — but it is backed by
-concrete citations and two counts. DISAGREE_CONCERN understates it. DISAGREE_EVIDENCE miscategorizes
-it, and worse, selects the wrong branch of the paper's own response protocol: on DISAGREE_EVIDENCE the
-reviewer must "revise using cited code", and there is no code. The tag spells its payload
-`<code citation>`, and findings 6, 12 and 13 cite a document, a timeline and a journal.
+reliability of a document's own reasoning — DISAGREE_CONCERN's exact territory, whose payload the
+paper spells `<epistemic objection>` — but it is backed by concrete citations and two counts.
+DISAGREE_CONCERN understates it. DISAGREE_EVIDENCE miscategorizes it, and its payload is spelled
+`<code citation>`, while findings 6, 12 and 13 cite a document, a timeline and a journal. The paper's
+response protocol on DISAGREE_EVIDENCE is to "revise the flag based on the evidence, or drop it",
+which is not the problem; the problem is that the evidence the tag is built to carry is code, and
+none of these three is about code. (That finding was upheld and acted on: see
+`docs/corrective-wave-rerun-findings.md` §"Correction: the threshold did less work here than the
+framing claims".)
 
-So on 13 real findings the three-tag set fits 9 only after an object is invented for them, fits 2
-without strain, and fits 2 not at all. One of the last two is the finding the reviewer itself rated
-highest.
+So on 13 real findings the three-tag set fits 9 once their object is taken from the reviewer's own
+domain, fits 2 without strain, and fits 2 not at all. One of the last two is the finding the reviewer
+itself rated highest, and it fails on payload rather than on object.
 
 ### What this system already has
 
@@ -387,7 +487,8 @@ system's carries severity, AR's carries the evidence-versus-concern split. Exact
 findings, number 12, is an instance where that split would have carried information the free text
 lost.
 
-The field's real problem is not its vocabulary. Across all 122 crew lines in the corpus:
+The field's real problem is not its vocabulary. Across all 126 crew lines in the corpus — a live
+count, since this run appends to it:
 
 ```
 for f in $(find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl); do
@@ -396,7 +497,7 @@ for f in $(find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl); do
 
 | Value                                            | Lines |
 | ------------------------------------------------ | ----- |
-| absent                                           | 76    |
+| absent                                           | 80    |
 | `refute`                                         | 11    |
 | `promote`                                        | 11    |
 | `batch`                                          | 11    |
@@ -404,11 +505,13 @@ for f in $(find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl); do
 | `CLEARED` — off schema                           | 1     |
 | an entire free-text review pasted into the field | 4     |
 
-33 of 122 carry a legal token; 13 carry an off-schema value, four of them prose runs of 315, 498, 557
+33 of 126 carry a legal token; 13 carry an off-schema value, four of them prose runs of 315, 498, 557
 and 573 characters. `grep -n 'outcome' scripts/loop-finding-audit.sh` prints nothing: unlike `kind`,
 whose enum is enforced and whose enforcement exists precisely because one run logged 31 spellings
 across ~50 lines, `outcome` is documented and unchecked. It drifted the same way and less far — nine
-distinct non-null values against that run's 31 — for the same reason.
+distinct non-null values across 126 lines, against that run's 31 across ~50 — for the same reason.
+The denominators differ by more than a factor of two, so "less far" is about the count of spellings,
+not a rate.
 
 Adding a second three-token vocabulary beside an unenforced first one is not the intervention this
 evidence supports.

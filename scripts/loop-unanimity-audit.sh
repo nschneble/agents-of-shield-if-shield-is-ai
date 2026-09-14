@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # loop-unanimity-audit — finds wave groups where every crew reviewer agreed
-# and not one of them claimed execution behind the verdict. G2 checks a line
-# has provenance, G3 checks a committed wave has some; neither asks whether a
+# and none claimed execution behind the verdict. G2 checks a line has
+# provenance, G3 checks a committed wave has some; neither asks whether a
 # UNANIMOUS crew pass rests on nothing. Usage: see --help.
 set -euo pipefail
 

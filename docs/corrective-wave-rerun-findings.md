@@ -1,10 +1,13 @@
 # Corrective waves: full rerun or one failing step?
 
 Archival classification of every corrective wave this system has produced, against looper-custodian
-issue #89 finding E-9. E-9 sources a runtime-branching-decomposition result (arxiv 2605.15425) in
-which retrying only the failed subtask, rather than the whole downstream chain, measured 52–73% lower
-retry cost than a fixed-plan baseline on a comparable coding-agent workload. The question here is
-whether this system's own corrective history shows the waste that result implies.
+issue #89 finding E-9. E-9 sources a runtime-structured-decomposition result (arxiv 2605.15425), in
+which rerunning only the failed subtask rather than the whole workflow achieved "up to 51.7% lower
+retry cost than monolithic systems and 73.2% lower retry cost than static decomposition baselines"
+on a Kubernetes root-cause-analysis and a debugging workload. Those are two separate ceilings
+against two different baselines, not a band. This system's correctives rerun the whole workflow, so
+the monolithic comparison — 51.7% — is the one that applies. The question here is whether this
+system's own corrective history shows the waste that result implies.
 
 Everything below is reconstructed from records that survive on disk as of 2026-09-14. Every figure
 names the command that produces it. Nothing is recalled.
@@ -15,18 +18,19 @@ names the command that produces it. Nothing is recalled.
 one.
 
 Structural: E-9's unit of retry is "the failed subtask". This system's correctives have no failed
-subtask to retry. Every one of the 15 was triggered by a gate that runs _outside_ the wave — the
+subtask to retry. Every one of the 14 was triggered by a gate that runs _outside_ the wave — the
 orchestrator's post-build crew pass, a specialist re-review, or the owner — after the wave's own
 verify and review had already passed. There is no red step sitting in the journal waiting to be
 re-run narrowly.
 
 Measured: on the five correctives whose step boundaries survive as hook-written receipts, the share of
-execution cost a narrower retry could have elided runs 3%–68%, median 23%. Two of the five do reach
-E-9's 52–73% band on cost, and both are cases where the elided work is what made the fix correct —
-one is a plan step that refused an unsatisfiable brief, the other is the failing measurement the fix
-and its verification are both written against. In 5 of the 8 correctives with a surviving step
-journal, the research or plan step produced a finding that changed what got built — twice by refuting
-the corrective's own brief. A build-only retry in those five ships the wrong fix.
+execution cost a narrower retry could have elided runs 3%–68%, median 23%, and four of those five
+figures are floors rather than exact readings. Two of the five clear E-9's 51.7% monolithic ceiling,
+and both are cases where the elided work is what made the fix correct — one is a plan step that
+refused an unsatisfiable brief, the other is the failing measurement the fix and its verification are
+both written against. In 5 of the 8 correctives with a surviving step journal, the research or plan
+step produced a finding that changed what got built — twice by refuting the corrective's own brief. A
+build-only retry in those five ships the wrong fix.
 
 The narrow path E-9 proposes already exists here and is already used when it fits: `carn`'s
 `16-corrective` is logged `agent: "orchestrator-direct-fix"`, shipped `dbfebca` (1 file, +3−1), and
@@ -41,12 +45,13 @@ find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl \
   -exec jq -r '.kind' {} \; | sort | uniq -c
 ```
 
-returns no `wave-retry`, and every `run-state.json` carries `counters.wave_retries: 0`. The
-corrective record is instead spread across four other `kind` spellings — `corrective`,
+returns no `wave-retry`, and no `run-state.json` carries a non-zero `counters.wave_retries`: of the
+16 on disk, 11 record `0` and 5 have no such field at all. The conclusion survives the distinction;
+the universal does not. The corrective record is instead spread across four other `kind` spellings — `corrective`,
 `corrective-wave`, `correction`, `recrew` — and, more usefully, across wave journals named for the
 corrective (`wave-2c.jsonl`, `wave-5-corrective.jsonl`, `wave-1c1.jsonl`).
 
-## Census: 15 correctives, 8 with step-level evidence
+## Census: 14 correctives, 8 with step-level evidence
 
 | #   | Repo / run                        | Corrective          | Evidence tier      | Commit     | Diffstat     | Trigger                                              |
 | --- | --------------------------------- | ------------------- | ------------------ | ---------- | ------------ | ---------------------------------------------------- |
@@ -58,34 +63,44 @@ corrective (`wave-2c.jsonl`, `wave-5-corrective.jsonl`, `wave-1c1.jsonl`).
 | 6   | carn / phase/1e                   | `5-corrective`      | journal            | `8f4eb1a`  | 8f +356−58   | 3 refuting crew agents, 4 gating bugs                |
 | 7   | carn / phase/1e                   | `15-corrective`     | journal            | `1a10ac2`  | 2f +136−38   | final crew pass, confirmed by the-auditor            |
 | 8   | carn / phase/1f                   | `2` (corrective-G1) | journal            | `fac9b7f`  | 3f +72−20    | crew gating G1                                       |
-| 9   | carn / phase/1e                   | `final-corrective`  | gates line only    | unresolved | —            | crew NO-GO                                           |
-| 10  | carn / phase/1e                   | `16-corrective`     | gates line only    | `dbfebca`  | 1f +3−1      | undocumented exit code ranked as success             |
-| 11  | linklater / main-v160-review      | `1c`                | gates lines        | `adcd4ab9` | 7f +290−34   | gate notes on PR #120                                |
-| 12  | linklater / main-v160-review      | `1d`                | gates lines        | `57152188` | 4f +104−20   | gate notes on PR #120                                |
-| 13  | linklater / main-v160-review      | `9c`                | gates lines        | `abf3daa1` | 20f +742−402 | 4 blockers on PR #122                                |
-| 14  | linklater / main-v160-review      | `9d`                | gates lines        | `978cb36d` | 9f +199−38   | 2 Majors on PR #122                                  |
-| 15  | rss-reader / theme-palette-logo   | `3` corrective      | gates line         | `2d6b987`  | 4f +8−3      | the-auditor WARNING (contrast)                       |
+| 9   | carn / phase/1e                   | `16-corrective`     | gates line only    | `dbfebca`  | 1f +3−1      | undocumented exit code ranked as success             |
+| 10  | linklater / main-v160-review      | `1c`                | gates lines        | `adcd4ab9` | 7f +290−34   | gate notes on PR #120                                |
+| 11  | linklater / main-v160-review      | `1d`                | gates lines        | `57152188` | 4f +104−20   | gate notes on PR #120                                |
+| 12  | linklater / main-v160-review      | `9c`                | gates lines        | `abf3daa1` | 20f +742−402 | 4 blockers on PR #122                                |
+| 13  | linklater / main-v160-review      | `9d`                | gates lines        | `978cb36d` | 9f +199−38   | 2 Majors on PR #122                                  |
+| 14  | rss-reader / theme-palette-logo   | `3` corrective      | gates line         | `2d6b987`  | 4f +8−3      | the-auditor WARNING (contrast)                       |
 
-Rows 1–8 are the **step-reconstructable** sample: N = 8, short of the 10–15 asked for. The seven
-without a step journal are not reaped — the mechanism postdates them. `git log -S "wave-N.jsonl"
+Rows 1–8 are the **step-reconstructable** sample: N = 8, short of the 10–15 asked for.
+
+**A duplicate was removed after first publication.** An earlier revision of this table ran to 15 rows,
+carrying `carn` 1e's `final-corrective` as a separate event from its `15-corrective`. They are one
+event. `carn/local/loops/phase/1e/wave-15-corrective.jsonl` records `"artifact":"1a10ac2"` on its
+commit line, and the `final-corrective` `executor-handback` line in the same directory's
+`gates.jsonl` summarises "commit 1a10ac2" — the gate log names the corrective by the crew pass that
+triggered it while the journal names it by its wave number. Every count below is the deduplicated
+one. The commit message of `f78c19e`, which shipped the first revision, says "fifteen"; it is pushed
+history and is left as it stands, a known discrepancy against this file rather than a second claim.
+
+Of the six rows without a step journal, five predate the mechanism. `git log -S "wave-N.jsonl"
 --reverse` puts the journal's first appearance at `d74c7c9`, 2026-08-09; linklater's
-`main-v160-review` ran 2026-08-07/08 and rss-reader's corrective shipped 2026-06-26. Their per-step
-evidence never existed. Row 9's commit could not be matched to a message on any surviving branch;
-`carn`'s phase branches were squash-merged and `phase/1e` is gone, so only the reachable objects
-survive.
+`main-v160-review` ran 2026-08-07/08 and rss-reader's corrective shipped 2026-06-26, so their
+per-step evidence never existed. The date argument does not cover row 9: `dbfebca` is committed
+2026-08-31, three weeks after the mechanism landed, and has no journal for a different and better
+reason — it never became a wave. `carn`'s phase branches were squash-merged and `phase/1e` is gone,
+so only the reachable objects survive.
 
 `carn` 1a's `recrew` line is excluded: it is a re-review of an already-shipped corrective diff, not a
 corrective.
 
 ## Classification
 
-**Full-wave rerun: 14 of 15 (93%).** All eight step-reconstructable correctives declared all seven
-steps and journaled a completion line for every one. The six wave-level rows were dispatched to
+**Full-wave rerun: 13 of 14 (93%).** All eight step-reconstructable correctives declared all seven
+steps and journaled a completion line for every one. The five wave-level rows were dispatched to
 `the-looper`, which runs the full protocol by construction (`gates.jsonl` logs `ran: "dispatched"`
 then `ran: true` with a shipped commit) — structural inference, not per-step evidence, and labelled
 as such.
 
-**Narrow, no wave: 1 of 15.** Row 10, `orchestrator-direct-fix`.
+**Narrow, no wave: 1 of 14.** Row 9, `orchestrator-direct-fix`.
 
 So the first half of E-9's premise holds: correctives here are overwhelmingly full waves.
 
@@ -93,16 +108,18 @@ The second half — that they were full waves _for what was really one failing s
 
 ### Was the rerun inert?
 
-The threshold was fixed before counting: a meaningful share means **≥30% of step-reconstructable
+The threshold was fixed before the tally: a meaningful share means **≥30% of step-reconstructable
 correctives that both ran all seven steps and had research/plan produce nothing that changed what got
-built**. The second arm is the one that decides it. A full wave is only waste if the re-run steps
-were inert.
+built**. The second arm is the one that decides it. A full wave is only waste if the re-run steps were
+inert.
+Read the caveat below before reading the count; the framing that threshold registration bought
+rigour here is more than the record supports.
 
 Of the 8:
 
 | #   | Did research/plan change the build?                                                                                                                                                                                                                                                                                            |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | **Yes.** Research re-derived the corpus on disk and found two of the brief's six stated constraints false — including the claim that no `gates.jsonl` survives (12 do).                                                                                                                                                        |
+| 1   | **Yes.** Research re-derived the corpus on disk and falsified two claims in the very document the corrective existed to fix — including `docs/wave-queue-dag-audit-findings.md`'s "no `gates.jsonl` survives on disk", where 12 do.                                                                                            |
 | 2   | **Yes.** Plan STOPPED: the brief's items 2–4 were not jointly satisfiable, because the file it ordered deleted also carried non-exclusion environmental facts. Resolved only by an owner amendment.                                                                                                                            |
 | 3   | **Yes.** Research probed node v26.7.0 directly and established which spawn arguments throw synchronously (env value, args, cwd NUL) and which do not — the guard's scope is a guess without it.                                                                                                                                |
 | 4   | Unknown. Journal is bare — completion lines with no notes.                                                                                                                                                                                                                                                                     |
@@ -118,8 +135,40 @@ Against the declared ≥30% threshold the trigger condition is **not met**: the 
 zero, and even scoring all three unknowns as inert reaches 37.5% on an assumption the record does not
 support.
 
+### Correction: the threshold did less work here than the framing claims
+
+Two things are wrong with the paragraph above, and both cut against this document.
+
+**The threshold was registered after the deciding evidence had been read, not before.** It was
+declared at plan time, one step after the research that had already located and read all 8 surviving
+step journals. Registration bought ordering against the TALLY. It bought nothing against the
+evidence, which is the thing pre-registration exists to guard.
+
+**The `Unknown` bucket is not in the declared predicate, and it is what decides the outcome.** The
+threshold as written has two arms, both binary: ran all seven steps, and research/plan produced
+nothing that changed what got built. Rows 4, 7 and 8 satisfy the second arm on its face — nothing in
+their journals records research or plan changing anything — so under the predicate as registered the
+count is 3 of 8, **37.5%, and the threshold is MET**. The third category introduced at write-up time,
+scoring a bare journal as unknown rather than as inert, is the entire difference between a met
+threshold and a zero. That category may well be the better epistemics. It was not declared, and a
+scoring rule chosen after seeing which rows it moves is not a pre-registered rule.
+
+So the honest statement of this section is: **the trigger condition is met under the predicate as
+registered and not met under the predicate as applied**, and the doc chose the second without saying
+it was choosing.
+
+The NOT CONFIRMED verdict survives that correction, and it is worth being precise about why, because
+"the verdict survives" is the cheapest thing a document can assert about its own error. The verdict
+rests on two legs and neither routes through the threshold. The structural leg — that E-9's unit of
+retry, a failed subtask, does not exist in this system's correctives, all of which were triggered by
+a gate outside the wave after the wave's own verify and review passed — is a fact about the census,
+not about the count. The measured leg is the cost table below, which was run anyway precisely because
+the threshold did not trigger it. What the correction does change is that the shadow test is now
+load-bearing rather than supplementary: with the threshold arm contested, the cost measurement is the
+verdict's only quantitative support.
+
 The same pattern shows in the wave-level rows, where the `gates.jsonl` verdicts carry a
-`corrections_to_orchestrator` field: row 14's corrective reported that the sentence its brief told it
+`corrections_to_orchestrator` field: row 13's corrective reported that the sentence its brief told it
 to fix "does NOT exist in the repo — grepped source, both commit messages, PR body."
 
 ## Shadow test
@@ -167,8 +216,8 @@ when the step's work ended by however long the append took to compose.
 |                                                           | verify → commit                 | 10         | 32%   |
 | **agents-of-shield `corrective-1`** (55 total, `e859fc5`) | declare → research + plan       | 6          | 11%   |
 |                                                           | plan → build                    | 22         | 40%   |
-|                                                           | build → verify                  | 8          | 15%   |
-|                                                           | verify → review + learn         | 17         | 31%   |
+|                                                           | build → verify + review         | 8          | 15%   |
+|                                                           | verify + review → learn         | 17         | 31%   |
 |                                                           | learn → commit                  | 2          | 4%    |
 | **carn 1e `15-corrective`** (57 total, `1a10ac2`)         | declare → research + plan       | 19         | 33%   |
 |                                                           | plan → build                    | 19         | 33%   |
@@ -205,26 +254,48 @@ review and learn.
 | carn 1a `2c`                | 68%            | The stop. Plan proved the brief's Amendment-4 instruction unsatisfiable; the build that eventually ran used option A from a _later_ owner amendment. A build-only retry executes the unsatisfiable instruction.                             |
 | carn 1b `4c`                | 23%            | The synchronous-throw boundary the guard is written against, plus a review warning that the guard covers `spawn()` only.                                                                                                                    |
 | carn 1b `9c`                | 3%             | Not separable — research and plan share one append with build; the measurable saving is the 1 execution before the research line.                                                                                                           |
-| agents-of-shield corrective | 11%            | Two false premises in its own brief, one of which ("no `gates.jsonl` survives") the corrective's whole method depended on.                                                                                                                  |
+| agents-of-shield corrective | 11%            | Two false claims in the document it was dispatched to fix, one of which — `docs/wave-queue-dag-audit-findings.md`'s "no `gates.jsonl` survives on disk" — that document's whole conclusion rested on.                                       |
 | carn 1e `15-corrective`     | 54%            | The reproduction. Its plan artifact opens with a measured before-state axe table at 320 and 375px in both themes; the fix targets that measurement and verify re-checks it. A build-only retry has no failing measurement to build against. |
 
-Where 11% and 54% are floors rather than exact: those two cases merge research with plan in one
-append, and the 11% case also merges verify with review and learn, so the separable elidable segment
-is smaller than the true one. The direction of that error favours the narrow-retry case, and it still
-does not carry it.
+**Four of the five figures are floors, and one is exact** — the reverse of what an earlier revision
+of this section said. A step's cost is separable only when its journal line got its own append; where
+two steps share one `printf`, the pair cannot be split and the elidable half of it is invisible.
 
-Median elidable share across the five: **23%**. Range 3–68%.
+| Case                        | Separably elided               | Hidden inside a retained segment | Reading                |
+| --------------------------- | ------------------------------ | -------------------------------- | ---------------------- |
+| carn 1a `2c`                | research + plan                | review, learn                    | floor 68%              |
+| carn 1b `4c`                | research, review               | plan, learn                      | floor 23%, ceiling 77% |
+| carn 1b `9c`                | research                       | plan, review, learn              | floor 3%, ceiling 94%  |
+| agents-of-shield corrective | research + plan                | review; and see below            | floor 11%              |
+| carn 1e `15-corrective`     | research + plan, review, learn | none                             | **exact 54%**          |
 
-E-9's source reports 52–73% lower retry cost. **Two of five cases reach that band on cost alone**, and
-that is the strongest thing the data says for E-9. It is also where the argument stops, because cost
-share is necessary and not sufficient: a step is only waste if eliding it changes nothing. In both
-band-reaching cases it changes everything. `2c`'s elided work is the plan step that refused the
-brief; `15-corrective`'s is the reproduction the fix and its verification are both written against.
+`15-corrective` is the only case where every elidable step has its own boundary, which is why its
+figure is the one to trust and why it was worth holding out.
 
-The cost of being wrong is not symmetric with the saving. The elided steps in census rows 1, 2, 3, 5
-and 6 each caught a brief that was factually wrong about the thing it ordered fixed. A build-only
-retry saves a median fifth of the shell executions and, on this sample's base rate, ships a wrong fix
-five times in eight.
+The agents-of-shield case needs a second caveat that only shows up by reading the commands rather
+than the counts. Its 17-execution segment between the `verify`+`review` append and the `learn` append
+is not 17 executions of learn: enumerating it gives 4 memory reads and 13 commit pre-flight runs
+(`git add`, the correction gates, prettier). Commit pre-flight is retained under a
+build → verify → commit retry, so attributing that whole segment to an elided step would inflate the
+case from 11% to 42%. 11% is the defensible reading. The boundary approximation is doing more work
+here than in the other four, and in a direction that favours the narrow-retry case.
+
+Median elidable share across the five: **23%**, itself a floor. Range 3–68%.
+
+E-9's monolithic comparison reports up to 51.7% lower retry cost. **Two of five cases clear it on cost
+alone** — `2c` at 68% and `15-corrective` at 54% — and that is the strongest thing the data says for
+E-9. It is also where the argument stops, because cost share is necessary and not sufficient: a step
+is only waste if eliding it changes nothing. In both of those cases it changes everything. `2c`'s
+elided work is the plan step that refused the brief; `15-corrective`'s is the reproduction the fix
+and its verification are both written against.
+
+The cost of being wrong is not symmetric with the saving. In census rows 1, 2, 3, 5 and 6 the elided
+steps each changed what got built, and four of the five did it by finding something false: the brief
+was wrong in rows 2 and 6, the document under repair was wrong in row 1, and in row 5 research
+refuted the crew finding that caused the corrective. Row 3 is the other shape — research supplied the
+synchronous-throw boundary the guard had to be written against, which no brief had. A build-only
+retry saves at least a median fifth of the shell executions and, on this sample's base rate, ships a
+wrong fix five times in eight.
 
 ## Secondary findings
 
@@ -242,11 +313,13 @@ rediscover.
    cross-run query selecting on one spelling under-counts. This is the same failure mode
    `skills/loop-de-looper/references/state-schemas.md` already documents for `crew`, reaching further
    than that note says.
-3. **`reason: "corrective"` is written in practice but is not in the schema.** Two journals
-   (`carn/phase/1b/wave-9c.jsonl`, and this repo's own run record) carry `_declared` with
-   `reason: "corrective"`, while `skills/loop-de-looper/references/state-schemas.md` declares the
-   field as `"initial" | "retry" | "resume-after-torn"`. A reader following the schema treats an
-   unrecognised reason as undefined behaviour. Pre-existing; not caused by this analysis.
+3. **`reason: "corrective"` is written in practice but is not in the schema.** Three journals
+   (`carn/phase/1b/wave-9c.jsonl`, `carn/phase/1c/wave-1c1.jsonl`, and this repo's own run record)
+   carry `_declared` with `reason: "corrective"`, and a fourth, `carn/phase/1f/wave-2.jsonl`, spells
+   it `reason: "corrective-G1"` — so even the off-schema value has a variant. Meanwhile
+   `skills/loop-de-looper/references/state-schemas.md` declares the field as
+   `"initial" | "retry" | "resume-after-torn"`. A reader following the schema treats an unrecognised
+   reason as undefined behaviour. Pre-existing; not caused by this analysis.
 
 ## Reproducing
 
@@ -262,6 +335,9 @@ find ~/Developer/Repos -path '*/local/loops/*' -name gates.jsonl \
 # corrective counters
 find ~/Developer/Repos -path '*/local/loops/*' -name run-state.json \
   -exec jq -c '{f:input_filename, c:.counters.corrective_waves, r:.counters.wave_retries}' {} \;
+
+# _declared reason spellings
+grep -rho '"reason":"[^"]*"' ~/Developer/Repos/*/local/loops/ | sort | uniq -c
 
 # step boundaries for one run
 jq -r 'select(.command | test("\"step\"")) | .ts + " " + (.command | gsub("\\s+";" ") | .[0:120])' \
