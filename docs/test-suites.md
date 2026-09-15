@@ -593,9 +593,35 @@ and the positive control comes first:
   the result.
 - DEDUP NEEDS A COUNTER, NOT A GROUP COUNT. Feeding the same wave through both
   corpus arms yields one group whether or not dedup runs, so the first version
-  of that arm survived deleting `unique_by`. It now asserts
-  `2 deduped · 2 crew` against 4 input lines, and deleting `unique_by` reddens
-  it.
+  of that arm survived deleting the dedup entirely. It now asserts
+  `2 deduped · 2 crew` against 4 input lines, and deleting the dedup reddens it.
+- A COLLISION HAS A WINNER, AND IT IS THE LIVE ROW. The index's copy of a gate
+  line is a snapshot that can predate fields the file now carries, so an arm
+  feeds an index row with no `pass` and no `verified_by` against a live row
+  carrying both, and asserts the survivor is the live one — on the real corpus
+  eight `linklater/main` cites were losing `pass: "final"` to their snapshots.
+  Preferring the index instead reddens it.
+- THE FALLBACK DEDUP KEY IS A SEPARATE PATH AND GETS ITS OWN ARM. Census rows
+  always synthesise a `cite`, so only a cite-less index row reaches
+  `repo|branch|kind|agent|summary`. Three such rows are asserted to collapse to
+  two, and a paired arm changes one `summary` and asserts they stay three —
+  dropping `summary` from the key reddens the second.
+- THE ERA SUB-BUCKETS MUST PARTITION THEIR PARENT. A group whose lines are
+  mixed — some carrying `verified_by`, some not — is neither all-legacy nor
+  all-modern, so it used to land in `t1_zero` and in neither sub-bucket, and
+  33 + 5 = 38 summed only because no real group was mixed. A third `mixed-era`
+  bucket now exists, and an arm builds all three group kinds at once and
+  asserts the three sub-counts sum to `t1_zero`.
+- AN UNREADABLE SUBTREE IS A WARNING, NOT A SILENT DROP. `find`'s stderr and
+  exit status used to be discarded, so a mode-000 directory removed its repo's
+  crew lines from the corpus with nothing said. An arm chmods a fixture repo to
+  000 and asserts both the warning and the loss it names — the corpus line
+  reads `census 2 line(s) from 1 file(s)` where four lines exist. A paired arm
+  asserts a fully readable census warns about nothing. The fixture refuses to
+  run rather than pass if `chmod 000` does not actually block the current user.
+- A NULL AGENT IS A ROLLUP. The rollup predicate has four arms and the null one
+  had no fixture; it now has one, asserted on the `rollup-agent` counter and on
+  the modern-era count staying 0.
 
 Self-contained: every fixture is written by the suite into a temp dir, and the
 census arm is pointed at a temp root. Nothing reads gitignored `local/` or the

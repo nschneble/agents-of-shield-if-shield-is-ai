@@ -12,7 +12,8 @@ temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-unanimity.XXXXXX") \
   || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] || die_temp "mktemp -d exited 0 with no path"
 [ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
-trap 'rm -rf "$temp_dir"' EXIT
+# u+rwX first: a fixture chmods a subtree to 000 and a crash would strand it
+trap 'chmod -R u+rwX "$temp_dir" 2>/dev/null; rm -rf "$temp_dir"' EXIT
 
 results="$temp_dir/results.log"
 : > "$results" || die_temp "cannot open the results log at $results"
@@ -83,6 +84,16 @@ out=$(run); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'single-reviewer            1'
 check "two lines from one agent do not make a unanimity (got $rc)" $?
 
+# --- a null agent is a rollup too, not an anonymous reviewer -----------
+{ printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":null,"ran":true,"blockers":0,"verified_by":"llm","cite":"r/local/loops/b/gates.jsonl:1"}\n'
+  row r b 1 the-chemist 0 '"llm"' 2; } > "$index"
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'rollup-agent               1'
+check "a null agent excludes the group as a rollup (got $rc)" $?
+
+printf '%s\n' "$out" | grep -q 'modern-era                       0'
+check "a null-agent group never reaches the finding bucket" $?
+
 # --- a rollup line is not a set of reviewers ---------------------------
 { row r b 1 ALL-SIX-ENUMERATED 0 '"llm"' 1
   row r b 1 the-chemist        0 '"llm"' 2; } > "$index"
@@ -105,6 +116,32 @@ check "a pre-schema group is legacy-era, not a finding (got $rc)" $?
 
 printf '%s\n' "$out" | grep -q 'modern-era                       0'
 check "the legacy group does not leak into the modern-era count" $?
+
+# --- mixed era: the three sub-buckets must partition t1_zero -----------
+{ row r b 1 the-stickler 0 '"llm"' 1
+  row r b 1 the-chemist  0 '"llm"' 2
+  printf '{"repo":"r","branch":"b","wave":2,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:3"}\n'
+  printf '{"repo":"r","branch":"b","wave":2,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:4"}\n'
+  row r b 3 the-stickler 0 '"llm"' 5
+  printf '{"repo":"r","branch":"b","wave":3,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:6"}\n'; } > "$index"
+out=$(run); rc=$?
+
+# read the token after the marker: a label can be reworded, the count cannot
+num_after() {
+  printf '%s\n' "$out" \
+    | awk -v m="$1" '{for (i = 1; i <= NF; i++) if ($i == m) { print $(i + 1); exit }}'
+}
+t1z=$(num_after 'llm/null/absent)'); legacy=$(num_after 'predates)')
+mixed=$(num_after 'predate)');       modern=$(num_after 'modern-era')
+
+[ "$t1z" = "3" ]
+check "all three unbacked groups land in t1_zero (got ${t1z:-none})" $?
+
+[ "$mixed" = "1" ] && [ "$legacy" = "1" ] && [ "$modern" = "1" ]
+check "the mixed-era group is its own bucket, not legacy or modern (got legacy=${legacy:-none} mixed=${mixed:-none} modern=${modern:-none})" $?
+
+[ -n "$t1z" ] && [ $((legacy + mixed + modern)) -eq "$t1z" ]
+check "the sub-buckets sum to t1_zero ($legacy+$mixed+$modern vs $t1z)" $?
 
 # --- a blocker means the pass was not unanimously clean ----------------
 { row r b 1 the-stickler 0 '"llm"' 1
@@ -180,6 +217,71 @@ check "both arms really do carry the same 2 lines (got $rc)" $?
 printf '%s\n' "$out" | grep -q '2 deduped · 2 crew'
 check "4 corpus lines collapse to 2 on cite, not 4" $?
 
+# --- on a cite collision the live row wins, not the index snapshot -----
+stale="$temp_dir/root-stale"
+mkdir -p "$stale/r/local/loops/b" || die_temp "cannot build $stale"
+{ printf '{"wave":1,"pass":"final","kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"verified_by":"llm"}\n'
+  printf '{"wave":1,"pass":"final","kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"verified_by":"llm"}\n'; } \
+  > "$stale/r/local/loops/b/gates.jsonl"
+{ printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:1"}\n'
+  printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:2"}\n'; } > "$index"
+out=$("$check_sh" --index "$index" --census "$stale" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q '2 deduped · 2 crew'
+check "the index and live copies of one line really do collide (got $rc)" $?
+
+[ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'carrying a real pass field 1'
+check "the surviving row keeps the live pass, not the index's absent one (got $rc)" $?
+
+printf '%s\n' "$out" | grep -q 'modern-era                       1'
+check "the surviving row keeps live verified_by, so the era is modern" $?
+
+# --- an unreadable census subtree is announced, not silently dropped ---
+perms="$temp_dir/root-perms"
+mkdir -p "$perms/ra/local/loops/b" "$perms/rb/local/loops/b" \
+  || die_temp "cannot build $perms"
+{ row ra b 1 the-stickler 0 '"llm"' 1
+  row ra b 1 the-chemist  0 '"llm"' 2; } | sed 's/,"cite":"[^"]*"//' \
+  > "$perms/ra/local/loops/b/gates.jsonl"
+{ row rb b 1 the-stickler 0 '"llm"' 1
+  row rb b 1 the-chemist  0 '"llm"' 2; } | sed 's/,"cite":"[^"]*"//' \
+  > "$perms/rb/local/loops/b/gates.jsonl"
+chmod 000 "$perms/rb/local"
+readable=0; ls "$perms/rb/local" >/dev/null 2>&1 && readable=1
+chmod 755 "$perms/rb/local"
+[ "$readable" -eq 0 ] || die_temp "chmod 000 did not block this user; the fixture cannot prove anything"
+chmod 000 "$perms/rb/local"
+out=$("$check_sh" --no-index --census "$perms" 2>&1); rc=$?
+chmod 755 "$perms/rb/local"
+
+printf '%s\n' "$out" | grep -q 'WARNING:  census could not read 1 path(s)'
+check "an unreadable census subtree raises a warning (got $rc)" $?
+
+printf '%s\n' "$out" | grep -q 'census 2 line(s) from 1 file(s)'
+check "and the warning is about real loss — rb's 2 lines are absent" $?
+
+out=$("$check_sh" --no-index --census "$perms" 2>&1)
+printf '%s\n' "$out" | grep -q 'WARNING'; warned=$?
+[ "$warned" -ne 0 ]
+check "a fully readable census raises no warning" $?
+
+# --- with no cite, dedup falls back to repo|branch|kind|agent|summary --
+{ printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"verified_by":"llm","summary":"same"}\n'
+  printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"verified_by":"llm","summary":"other"}\n'
+  printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"verified_by":"llm","summary":"same"}\n'; } > "$index"
+out=$(run); rc=$?
+[ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q '2 deduped · 2 crew'
+check "3 cite-less rows collapse to 2 on the fallback key (got $rc)" $?
+
+printf '%s\n' "$out" | grep -q '2 reviewer(s) ran of 2 crew line(s) logged'
+check "the fallback key still keeps the two distinct agents apart" $?
+
+{ printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"verified_by":"llm","summary":"same"}\n'
+  printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"verified_by":"llm","summary":"other"}\n'
+  printf '{"repo":"r","branch":"b","wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0,"verified_by":"llm","summary":"third"}\n'; } > "$index"
+out=$(run); rc=$?
+[ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q '3 deduped · 3 crew'
+check "a differing summary is not deduped away by the fallback key (got $rc)" $?
+
 # --- usage errors are exit 2, never a silent clean run ----------------
 "$check_sh" --index "$temp_dir/nope.jsonl" --census "$empty_root" >/dev/null 2>&1
 [ $? -eq 2 ]
@@ -207,7 +309,7 @@ out=$("$check_sh" --index "$index" --census "$empty_root" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'NOTHING CHECKED'
 check "a wholly unparseable corpus exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=31
+EXPECTED_CHECKS=45
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

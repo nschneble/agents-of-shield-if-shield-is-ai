@@ -112,7 +112,13 @@ unanimity-ran-gate-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q
 unanimity-era-gate-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qmap(select(.all_modern))\E/map(select(true))/
 unanimity-rollup-slash-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s!\Qor ((.agent | tostring) | test("/"));\E!;!
 unanimity-t1-accepts-executable|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q(vb == null) or (vb == "llm")\E/(vb == null) or (vb == "llm") or (vb == "executable")/
-unanimity-dedup-key-collapses|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qunique_by(.cite\E/unique_by(.kind/
+unanimity-dedup-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s%\Qgroup_by(dedup_key)\E\n\s*\Q| map(first(.[] | select(.source == "live")) // .[0])\E%.%
+unanimity-dedup-drops-live-row|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qfirst(.[] | select(.source == "live"))\E/first(.[] | select(.source == "index"))/
+unanimity-fallback-key-drops-summary|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\|\\\(\.agent\)\|\\\(\.summary\)"\);/|\\(.agent)");/
+unanimity-rollup-null-agent-off|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q(.agent == null)\E/(false)/
+unanimity-mixed-era-counted-legacy|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Qmap(select(.any_modern | not))\E/map(select(.all_modern | not))/
+unanimity-mixed-bucket-dead|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q.any_modern and (.all_modern | not)\E/false/
+unanimity-unreadable-census-silent|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=0/
 unanimity-blockers-any-count|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s!\Qall_clean: all(.[]; (.blockers // 0) == 0)\E!all_clean: all(.[]; (.blockers // 0) >= 0)!
 wq-contiguity-one-sided|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\(\(\$want - \$w\) \+ \(\$w - \$want\)\)%(\$want - \$w)%
 wq-asks-nonarray-guard-off|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type != "array" then 1\E%if false then 1%

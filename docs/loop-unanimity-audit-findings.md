@@ -67,14 +67,18 @@ of:
    the silence is a choice rather than a schema gap.
 
 `scripts/loop-unanimity-audit.sh` is that predicate. Corpus is the custodian
-history index plus every live `local/loops/*/gates.jsonl`, deduped on `cite`.
+history index plus every live `local/loops/*/gates.jsonl`, deduped on `cite`
+— and where both arms hold the same cite, the live row wins, because the
+index's copy is a snapshot that can predate fields the file now carries.
 
 ## The replay
 
-Transcript of one run, 2026-09-14. The census arm reads every live
-`local/loops/*/gates.jsonl`, this run's own included, so re-running it later
-returns larger totals; the five findings are stable because all five branches
-are reaped and cannot grow.
+Transcript of one run, 2026-09-14, left verbatim. The census arm reads every
+live `local/loops/*/gates.jsonl`, this run's own included, so re-running it
+later returns larger totals; the five findings are stable because all five
+branches are reaped and cannot grow. A later run also prints a third era
+sub-bucket, `mixed-era`, and may print a census WARNING — neither existed when
+this transcript was taken.
 
 ```
 corpus:   index 1397 line(s) · census 314 line(s) from 12 file(s)
