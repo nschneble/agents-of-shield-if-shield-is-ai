@@ -103,35 +103,46 @@ for state in "${paths[@]}"; do
 
     gaps=$(jq -r '
       ([.queue[]? | .wave | numbers] | unique) as $w
-      | ($w | max) as $m
-      | [range(1; $m + 1)] - $w | length' "$state")
+      | [range(1; ($w | max) + 1)] as $want
+      | (($want - $w) + ($w - $want)) | length' "$state")
     arm "waves are 1..N with no gaps" "$gaps" "0"
   fi
 
   # goal_contract ships in two shapes: {asks:[...]} and a bare array
-  ask_ids=$(jq -r '
-    (if (.goal_contract | type) == "array" then .goal_contract
-     else (.goal_contract.asks? // []) end)
-    | map(.id | tostring) | sort | join(",")' "$state")
+  contract_asks=$(jq -c 'if (.goal_contract | type) == "array" then .goal_contract
+                         else (.goal_contract.asks? // []) end' "$state")
+  unreadable_asks=$(jq -r 'if type != "array" then 1
+                           else [.[] | select(type != "object")] | length end' <<<"$contract_asks")
+  # an id is opaque, so the ids travel as JSON — a comma is not a separator
+  ask_ids=$(jq -c 'if type == "array" then [.[] | objects | .id | tostring] | unique
+                   else [] end' <<<"$contract_asks")
   has_closes=$(jq -r '[.queue[]? | select(has("closes"))] | length' "$state")
+  bad_closes=$(jq -r '
+    [.queue[]? | select(has("closes")) | select((.closes | type) != "array")] | length' "$state")
 
-  if [ -z "$ask_ids" ]; then
+  if [ "$unreadable_asks" -gt 0 ]; then
+    decline "ask assignment (2 arms)" \
+      "$unreadable_asks ask value(s) are not objects — a shape this arm cannot read"
+    skipped_arms=$((skipped_arms + 1))
+  elif [ "$ask_ids" = "[]" ]; then
     decline "ask assignment (2 arms)" "snapshot declares no goal-contract asks"
     skipped_arms=$((skipped_arms + 1))
   elif [ "$has_closes" -eq 0 ]; then
     decline "ask assignment (2 arms)" "no queue entry carries \`closes\` — asks are not mapped to waves here"
     skipped_arms=$((skipped_arms + 1))
+  elif [ "$bad_closes" -gt 0 ]; then
+    decline "ask assignment (2 arms)" \
+      "$bad_closes entry(s) carry a non-array \`closes\` value — a shape this arm cannot read"
+    skipped_arms=$((skipped_arms + 1))
   else
-    unassigned=$(jq -r --arg ids "$ask_ids" '
-      ($ids | split(",")) as $asks
-      | ([.queue[]? | .closes[]? | tostring] | unique) as $claimed
-      | ($asks - $claimed) | length' "$state")
+    unassigned=$(jq -r --argjson ids "$ask_ids" '
+      ([.queue[]? | .closes[]? | tostring] | unique) as $claimed
+      | ($ids - $claimed) | length' "$state")
     arm "every ask is claimed by a wave" "$unassigned" "0"
 
-    dangling=$(jq -r --arg ids "$ask_ids" '
-      ($ids | split(",")) as $asks
-      | ([.queue[]? | .closes[]? | tostring] | unique) as $claimed
-      | ($claimed - $asks) | length' "$state")
+    dangling=$(jq -r --argjson ids "$ask_ids" '
+      ([.queue[]? | .closes[]? | tostring] | unique) as $claimed
+      | ($claimed - $ids) | length' "$state")
     arm "every closes id is a declared ask" "$dangling" "0"
   fi
 

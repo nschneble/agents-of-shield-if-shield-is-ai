@@ -516,15 +516,35 @@ and the whole suite exists because two pairs of those are easy to confuse.
   INCOMPLETE.
 - THE EDGE ARM REALLY EVALUATES, AND REAL DATA REACHES IT. `carn/phase/1a`
   persists `depends_on` as arrays on all five entries; the arm checks strict
-  source-before-target and rejects a self-edge. Four arms — earlier-wave edge,
-  later-wave edge, self-edge, and the five-entry multi-edge graph that snapshot
-  actually carries — since an arm nobody watched fire is indistinguishable from
-  an arm that returns "no edges" forever.
+  source-before-target and rejects a self-edge. Six arms — earlier-wave edge,
+  later-wave edge, self-edge, the five-entry multi-edge graph that snapshot
+  actually carries, a second edge in an entry whose first edge is fine, and the
+  `depends`/`blocked_by` spellings of the same field — since an arm nobody
+  watched fire is indistinguishable from an arm that returns "no edges"
+  forever. The last two exist because the arm reads every edge and four field
+  spellings, and a version reading only the first edge, or only two spellings,
+  passed everything the suite asserted before them.
 - A FIELD IN THE WRONG TYPE DECLINES, IT DOES NOT CRASH. `carn/phase/1c`
   persists the same key as prose (`"none"`, `"wave 1"`), which iterated as an
   array exits 5 — outside the script's own 0/1/2 contract — and in a batch run
   silently drops every snapshot after it. Two arms: the prose value declines,
   and a good snapshot listed after a prose one is still reported.
+- THE SAME GUARD COVERS `goal_contract` AND `closes`, AHEAD OF THE DATA. Its
+  four arms are the only ones here with no snapshot behind them: nothing on
+  disk lists bare ids where ask objects belong, or a `closes` that is not a
+  list. They cost the same two failures anyway — a contract of bare ids exits 5
+  on `.id` and takes the rest of the batch with it, and a scalar `closes`
+  reports every ask unclaimed, which is a VIOLATION the reader has no way to
+  tell from a real one. Arms for both, plus the prose-`asks` spelling and the
+  batch cost.
+- CONTIGUITY IS A SET EQUALITY, NOT A CEILING. Differencing `1..max` against
+  the observed set in one direction alone lets a wave numbered 0 or -1 through,
+  because neither leaves a hole below the maximum. Both directions are
+  differenced, and two arms hold the low end the one-sided form never had.
+- AN ASK ID IS OPAQUE. The ids used to reach the arms comma-joined into one
+  string and split back apart, so an id carrying a comma arrived as two asks
+  nobody declared — a false unclaimed-ask and a false dangling-id at once. They
+  travel as JSON now, and an arm pins it.
 - THE CORPUS IS DISCOVERED, NOT LISTED. `--census ROOT` walks for
   `*/local/loops/*/run-state.json`, because a hand-written list of repos
   silently omits the next one. Three arms: nested snapshots are found, a
@@ -532,12 +552,13 @@ and the whole suite exists because two pairs of those are easy to confuse.
   exits 2 instead of quietly auditing something else.
 - THE ARM COUNT IN THE HEADLINE IS ASSERTED. It is what separates "five arms
   agreed" from "one arm ran". Deleting the contiguity arm from the audit
-  reddens six assertions, three of them count assertions.
+  reddens eight assertions, three of them count assertions.
 
 Self-contained: every fixture is written by the suite, including a throwaway
 git repo with two real commits for the execution-order proxy arm — inverting
-the two shas is how the RED half of that arm is reached. Nothing reads
-gitignored `local/`.
+the two shas is how the RED half of that arm is reached, and listing the
+entries in the reverse of their wave order is what pins the sort the arm reads
+them through. Nothing reads gitignored `local/`.
 
 ## loop-unanimity-audit
 
