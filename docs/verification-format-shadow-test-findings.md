@@ -353,7 +353,7 @@ shape the PREMISES field exists to prevent: a free-text reviewer reasons inside 
 itself and never has to say where the boundary is, while the template makes the boundary a field
 somebody else can read. That is the whole of what this evidence supports, and it is one field of six.
 
-**The rest of the template did harm in the one case where it was load-bearing.** Case 3's
+**The rest of the template did harm in the one case where a conclusion rested on it.** Case 3's
 COUNTEREXAMPLE-OR-PROOF section ran one probe, at one payload length, and wrote its result as a
 settled fact under a heading that says "proof". The claim was false at any payload of 77 characters
 or more. A free-text reviewer writing "I checked a short payload and saw no raw newlines" would have

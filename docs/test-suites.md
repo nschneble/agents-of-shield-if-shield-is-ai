@@ -499,10 +499,10 @@ and the whole suite exists because two pairs of those are easy to confuse.
   entries keyed `id: "wave-1"`, entries keyed `n` with values like `"8a"`, and
   an empty `queue[]` with the wave records in top-level `wave_N` keys beside a
   `goal_contract` that is a bare array of integer-id asks rather than
-  `{asks: […]}`. Each has an arm, because an audit
-  that read the schema gap as lost position would report 17 false violations
-  on one real `linklater` snapshot — confirmed by deleting the guard and
-  watching exactly that happen.
+  `{asks: […]}`. Each has an arm, because removing that guard makes the
+  `linklater` snapshot fail its every-entry-has-a-wave-number arm — one
+  violated arm of three, carrying a count of 17 entries, not 17 separate
+  violations — which is what the suite's legacy arms exist to catch.
 - A DECLINE IS NOT A VIOLATION EITHER, so the exit code has to separate them:
   1 for a real disagreement, 2 for an arm that could not be settled. A
   snapshot that both violates and declines exits 1, because a disagreement is
