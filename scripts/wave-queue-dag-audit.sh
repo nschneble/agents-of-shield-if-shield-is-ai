@@ -118,8 +118,8 @@ for state in "${paths[@]}"; do
   # an id is opaque, so the ids travel as JSON — a comma is not a separator
   ask_ids=$(jq -c 'if type == "array" then [.[] | objects | .id | tostring] | unique
                    else [] end' <<<"$contract_asks")
-  has_closes=$(jq -r '[.queue[]? | select(has("closes"))] | length' "$state")
-  # not has("closes"): null closes nothing, and the claim arms read that
+  # not has("closes"): a null-valued closes closes nothing, same as absent
+  has_closes=$(jq -r '[.queue[]? | select(.closes != null)] | length' "$state")
   bad_closes=$(jq -r '
     [.queue[]? | select(.closes != null and (.closes | type) != "array")] | length' "$state")
 

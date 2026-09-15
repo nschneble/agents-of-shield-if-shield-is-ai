@@ -132,6 +132,7 @@ wq-first-edge-only|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\. as 
 wq-duplicate-arm-relabelled|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qarm "no wave number used twice"\E%arm "no wave number reused"%
 wq-closes-null-counted-bad|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null and (.closes | type) != "array")\E%select(has("closes")) | select((.closes | type) != "array")%
 wq-asks-container-noun-collapsed|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type == "array" then "yes" else "no" end\E%"yes"%
+wq-has-closes-null-uncounted|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null)] | length\E%select(has("closes"))] | length%
 unanimity-census-warns-always|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=1/
 TABLE
 }

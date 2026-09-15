@@ -233,6 +233,13 @@ run
   && ! saw 'SKIP   ask assignment'
 check_that "a null closes closes nothing, it does not decline (got $rc)" $?
 
+snap '{"goal_contract":{"asks":[{"id":"A1"}]},
+ "queue":[{"wave":1,"closes":null},{"wave":2,"closes":null}]}'
+run
+[ "$rc" -eq 2 ] && saw 'SKIP   ask assignment' \
+  && saw 'no queue entry carries `closes`' && ! saw 'VIOLATION'
+check_that "every entry null-closes declines, it does not false-violate (got $rc)" $?
+
 # --- arm 7: the git execution-order proxy -------------------------------
 repo="$temp_dir/repo"
 mkdir -p "$repo" || die_temp "cannot build $repo"
@@ -329,7 +336,7 @@ out=$("$check" "$good" "$state" 2>&1); rc=$?
   && printf '%s\n' "$out" | grep -q '0 of 5 arm(s) violated'
 check_that "a batch reports every snapshot and the whole arm count (got $rc)" $?
 
-EXPECTED_CHECKS=47
+EXPECTED_CHECKS=48
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \
