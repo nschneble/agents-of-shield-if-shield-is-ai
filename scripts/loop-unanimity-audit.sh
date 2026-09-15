@@ -65,7 +65,8 @@ census_lines=0
 census_unreadable=0
 if [ "$WANT_CENSUS" -eq 1 ]; then
   [ -d "$CENSUS_ROOT" ] || { echo "--census needs a directory: $CENSUS_ROOT" >&2; exit 2; }
-  # only a WHOLLY empty corpus is fatal below, so a partial walk must speak up
+  # only a WHOLLY empty corpus is fatal below, so a partial walk
+  # must speak up
   find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
        -path '*/local/loops/*' -name gates.jsonl -print \
        > "$work/gates.found" 2> "$work/find.err" || true
@@ -108,7 +109,8 @@ analysis=$(jq -Rn --argjson min "$MIN_AGENTS" '
   def dedup_key: (.cite // "\(.repo)|\(.branch)|\(.kind)|\(.agent)|\(.summary)");
 
   [inputs | fromjson? // empty | select(type == "object")]
-  # an index row is a lossy snapshot; keeping it over the live row drops pass
+  # an index row is a lossy snapshot; keeping it over the live
+  # row drops pass
   | (group_by(dedup_key)
      | map(first(.[] | select(.source == "live")) // .[0]))              as $rows
   | ($rows | map(select(is_crew)))                                  as $crew
@@ -177,7 +179,8 @@ printf '            %s deduped · %s crew · %s usable (dropped %s not-ran, %s w
 if [ "$census_unreadable" -ne 0 ]; then
   printf '  WARNING:  census could not read %s path(s) — any crew line beneath them is MISSING from this corpus\n' \
     "$census_unreadable"
-  # echoed verbatim, never parsed: the wording is find-implementation-specific
+  # echoed verbatim, never parsed: the wording is
+  # find-implementation-specific
   head -3 "$work/find.err" | sed 's/^/            /'
 fi
 echo

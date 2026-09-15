@@ -113,16 +113,24 @@ for state in "${paths[@]}"; do
                          else (.goal_contract.asks? // []) end' "$state")
   unreadable_asks=$(jq -r 'if type != "array" then 1
                            else [.[] | select(type != "object")] | length end' <<<"$contract_asks")
+  # an asks OBJECT holds objects — the container is unreadable, not them
+  asks_are_listed=$(jq -r 'if type == "array" then "yes" else "no" end' <<<"$contract_asks")
   # an id is opaque, so the ids travel as JSON — a comma is not a separator
   ask_ids=$(jq -c 'if type == "array" then [.[] | objects | .id | tostring] | unique
                    else [] end' <<<"$contract_asks")
   has_closes=$(jq -r '[.queue[]? | select(has("closes"))] | length' "$state")
+  # not has("closes"): null closes nothing, and the claim arms read that
   bad_closes=$(jq -r '
-    [.queue[]? | select(has("closes")) | select((.closes | type) != "array")] | length' "$state")
+    [.queue[]? | select(.closes != null and (.closes | type) != "array")] | length' "$state")
 
   if [ "$unreadable_asks" -gt 0 ]; then
-    decline "ask assignment (2 arms)" \
-      "$unreadable_asks ask value(s) are not objects — a shape this arm cannot read"
+    if [ "$asks_are_listed" = "no" ]; then
+      decline "ask assignment (2 arms)" \
+        "\`asks\` is not a list of asks — a shape this arm cannot read"
+    else
+      decline "ask assignment (2 arms)" \
+        "$unreadable_asks ask value(s) are not objects — a shape this arm cannot read"
+    fi
     skipped_arms=$((skipped_arms + 1))
   elif [ "$ask_ids" = "[]" ]; then
     decline "ask assignment (2 arms)" "snapshot declares no goal-contract asks"

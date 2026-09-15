@@ -35,7 +35,8 @@ done
 #
 # perl + equivalent-mutant gotchas: looper-custodian.md decision 25
 # gotcha: the replacement side interpolates too, a stray `\{` breaks awk
-# gotcha: inside \Q..\E a `\$` matches backslash-dollar, so hand-escape those
+# gotcha: inside \Q..\E a `\$` matches backslash-dollar, so hand-escape
+# every dollar sign instead of trusting the quotemeta to cover it
 
 # checked here, not in mutants(): exit 2 there ends only the subshell
 # -s tests size, not readability; head -c1 catches a mode-000 table too
@@ -129,6 +130,9 @@ wq-shipped-sort-dropped|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\
 wq-depends-alias-dropped|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\. as \$t \| \(\.depends_on // \.dependsOn // \.depends // \.blocked_by // \[\]\)\[\]%. as \$t | (.depends_on // .dependsOn // .blocked_by // [])[]%
 wq-first-edge-only|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\. as \$t \| \(\.depends_on // \.dependsOn // \.depends // \.blocked_by // \[\]\)\[\]%. as \$t | (.depends_on // .dependsOn // .depends // .blocked_by // [])[0:1][]%
 wq-duplicate-arm-relabelled|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qarm "no wave number used twice"\E%arm "no wave number reused"%
+wq-closes-null-counted-bad|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null and (.closes | type) != "array")\E%select(has("closes")) | select((.closes | type) != "array")%
+wq-asks-container-noun-collapsed|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type == "array" then "yes" else "no" end\E%"yes"%
+unanimity-census-warns-always|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=1/
 TABLE
 }
 

@@ -91,7 +91,6 @@ run
 [ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave'
 check_that "one wave closing two asks passes (got $rc)" $?
 
-# an id is opaque: a comma inside one must not split it into two asks
 snap '{"goal_contract":{"asks":[{"id":"A1,A2"}]},
  "queue":[{"wave":1,"closes":["A1,A2"]}]}'
 run
@@ -143,13 +142,11 @@ run
 [ "$rc" -eq 2 ] && saw 'ok     dependency edges ordered' && ! saw 'VIOLATION'
 check_that "a real multi-edge array graph evaluates and passes (got $rc)" $?
 
-# every edge is checked, not just each entry's first
 snap '{"queue":[{"wave":1},{"wave":2,"depends_on":[1,3]},{"wave":3}]}'
 run
 [ "$rc" -eq 1 ] && saw 'VIOLATION dependency edges ordered' && saw 'got 1'
 check_that "a later edge in the same entry violates (got $rc)" $?
 
-# depends/blocked_by are read too, and both bad edges are counted
 snap '{"queue":[{"wave":1,"depends":[2]},{"wave":2,"blocked_by":[3]},{"wave":3}]}'
 run
 [ "$rc" -eq 1 ] && saw 'VIOLATION dependency edges ordered' && saw 'got 2'
@@ -198,7 +195,6 @@ run
 [ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave'
 check_that "a bare-array contract with integer ids is read, not skipped (got $rc)" $?
 
-# a contract listing bare ids instead of ask objects is a shape, not a crash
 snap '{"goal_contract":["A1","A2"],"queue":[{"wave":1,"closes":["A1"]}]}'
 run
 [ "$rc" -eq 2 ] && saw '2 ask value(s) are not objects' && saw '2 arm(s) declined' \
@@ -207,8 +203,14 @@ check_that "non-object asks decline, never crash (got $rc)" $?
 
 snap '{"goal_contract":{"asks":"A1"},"queue":[{"wave":1,"closes":["A1"]}]}'
 run
-[ "$rc" -eq 2 ] && saw '1 ask value(s) are not objects' && ! saw 'jq: error'
+[ "$rc" -eq 2 ] && saw '`asks` is not a list of asks' && ! saw 'jq: error'
 check_that "an asks key holding prose declines, never crashes (got $rc)" $?
+
+snap '{"goal_contract":{"asks":{"A1":{"id":"A1"}}},"queue":[{"wave":1,"closes":["A1"]}]}'
+run
+[ "$rc" -eq 2 ] && saw '`asks` is not a list of asks' \
+  && ! saw 'ask value(s) are not objects' && ! saw 'jq: error'
+check_that "an asks map declines on the container, not its values (got $rc)" $?
 
 # the crash's real cost is the batch, the same way the prose edge's was
 bare="$temp_dir/bare.json"
@@ -218,12 +220,18 @@ out=$("$check" "$bare" "$state" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && saw 'ok     every ask is claimed by a wave' && ! saw 'jq: error'
 check_that "a snapshot after a non-object-ask one is still read (got $rc)" $?
 
-# a closes that is not a list is a shape this arm cannot read, not a miss
 snap '{"goal_contract":{"asks":[{"id":"A1"}]},"queue":[{"wave":1,"closes":"A1"}]}'
 run
 [ "$rc" -eq 2 ] && saw 'SKIP   ask assignment' && saw 'non-array `closes`' \
   && ! saw 'VIOLATION'
 check_that "a string-valued closes declines, never false-violates (got $rc)" $?
+
+snap '{"goal_contract":{"asks":[{"id":"A1"}]},
+ "queue":[{"wave":1,"closes":["A1"]},{"wave":2,"closes":null}]}'
+run
+[ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave' \
+  && ! saw 'SKIP   ask assignment'
+check_that "a null closes closes nothing, it does not decline (got $rc)" $?
 
 # --- arm 7: the git execution-order proxy -------------------------------
 repo="$temp_dir/repo"
@@ -241,7 +249,6 @@ run --git "$repo"
 saw 'ok     execution realizes wave order'
 check_that "wave 1's commit being an ancestor of wave 2's passes" $?
 
-# array order is not wave order, and the wave number is what the arm reads
 printf '{"queue":[{"wave":2,"status":"shipped","commit":"%s"},
  {"wave":1,"status":"shipped","commit":"%s"}]}' "$second" "$first" > "$state"
 run --git "$repo"
@@ -289,7 +296,7 @@ check_that "a missing snapshot exits 2, not clean (got $rc)" $?
 
 snap "$modern"
 out=$("$check" --git 2>&1); rc=$?
-exited 2
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q -- '--git needs a value'
 check_that "a value-taking flag with no value exits 2 (got $rc)" $?
 
 out=$("$check" --nope "$state" 2>&1); rc=$?
@@ -322,7 +329,7 @@ out=$("$check" "$good" "$state" 2>&1); rc=$?
   && printf '%s\n' "$out" | grep -q '0 of 5 arm(s) violated'
 check_that "a batch reports every snapshot and the whole arm count (got $rc)" $?
 
-EXPECTED_CHECKS=45
+EXPECTED_CHECKS=47
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

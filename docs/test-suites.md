@@ -530,13 +530,18 @@ and the whole suite exists because two pairs of those are easy to confuse.
   silently drops every snapshot after it. Two arms: the prose value declines,
   and a good snapshot listed after a prose one is still reported.
 - THE SAME GUARD COVERS `goal_contract` AND `closes`, AHEAD OF THE DATA. Its
-  four arms are the only ones here with no snapshot behind them: nothing on
-  disk lists bare ids where ask objects belong, or a `closes` that is not a
-  list. They cost the same two failures anyway — a contract of bare ids exits 5
-  on `.id` and takes the rest of the batch with it, and a scalar `closes`
-  reports every ask unclaimed, which is a VIOLATION the reader has no way to
-  tell from a real one. Arms for both, plus the prose-`asks` spelling and the
-  batch cost.
+  arms are the only ones here with no snapshot behind them: nothing on disk
+  lists bare ids where ask objects belong, or a `closes` that is not a list.
+  They cost the same two failures anyway — a contract of bare ids exits 5 on
+  `.id` and takes the rest of the batch with it, and a scalar `closes` reports
+  every ask unclaimed, which is a VIOLATION the reader has no way to tell from
+  a real one. Arms for both, plus the prose-`asks` spelling and the batch cost.
+- A DECLINE NAMES THE SHAPE IT ACTUALLY CANNOT READ. Two arms, for two ways
+  the guard misnamed what stopped it. An `asks` map keyed by id declines on the
+  CONTAINER, because its values are objects and the element wording said they
+  were not; and a `closes` that is `null` does not decline at all — null closes
+  nothing, which the claim arms already read correctly, so counting it
+  unreadable turned a right answer into a SKIP. A declared mutant pins each.
 - CONTIGUITY IS A SET EQUALITY, NOT A CEILING. Differencing `1..max` against
   the observed set in one direction alone lets a wave numbered 0 or -1 through,
   because neither leaves a hole below the maximum. Both directions are
@@ -594,13 +599,17 @@ and the positive control comes first:
 - DEDUP NEEDS A COUNTER, NOT A GROUP COUNT. Feeding the same wave through both
   corpus arms yields one group whether or not dedup runs, so the first version
   of that arm survived deleting the dedup entirely. It now asserts
-  `2 deduped · 2 crew` against 4 input lines, and deleting the dedup reddens it.
+  `2 deduped · 2 crew` against 4 input lines, and deleting the dedup reddens
+  it.
 - A COLLISION HAS A WINNER, AND IT IS THE LIVE ROW. The index's copy of a gate
   line is a snapshot that can predate fields the file now carries, so an arm
   feeds an index row with no `pass` and no `verified_by` against a live row
   carrying both, and asserts the survivor is the live one — on the real corpus
-  eight `linklater/main` cites were losing `pass: "final"` to their snapshots.
-  Preferring the index instead reddens it.
+  eight `linklater/main` cites collide and seven of them were losing
+  `pass: "final"` to their snapshots. Eight is the collision count, seven the
+  loss count: the eighth is a `pr-finalization` row carrying `pass: null` on
+  both sides, which loses nothing either way. Preferring the index instead
+  reddens it.
 - THE FALLBACK DEDUP KEY IS A SEPARATE PATH AND GETS ITS OWN ARM. Census rows
   always synthesise a `cite`, so only a cite-less index row reaches
   `repo|branch|kind|agent|summary`. Three such rows are asserted to collapse to
@@ -615,10 +624,20 @@ and the positive control comes first:
 - AN UNREADABLE SUBTREE IS A WARNING, NOT A SILENT DROP. `find`'s stderr and
   exit status used to be discarded, so a mode-000 directory removed its repo's
   crew lines from the corpus with nothing said. An arm chmods a fixture repo to
-  000 and asserts both the warning and the loss it names — the corpus line
-  reads `census 2 line(s) from 1 file(s)` where four lines exist. A paired arm
-  asserts a fully readable census warns about nothing. The fixture refuses to
-  run rather than pass if `chmod 000` does not actually block the current user.
+  000 and asserts the warning fires, and a paired arm asserts a fully readable
+  census warns about nothing — that second half is pinned by a declared mutant
+  forcing the warning permanently on. The fixture refuses to run rather than
+  pass if `chmod 000` does not actually block the current user. Two limits are
+  part of the claim rather than exceptions to it. The warning carries only what
+  `find` itself reports, and that is platform-dependent: measured against BSD
+  `find` on macOS, modes 111 and 000 are reported, but a read-but-not-
+  traversable directory at mode 444 loses its whole subtree at exit 0 with
+  nothing on stderr — silently, the very shape the warning exists to end.
+  Whether another platform's `find` reports 444 was not measured. So this
+  closes the silent drop for the permission shapes the running `find`
+  surfaces, not for every shape. And the arm's companion
+  `census 2 line(s) from 1 file(s)` clause is fixture sanity, not a pin: it
+  reads the same on both sides of the change it shipped with.
 - A NULL AGENT IS A ROLLUP. The rollup predicate has four arms and the null one
   had no fixture; it now has one, asserted on the `rollup-agent` counter and on
   the modern-era count staying 0.

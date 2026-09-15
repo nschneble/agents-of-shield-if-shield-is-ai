@@ -12,7 +12,8 @@ temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-unanimity.XXXXXX") \
   || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
 [ -n "$temp_dir" ] || die_temp "mktemp -d exited 0 with no path"
 [ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
-# u+rwX first: a fixture chmods a subtree to 000 and a crash would strand it
+# u+rwX first: a fixture chmods a subtree to 000 and a crash would
+# strand it
 trap 'chmod -R u+rwX "$temp_dir" 2>/dev/null; rm -rf "$temp_dir"' EXIT
 
 results="$temp_dir/results.log"
@@ -126,7 +127,8 @@ check "the legacy group does not leak into the modern-era count" $?
   printf '{"repo":"r","branch":"b","wave":3,"kind":"crew","agent":"the-chemist","ran":true,"blockers":0,"cite":"r/local/loops/b/gates.jsonl:6"}\n'; } > "$index"
 out=$(run); rc=$?
 
-# read the token after the marker: a label can be reworded, the count cannot
+# read the token after the marker: a label can be reworded, the
+# count cannot
 num_after() {
   printf '%s\n' "$out" \
     | awk -v m="$1" '{for (i = 1; i <= NF; i++) if ($i == m) { print $(i + 1); exit }}'
