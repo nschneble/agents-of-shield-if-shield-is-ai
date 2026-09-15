@@ -66,6 +66,17 @@ run
 [ "$rc" -eq 1 ] && saw 'VIOLATION waves are 1..N with no gaps'
 check_that "a queue starting at 2 violates contiguity (got $rc)" $?
 
+# contiguity is a set equality, not a max-and-count: 1..N excludes 0
+snap '{"queue":[{"wave":0},{"wave":1}]}'
+run
+[ "$rc" -eq 1 ] && saw 'VIOLATION waves are 1..N with no gaps'
+check_that "a wave numbered 0 violates contiguity (got $rc)" $?
+
+snap '{"queue":[{"wave":-1},{"wave":1}]}'
+run
+[ "$rc" -eq 1 ] && saw 'VIOLATION waves are 1..N with no gaps'
+check_that "a negative wave number violates contiguity (got $rc)" $?
+
 # --- arm 4: an ask no wave claims ---------------------------------------
 snap '{"goal_contract":{"asks":[{"id":"A1"},{"id":"A2"}]},
  "queue":[{"wave":1,"closes":["A1"]}]}'
@@ -77,8 +88,15 @@ check_that "an unclaimed ask violates (got $rc)" $?
 snap '{"goal_contract":{"asks":[{"id":"A1"},{"id":"A2"}]},
  "queue":[{"wave":1,"closes":["A1","A2"]}]}'
 run
-exited 0
+[ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave'
 check_that "one wave closing two asks passes (got $rc)" $?
+
+snap '{"goal_contract":{"asks":[{"id":"A1,A2"}]},
+ "queue":[{"wave":1,"closes":["A1,A2"]}]}'
+run
+[ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave' \
+  && saw 'ok     every closes id is a declared ask'
+check_that "a comma-bearing ask id stays one ask (got $rc)" $?
 
 # --- arm 5: a closes id naming no declared ask --------------------------
 snap '{"goal_contract":{"asks":[{"id":"A1"}]},
@@ -124,6 +142,16 @@ run
 [ "$rc" -eq 2 ] && saw 'ok     dependency edges ordered' && ! saw 'VIOLATION'
 check_that "a real multi-edge array graph evaluates and passes (got $rc)" $?
 
+snap '{"queue":[{"wave":1},{"wave":2,"depends_on":[1,3]},{"wave":3}]}'
+run
+[ "$rc" -eq 1 ] && saw 'VIOLATION dependency edges ordered' && saw 'got 1'
+check_that "a later edge in the same entry violates (got $rc)" $?
+
+snap '{"queue":[{"wave":1,"depends":[2]},{"wave":2,"blocked_by":[3]},{"wave":3}]}'
+run
+[ "$rc" -eq 1 ] && saw 'VIOLATION dependency edges ordered' && saw 'got 2'
+check_that "the depends and blocked_by spellings are evaluated (got $rc)" $?
+
 snap '{"queue":[{"wave":1,"depends_on":"none"},{"wave":2,"depends_on":"wave 1"}]}'
 run
 [ "$rc" -eq 2 ] && saw 'SKIP   dependency edges ordered' && saw '2 entry(s)' \
@@ -167,6 +195,51 @@ run
 [ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave'
 check_that "a bare-array contract with integer ids is read, not skipped (got $rc)" $?
 
+snap '{"goal_contract":["A1","A2"],"queue":[{"wave":1,"closes":["A1"]}]}'
+run
+[ "$rc" -eq 2 ] && saw '2 ask value(s) are not objects' && saw '2 arm(s) declined' \
+  && ! saw 'VIOLATION' && ! saw 'jq: error'
+check_that "non-object asks decline, never crash (got $rc)" $?
+
+snap '{"goal_contract":{"asks":"A1"},"queue":[{"wave":1,"closes":["A1"]}]}'
+run
+[ "$rc" -eq 2 ] && saw '`asks` is not a list of asks' && ! saw 'jq: error'
+check_that "an asks key holding prose declines, never crashes (got $rc)" $?
+
+snap '{"goal_contract":{"asks":{"A1":{"id":"A1"}}},"queue":[{"wave":1,"closes":["A1"]}]}'
+run
+[ "$rc" -eq 2 ] && saw '`asks` is not a list of asks' \
+  && ! saw 'ask value(s) are not objects' && ! saw 'jq: error'
+check_that "an asks map declines on the container, not its values (got $rc)" $?
+
+# the crash's real cost is the batch, the same way the prose edge's was
+bare="$temp_dir/bare.json"
+printf '%s' '{"goal_contract":["A1"],"queue":[{"wave":1,"closes":["A1"]}]}' > "$bare"
+snap "$modern"
+out=$("$check" "$bare" "$state" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && saw 'ok     every ask is claimed by a wave' && ! saw 'jq: error'
+check_that "a snapshot after a non-object-ask one is still read (got $rc)" $?
+
+snap '{"goal_contract":{"asks":[{"id":"A1"}]},"queue":[{"wave":1,"closes":"A1"}]}'
+run
+[ "$rc" -eq 2 ] && saw 'SKIP   ask assignment' && saw 'non-array `closes`' \
+  && ! saw 'VIOLATION'
+check_that "a string-valued closes declines, never false-violates (got $rc)" $?
+
+snap '{"goal_contract":{"asks":[{"id":"A1"}]},
+ "queue":[{"wave":1,"closes":["A1"]},{"wave":2,"closes":null}]}'
+run
+[ "$rc" -eq 0 ] && saw 'ok     every ask is claimed by a wave' \
+  && ! saw 'SKIP   ask assignment'
+check_that "a null closes closes nothing, it does not decline (got $rc)" $?
+
+snap '{"goal_contract":{"asks":[{"id":"A1"}]},
+ "queue":[{"wave":1,"closes":null},{"wave":2,"closes":null}]}'
+run
+[ "$rc" -eq 2 ] && saw 'SKIP   ask assignment' \
+  && saw 'no queue entry carries `closes`' && ! saw 'VIOLATION'
+check_that "every entry null-closes declines, it does not false-violate (got $rc)" $?
+
 # --- arm 7: the git execution-order proxy -------------------------------
 repo="$temp_dir/repo"
 mkdir -p "$repo" || die_temp "cannot build $repo"
@@ -182,6 +255,12 @@ printf '{"queue":[{"wave":1,"status":"shipped","commit":"%s"},
 run --git "$repo"
 saw 'ok     execution realizes wave order'
 check_that "wave 1's commit being an ancestor of wave 2's passes" $?
+
+printf '{"queue":[{"wave":2,"status":"shipped","commit":"%s"},
+ {"wave":1,"status":"shipped","commit":"%s"}]}' "$second" "$first" > "$state"
+run --git "$repo"
+saw 'ok     execution realizes wave order' && ! saw 'VIOLATION'
+check_that "entries listed out of wave order are sorted before comparing" $?
 
 printf '{"queue":[{"wave":1,"status":"shipped","commit":"%s"},
  {"wave":2,"status":"shipped","commit":"%s"}]}' "$second" "$first" > "$state"
@@ -224,7 +303,7 @@ check_that "a missing snapshot exits 2, not clean (got $rc)" $?
 
 snap "$modern"
 out=$("$check" --git 2>&1); rc=$?
-exited 2
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q -- '--git needs a value'
 check_that "a value-taking flag with no value exits 2 (got $rc)" $?
 
 out=$("$check" --nope "$state" 2>&1); rc=$?
@@ -257,7 +336,7 @@ out=$("$check" "$good" "$state" 2>&1); rc=$?
   && printf '%s\n' "$out" | grep -q '0 of 5 arm(s) violated'
 check_that "a batch reports every snapshot and the whole arm count (got $rc)" $?
 
-EXPECTED_CHECKS=35
+EXPECTED_CHECKS=48
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

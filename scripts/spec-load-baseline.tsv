@@ -96,7 +96,20 @@
 # through a targeted review pass regardless of size or timing (SKILL.md
 # Corrective budget, mirrored in "does NOT"). Same growth
 # skill-body-ceiling.sh caught on loop-de-looper's own ceiling.
-orchestrator-run	23839	1898
+#
+# +178 orchestrator-run for the standing-eight-instructions rule: a brief
+# must carry all eight lines of the standing wave-brief template verbatim,
+# never a task-specific subset. Traced to a real miss — a cleanup wave
+# briefed with 2 of 8 omitted the one rule that would have caught a false
+# claim corrected in one doc but left standing in its sibling; the final
+# crew pass caught it instead, three reviewers independently.
+#
+# +188 orchestrator-run for a Finding severity floor clarification:
+# correctness regression gates on the defect existing in the diff, not on
+# whether any snapshot on disk currently triggers it. Two crew agents
+# split GATING vs BATCHED on the identical defect over exactly this
+# question; the floor's own text supported only one of the two readings.
+orchestrator-run	24205	1898
 pre-flight	2452	2617
 orchestrated-wave	17600	10314
 crew-agent	13692	0

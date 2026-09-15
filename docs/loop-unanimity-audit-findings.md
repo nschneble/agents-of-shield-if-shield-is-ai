@@ -67,14 +67,32 @@ of:
    the silence is a choice rather than a schema gap.
 
 `scripts/loop-unanimity-audit.sh` is that predicate. Corpus is the custodian
-history index plus every live `local/loops/*/gates.jsonl`, deduped on `cite`.
+history index plus every live `local/loops/*/gates.jsonl`, deduped on `cite`
+— and where both arms hold the same cite, the live row wins, because the
+index's copy is a snapshot that can predate fields the file now carries.
 
 ## The replay
 
-Transcript of one run, 2026-09-14. The census arm reads every live
-`local/loops/*/gates.jsonl`, this run's own included, so re-running it later
-returns larger totals; the five findings are stable because all five branches
-are reaped and cannot grow.
+Transcript of one run, 2026-09-14, left verbatim. Two separate things make a
+re-run's numbers differ from what is below, and only one of them is growth.
+The census arm reads every live `local/loops/*/gates.jsonl`, this run's own
+included, so later totals are larger; the five findings are stable because all
+five branches are reaped and cannot grow. The other is the audit itself:
+live-wins dedup landed after this transcript, and running the before and after
+versions back to back over one unchanged corpus moved `carrying a real pass
+field` from 33 to 34 — a corpus already bigger than the one below, which is
+exactly why the two causes have to be read apart rather than both charged to
+growth. Seven `linklater/main` index snapshots had been winning over live rows
+that carry `pass`, and the group they belong to now resolves.
+
+The FORMAT drifted too, and part of it had already drifted before either change
+above: a current run ends the census line with an `under <ROOT>` suffix and
+writes the verdict's share as `(N% of unanimous passes)`, where the transcript
+carries neither the suffix nor the qualifier. The share itself reads 4% now
+rather than 5%, but that one is arithmetic, not format — the denominator grew.
+A current run also prints a third era sub-bucket, `mixed-era`, and may print a
+census WARNING; those two genuinely did not exist when this was taken. The text
+below is kept as it was taken rather than re-rendered.
 
 ```
 corpus:   index 1397 line(s) · census 314 line(s) from 12 file(s)

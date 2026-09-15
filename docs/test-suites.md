@@ -499,10 +499,10 @@ and the whole suite exists because two pairs of those are easy to confuse.
   entries keyed `id: "wave-1"`, entries keyed `n` with values like `"8a"`, and
   an empty `queue[]` with the wave records in top-level `wave_N` keys beside a
   `goal_contract` that is a bare array of integer-id asks rather than
-  `{asks: […]}`. Each has an arm, because an audit
-  that read the schema gap as lost position would report 17 false violations
-  on one real `linklater` snapshot — confirmed by deleting the guard and
-  watching exactly that happen.
+  `{asks: […]}`. Each has an arm, because removing that guard makes the
+  `linklater` snapshot fail its every-entry-has-a-wave-number arm — one
+  violated arm of three, carrying a count of 17 entries, not 17 separate
+  violations — which is what the suite's legacy arms exist to catch.
 - A DECLINE IS NOT A VIOLATION EITHER, so the exit code has to separate them:
   1 for a real disagreement, 2 for an arm that could not be settled. A
   snapshot that both violates and declines exits 1, because a disagreement is
@@ -516,15 +516,40 @@ and the whole suite exists because two pairs of those are easy to confuse.
   INCOMPLETE.
 - THE EDGE ARM REALLY EVALUATES, AND REAL DATA REACHES IT. `carn/phase/1a`
   persists `depends_on` as arrays on all five entries; the arm checks strict
-  source-before-target and rejects a self-edge. Four arms — earlier-wave edge,
-  later-wave edge, self-edge, and the five-entry multi-edge graph that snapshot
-  actually carries — since an arm nobody watched fire is indistinguishable from
-  an arm that returns "no edges" forever.
+  source-before-target and rejects a self-edge. Six arms — earlier-wave edge,
+  later-wave edge, self-edge, the five-entry multi-edge graph that snapshot
+  actually carries, a second edge in an entry whose first edge is fine, and the
+  `depends`/`blocked_by` spellings of the same field — since an arm nobody
+  watched fire is indistinguishable from an arm that returns "no edges"
+  forever. The last two exist because the arm reads every edge and four field
+  spellings, and a version reading only the first edge, or only two spellings,
+  passed everything the suite asserted before them.
 - A FIELD IN THE WRONG TYPE DECLINES, IT DOES NOT CRASH. `carn/phase/1c`
   persists the same key as prose (`"none"`, `"wave 1"`), which iterated as an
   array exits 5 — outside the script's own 0/1/2 contract — and in a batch run
   silently drops every snapshot after it. Two arms: the prose value declines,
   and a good snapshot listed after a prose one is still reported.
+- THE SAME GUARD COVERS `goal_contract` AND `closes`, AHEAD OF THE DATA. Its
+  arms are the only ones here with no snapshot behind them: nothing on disk
+  lists bare ids where ask objects belong, or a `closes` that is not a list.
+  They cost the same two failures anyway — a contract of bare ids exits 5 on
+  `.id` and takes the rest of the batch with it, and a scalar `closes` reports
+  every ask unclaimed, which is a VIOLATION the reader has no way to tell from
+  a real one. Arms for both, plus the prose-`asks` spelling and the batch cost.
+- A DECLINE NAMES THE SHAPE IT ACTUALLY CANNOT READ. Two arms, for two ways
+  the guard misnamed what stopped it. An `asks` map keyed by id declines on the
+  CONTAINER, because its values are objects and the element wording said they
+  were not; and a `closes` that is `null` does not decline at all — null closes
+  nothing, which the claim arms already read correctly, so counting it
+  unreadable turned a right answer into a SKIP. A declared mutant pins each.
+- CONTIGUITY IS A SET EQUALITY, NOT A CEILING. Differencing `1..max` against
+  the observed set in one direction alone lets a wave numbered 0 or -1 through,
+  because neither leaves a hole below the maximum. Both directions are
+  differenced, and two arms hold the low end the one-sided form never had.
+- AN ASK ID IS OPAQUE. The ids used to reach the arms comma-joined into one
+  string and split back apart, so an id carrying a comma arrived as two asks
+  nobody declared — a false unclaimed-ask and a false dangling-id at once. They
+  travel as JSON now, and an arm pins it.
 - THE CORPUS IS DISCOVERED, NOT LISTED. `--census ROOT` walks for
   `*/local/loops/*/run-state.json`, because a hand-written list of repos
   silently omits the next one. Three arms: nested snapshots are found, a
@@ -532,12 +557,13 @@ and the whole suite exists because two pairs of those are easy to confuse.
   exits 2 instead of quietly auditing something else.
 - THE ARM COUNT IN THE HEADLINE IS ASSERTED. It is what separates "five arms
   agreed" from "one arm ran". Deleting the contiguity arm from the audit
-  reddens six assertions, three of them count assertions.
+  reddens eight assertions, three of them count assertions.
 
 Self-contained: every fixture is written by the suite, including a throwaway
 git repo with two real commits for the execution-order proxy arm — inverting
-the two shas is how the RED half of that arm is reached. Nothing reads
-gitignored `local/`.
+the two shas is how the RED half of that arm is reached, and listing the
+entries in the reverse of their wave order is what pins the sort the arm reads
+them through. Nothing reads gitignored `local/`.
 
 ## loop-unanimity-audit
 
@@ -572,9 +598,49 @@ and the positive control comes first:
   the result.
 - DEDUP NEEDS A COUNTER, NOT A GROUP COUNT. Feeding the same wave through both
   corpus arms yields one group whether or not dedup runs, so the first version
-  of that arm survived deleting `unique_by`. It now asserts
-  `2 deduped · 2 crew` against 4 input lines, and deleting `unique_by` reddens
+  of that arm survived deleting the dedup entirely. It now asserts
+  `2 deduped · 2 crew` against 4 input lines, and deleting the dedup reddens
   it.
+- A COLLISION HAS A WINNER, AND IT IS THE LIVE ROW. The index's copy of a gate
+  line is a snapshot that can predate fields the file now carries, so an arm
+  feeds an index row with no `pass` and no `verified_by` against a live row
+  carrying both, and asserts the survivor is the live one — on the real corpus
+  eight `linklater/main` cites collide and seven of them were losing
+  `pass: "final"` to their snapshots. Eight is the collision count, seven the
+  loss count: the eighth is a `pr-finalization` row carrying `pass: null` on
+  both sides, which loses nothing either way. Preferring the index instead
+  reddens it.
+- THE FALLBACK DEDUP KEY IS A SEPARATE PATH AND GETS ITS OWN ARM. Census rows
+  always synthesise a `cite`, so only a cite-less index row reaches
+  `repo|branch|kind|agent|summary`. Three such rows are asserted to collapse to
+  two, and a paired arm changes one `summary` and asserts they stay three —
+  dropping `summary` from the key reddens the second.
+- THE ERA SUB-BUCKETS MUST PARTITION THEIR PARENT. A group whose lines are
+  mixed — some carrying `verified_by`, some not — is neither all-legacy nor
+  all-modern, so it used to land in `t1_zero` and in neither sub-bucket, and
+  33 + 5 = 38 summed only because no real group was mixed. A third `mixed-era`
+  bucket now exists, and an arm builds all three group kinds at once and
+  asserts the three sub-counts sum to `t1_zero`.
+- AN UNREADABLE SUBTREE IS A WARNING, NOT A SILENT DROP. `find`'s stderr and
+  exit status used to be discarded, so a mode-000 directory removed its repo's
+  crew lines from the corpus with nothing said. An arm chmods a fixture repo to
+  000 and asserts the warning fires, and a paired arm asserts a fully readable
+  census warns about nothing — that second half is pinned by a declared mutant
+  forcing the warning permanently on. The fixture refuses to run rather than
+  pass if `chmod 000` does not actually block the current user. Two limits are
+  part of the claim rather than exceptions to it. The warning carries only what
+  `find` itself reports, and that is platform-dependent: measured against BSD
+  `find` on macOS, modes 111 and 000 are reported, but a read-but-not-
+  traversable directory at mode 444 loses its whole subtree at exit 0 with
+  nothing on stderr — silently, the very shape the warning exists to end.
+  Whether another platform's `find` reports 444 was not measured. So this
+  closes the silent drop for the permission shapes the running `find`
+  surfaces, not for every shape. And the arm's companion
+  `census 2 line(s) from 1 file(s)` clause is fixture sanity, not a pin: it
+  reads the same on both sides of the change it shipped with.
+- A NULL AGENT IS A ROLLUP. The rollup predicate has four arms and the null one
+  had no fixture; it now has one, asserted on the `rollup-agent` counter and on
+  the modern-era count staying 0.
 
 Self-contained: every fixture is written by the suite into a temp dir, and the
 census arm is pointed at a temp root. Nothing reads gitignored `local/` or the

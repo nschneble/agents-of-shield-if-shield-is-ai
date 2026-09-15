@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
       echo "  groups crew gate lines by repo|branch|wave|pass, then reports how" >&2
       echo "  many reached a unanimous all-clean verdict with zero execution" >&2
       echo "  backing. Corpus is the custodian history index plus every live" >&2
-      echo "  local/loops/*/gates.jsonl under ROOT, deduped on cite." >&2
+      echo "  local/loops/*/gates.jsonl under ROOT, deduped on cite (live wins)." >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   echo "unexpected arg: $1" >&2; exit 2;;
@@ -62,8 +62,16 @@ fi
 
 census_files=0
 census_lines=0
+census_unreadable=0
 if [ "$WANT_CENSUS" -eq 1 ]; then
   [ -d "$CENSUS_ROOT" ] || { echo "--census needs a directory: $CENSUS_ROOT" >&2; exit 2; }
+  # only a WHOLLY empty corpus is fatal below, so a partial walk
+  # must speak up
+  find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
+       -path '*/local/loops/*' -name gates.jsonl -print \
+       > "$work/gates.found" 2> "$work/find.err" || true
+  census_unreadable=$(grep -c . "$work/find.err" || true)
+  sort "$work/gates.found" > "$work/gates.list"
   while IFS= read -r gates; do
     [ -s "$gates" ] || continue
     rel="${gates#"$CENSUS_ROOT"/}"
@@ -78,8 +86,7 @@ if [ "$WANT_CENSUS" -eq 1 ]; then
       | . + {repo: $repo, branch: $branch, cite: ($rel + ":" + ($ln | tostring)),
              source: "live"}' "$gates" >> "$corpus"
     census_files=$((census_files + 1))
-  done < <(find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
-                -path '*/local/loops/*' -name gates.jsonl -print 2>/dev/null | sort)
+  done < "$work/gates.list"
   census_lines=$(jq -Rn '[inputs | fromjson? // empty | select(type == "object")
                           | select(.source == "live")] | length' "$corpus")
 fi
@@ -99,9 +106,13 @@ analysis=$(jq -Rn --argjson min "$MIN_AGENTS" '
   def is_crew: ((.kind // "") | tostring | test("crew"));
   def modern:  has("verified_by");
   def vb:      (.verified_by // null);
+  def dedup_key: (.cite // "\(.repo)|\(.branch)|\(.kind)|\(.agent)|\(.summary)");
 
   [inputs | fromjson? // empty | select(type == "object")]
-  | (unique_by(.cite // "\(.repo)|\(.branch)|\(.kind)|\(.agent)|\(.summary)")) as $rows
+  # an index row is a lossy snapshot; keeping it over the live
+  # row drops pass
+  | (group_by(dedup_key)
+     | map(first(.[] | select(.source == "live")) // .[0]))              as $rows
   | ($rows | map(select(is_crew)))                                  as $crew
   | ($crew | map(select(.ran == true)))                             as $ran
   | ($crew | map(select(.ran != true)) | length)                    as $notran
@@ -149,6 +160,7 @@ analysis=$(jq -Rn --argjson min "$MIN_AGENTS" '
               pass_resolved: ($g | map(select(.pass != "unspecified")) | length)},
      backing: {t1_zero: ($t1z | length),
                t1_zero_legacy_era: ($t1z | map(select(.any_modern | not)) | length),
+               t1_zero_mixed_era: ($t1z | map(select(.any_modern and (.all_modern | not))) | length),
                t1_zero_modern_era: ($findings | length),
                t2_zero: ($t2z | length)},
      findings: ($findings | sort_by(.repo, .branch, .wave))}
@@ -164,6 +176,13 @@ printf '            %s deduped · %s crew · %s usable (dropped %s not-ran, %s w
   "$(printf '%s' "$analysis" | jq -r '.corpus.usable')" \
   "$(printf '%s' "$analysis" | jq -r '.corpus.dropped_not_ran')" \
   "$(printf '%s' "$analysis" | jq -r '.corpus.dropped_no_wave')"
+if [ "$census_unreadable" -ne 0 ]; then
+  printf '  WARNING:  census could not read %s path(s) — any crew line beneath them is MISSING from this corpus\n' \
+    "$census_unreadable"
+  # echoed verbatim, never parsed: the wording is
+  # find-implementation-specific
+  head -3 "$work/find.err" | sed 's/^/            /'
+fi
 echo
 
 printf '%s\n' "$analysis" | jq -r '
@@ -179,6 +198,7 @@ printf '%s\n' "$analysis" | jq -r '
   "  execution backing behind the unanimous all-clean groups",
   "    T1 zero (every verified_by llm/null/absent)  \(.backing.t1_zero)",
   "      of those, all-legacy-era (field predates)  \(.backing.t1_zero_legacy_era)   unevidenced, NOT a finding",
+  "      of those, mixed-era (some lines predate)   \(.backing.t1_zero_mixed_era)   unevidenced, NOT a finding",
   "      of those, modern-era                       \(.backing.t1_zero_modern_era)   <- the finding",
   "    T2 zero (no verified_by == \"executable\")      \(.backing.t2_zero)"'
 echo

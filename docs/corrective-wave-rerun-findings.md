@@ -164,7 +164,7 @@ retry, a failed subtask, does not exist in this system's correctives, all of whi
 a gate outside the wave after the wave's own verify and review passed — is a fact about the census,
 not about the count. The measured leg is the cost table below, which was run anyway precisely because
 the threshold did not trigger it. What the correction does change is that the shadow test is now
-load-bearing rather than supplementary: with the threshold arm contested, the cost measurement is the
+essential rather than supplementary: with the threshold arm contested, the cost measurement is the
 verdict's only quantitative support.
 
 The same pattern shows in the wave-level rows, where the `gates.jsonl` verdicts carry a
