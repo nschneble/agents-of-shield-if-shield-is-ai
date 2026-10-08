@@ -44,6 +44,22 @@ run() { # counter-overrides-json, outcome-json, extra args...
         --claude-md "$no_md" "$@" 2>&1)
   rc=$?
 }
+# the pre-dispatch query: writes $d, $out, $rc and leaves the snapshot alone
+query() { # counter-overrides-json, next-kind, extra args...
+  case_n=$((case_n + 1))
+  d="$temp_dir/case-$case_n"
+  mkdir -p "$d"
+  jq -n --argjson z "$zeros" --argjson over "$1" \
+    '{counters: ($z + $over), cleanup_batch: []}' > "$d/run-state.json"
+  local next=$2 pristine
+  pristine=$(cat "$d/run-state.json")
+  shift 2
+  out=$("$runner" --state "$d/run-state.json" --next "$next" \
+        --claude-md "$no_md" "$@" 2>&1)
+  rc=$?
+  [ "$(cat "$d/run-state.json")" = "$pristine" ] && [ ! -e "$d/run-state.json.tmp" ]
+  check "QUERY --next $next: the snapshot is left byte-identical" $?
+}
 ctr() { jq -r ".counters.$1" "$d/run-state.json"; }
 is() { # desc, counter, want
   local got; got=$(ctr "$2")
@@ -146,15 +162,51 @@ rail() { # desc, rail, overrides-at, overrides-short, outcome
   ! printf '%s\n' "$out" | grep -q "TRIPPED  $2 "
   check "RAIL $1: stays quiet one short of it" $?
 }
-rail "max_total_waves" max_total_waves '{"total_waves":24}' '{"total_waves":23}' "$shipped_q"
+next_rail() { # desc, rail, overrides-at, overrides-short, next-kind
+  query "$3" "$5"
+  printf '%s\n' "$out" | grep -q "TRIPPED  $2 "
+  check "RAIL $1: trips before a $5 dispatch at its limit" $?
+  agree "RAIL $1 at limit:"
+  mirrored "$2"
+  query "$4" "$5"
+  ! printf '%s\n' "$out" | grep -q "TRIPPED  $2 "
+  check "RAIL $1: stays quiet one short of it" $?
+  agree "RAIL $1 short of limit:"
+}
+next_rail "max_total_waves" max_total_waves '{"total_waves":25}' '{"total_waves":24}' queue
 rail "max_corrective_waves" max_corrective_waves '{"corrective_waves":5}' '{"corrective_waves":4}' \
-  '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true}'
+  '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true,"gating":true}'
 rail "consecutive_no_progress" consecutive_no_progress '{"consecutive_no_progress":2}' '{"consecutive_no_progress":1}' \
   '{"kind":"queue","shipped":false}'
-rail "max_wave_retries" max_wave_retries '{"wave_retries":3}' '{"wave_retries":2}' \
-  '{"kind":"retry","shipped":true,"files_changed":1,"touched_product":true,"net_new":true}'
+next_rail "max_wave_retries" max_wave_retries '{"wave_retries":4}' '{"wave_retries":3}' retry
 rail "scaffolding_only_correctives" scaffolding_only_correctives '{"scaffolding_only_correctives":1}' '{"scaffolding_only_correctives":0}' \
   '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":false}'
+
+# --- a rail never halts the run on a unit that succeeded ---
+run '{"corrective_waves":5}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true}'
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "SUCCEEDED: the 6th corrective, nothing gating after it, is clear" $?
+run '{"wave_retries":3}' '{"kind":"retry","shipped":true,"files_changed":1,"touched_product":true,"net_new":true}'
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "SUCCEEDED: the 4th retry shipping net-new work is clear" $?
+run '{"total_waves":24}' "$shipped_q"
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "SUCCEEDED: the 25th wave, shipped, is clear" $?
+
+# --- the dispatch rails gate the next dispatch of their kind only ---
+query '{"total_waves":25}' cleanup
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "NEXT: the cleanup batch wave is not gated by max_total_waves" $?
+agree "NEXT cleanup at the ceiling:"
+query '{"total_waves":25}' corrective
+printf '%s\n' "$out" | grep -q 'TRIPPED  max_total_waves 25/25'
+check "NEXT: a corrective dispatch at the ceiling trips max_total_waves" $?
+query '{"total_waves":25}' retry
+printf '%s\n' "$out" | grep -q 'TRIPPED  max_total_waves 25/25'
+check "NEXT: a retry dispatch at the ceiling trips max_total_waves" $?
+query '{"wave_retries":4}' queue
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "NEXT: a queue dispatch is not gated by max_wave_retries" $?
 
 gating_fix='{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true,"gating":true}'
 run '{}' "$gating_fix"
@@ -174,7 +226,7 @@ run '{"correctives_this_wave":1}' '{"kind":"queue","shipped":true,"files_changed
 ! printf '%s\n' "$out" | grep -q 'max_correctives_per_wave'
 check "PER-WAVE: a gating finding on a NEW wave is its first, not a rethink" $?
 
-run '{"total_waves":24}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true,"gating":true}'
+run '{"corrective_waves":5}' "$gating_fix"
 printf '%s\n' "$out" | grep -q '^GOVERNOR: STOP'
 check "OUTRANK: a STOP rail outranks a rethink tripped beside it" $?
 
@@ -227,6 +279,23 @@ step "$gating_fix"
 h=$(headline); [ "$h" = rethink ]
 check "RETRY SPENT: the next wave's rethink earns its own retry (got $h)" $?
 
+# --- no progress earns the wave its one retry, then stops ---
+unshipped_q='{"kind":"queue","shipped":false}'
+fresh
+step "$unshipped_q"; step "$unshipped_q"; step "$unshipped_q"
+h=$(headline); [ "$h" = rethink ]
+check "NO PROGRESS: the wave's first trip earns its retry (got $h)" $?
+mirrored consecutive_no_progress
+step '{"kind":"retry","shipped":false}'
+h=$(headline); [ "$h" = STOP ]
+check "NO PROGRESS: still no progress after the wave's one retry is a STOP (got $h)" $?
+mirrored consecutive_no_progress
+agree "NO PROGRESS spent:"
+fresh
+step "$unshipped_q"; step "$unshipped_q"; step "$unshipped_q"; step "$clean_retry"
+h=$(headline); [ "$h" = clear ]
+check "NO PROGRESS: a retry shipping net-new work clears it (got $h)" $?
+
 # --- overrides, from the project CLAUDE.md ---
 md="$temp_dir/override.md"
 cat > "$md" <<'MD'
@@ -239,9 +308,9 @@ cat > "$md" <<'MD'
 - crew-agents: interim=3
 - budget: max-waves=30, max-corrective=7, per-wave-corrective=2, no-progress=4, max-retries=5, scaffolding-only=3   # tuned
 MD
-run '{"total_waves":24}' "$shipped_q" --claude-md "$md"
+query '{"total_waves":25}' queue --claude-md "$md"
 printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
-check "OVERRIDE: a raised max-waves lets wave 25 through" $?
+check "OVERRIDE: a raised max-waves lets the 26th dispatch through" $?
 printf '%s\n' "$out" | grep -q "limits from $md: per-wave 2 · total 30 · corrective 7 · no-progress 4 · retries 5 · scaffolding 3"
 check "OVERRIDE: every budget key lands on its own rail" $?
 
@@ -406,24 +475,33 @@ budget_run '## Loop de Looper
 [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
 check "REFUSE budget 'max-retries=00': a zero is a zero however it is spelled (exit $rc)" $?
 
-# a jq shim failing only the rail call, the one passing --argjson per
+# a jq shim failing only the rail call: the one passing $SHIM_ARG
 shim="$temp_dir/shim"
 mkdir -p "$shim"
 real_jq=$(command -v jq)
-printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = per ] && exit 5; done\nexec %q "$@"\n' "$real_jq" > "$shim/jq"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = "$SHIM_ARG" ] && exit 5; done\nexec %q "$@"\n' "$real_jq" > "$shim/jq"
 chmod +x "$shim/jq"
 fresh
 printf '%s\n' "$shipped_q" > "$d/outcome.json"
 pristine=$(cat "$d/run-state.json")
-out=$(PATH="$shim:$PATH" "$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
+out=$(SHIM_ARG=per PATH="$shim:$PATH" "$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ] && [ ! -e "$d/run-state.json.tmp" ]
 check "FAIL CLOSED: a rail evaluation that errors exits 2 and writes nothing (exit $rc)" $?
 ! printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
 check "FAIL CLOSED: an unevaluated governor never reads clear" $?
+out=$(SHIM_ARG=next PATH="$shim:$PATH" "$runner" --state "$d/run-state.json" --next queue --claude-md "$no_md" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "FAIL CLOSED: a dispatch-rail evaluation that errors exits 2, never clear (exit $rc)" $?
 
 out=$("$runner" --outcome "$d/outcome.json" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "USAGE: a missing --state exits 2" $?
+out=$("$runner" --state "$d/run-state.json" --next queue --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
+check "USAGE: --next and --outcome together exit 2 and write nothing (exit $rc)" $?
+out=$("$runner" --state "$d/run-state.json" --next crew --claude-md "$no_md" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -q '^GOVERNOR'
+check "USAGE: an unknown --next kind exits 2 with no verdict (exit $rc)" $?
 
 echo
 if [ "$fails" -gt 0 ]; then

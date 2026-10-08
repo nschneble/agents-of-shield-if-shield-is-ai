@@ -123,7 +123,10 @@
 # dropped a comma and corrupted it. Its correctives add +101 more: +8 from
 # ae67a90 naming retries in total_waves, +93 for retries_this_wave (a
 # rethink after the wave's one 2b-retry is a STOP), counter validation,
-# fail-closed rails and fenced/duplicate/zero budget refusals.
+# fail-closed rails and fenced/duplicate/zero budget refusals. +418 more
+# for the user's two governor decisions: no rail halts on a unit that
+# succeeded (a --next query gates dispatches, the cleanup wave exempt) and
+# consecutive_no_progress earns the wave's one 2b-retry before a STOP.
 #
 # +127 always / +249 conditional custodian-run for custodian-reap.sh and
 # custodian-backup.sh: Phase A and Phase D name the commands and what each
@@ -133,7 +136,7 @@
 # ancestry needs a recorded commit and a merged PR needs the local tip, and
 # phase-d-apply.md that undo takes --issue and a symlink stays a link. Each
 # replaces a rule the first cut stated and a review refuted.
-orchestrator-run	25117	1898
+orchestrator-run	25535	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0

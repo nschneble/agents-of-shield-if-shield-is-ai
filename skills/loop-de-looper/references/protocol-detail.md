@@ -60,7 +60,7 @@ Before bubbling a **retryable** stop up to Step 4, attempt EXACTLY ONE fresh-con
 
 **Retryable** (non-deterministic — a fresh attempt can plausibly differ): `verify fails twice` on the same root cause; review verdict `rethink`; a wave that tripped `consecutive_no_progress`.
 
-**NOT retryable** (deterministic — a retry hits the same wall and burns a dispatch): tooling gate / write-block / permission denial, nonbeliever STOP, scope refusal, a budget governor rail other than `max_correctives_per_wave` (a `rethink`), or a design `gate needed pre-build`. These bubble up immediately.
+**NOT retryable** (deterministic — a retry hits the same wall and burns a dispatch): tooling gate / write-block / permission denial, nonbeliever STOP, scope refusal, a budget governor rail other than `max_correctives_per_wave` and `consecutive_no_progress` (each a `rethink` while the wave's retry is unspent), or a design `gate needed pre-build`. These bubble up immediately.
 
 Mechanics:
 
@@ -68,7 +68,7 @@ Mechanics:
 2. **Directed, not blind — revert to the next ranked plan first.** The retry brief carries a `prior attempt failed:` note (the failure mode in one line). The retry FIRST reverts to the next-highest-ranked alternate the wave's `looper-plan` emitted, if one exists — vetted against the same constraints while research context was fresh, so the shot is spent on a pre-vetted approach, not a cold guess (MapCoder, ACL 2024). Only when the plan emitted NO ranked alternate does the retry improvise from the failure signal. Either way pass the note.
 3. **One shot.** Best-of-2. A second stuck hand-back on the SAME wave bubbles to Step 4 and escalates to the user.
 4. **Log it.** Append a `kind: "wave-retry"` event to `gates.jsonl`. A retry the orchestrator could not dispatch logs `ran: false`.
-5. **Counters.** A retry increments `total_waves` and `wave_retries` (never reset). It does NOT increment `corrective_waves` — those are floor-gated fix waves, a different cause. A retry that ships net-new work resets `consecutive_no_progress`; one that fails again counts toward it.
+5. **Counters.** A retry increments `total_waves` and `wave_retries` (never reset). It does NOT increment `corrective_waves` — those are floor-gated fix waves, a different cause. A retry that ships net-new work resets `consecutive_no_progress`; one that fails again counts toward it. Dispatch it only after `loop-counters.sh --next retry` reads clear: `max_wave_retries` and `max_total_waves` gate the retry itself. `retries_this_wave` records it, so the same wave's next `rethink` from either rail is a STOP.
 
 ## Step 2b-flags — triage cross-file flags before advancing
 

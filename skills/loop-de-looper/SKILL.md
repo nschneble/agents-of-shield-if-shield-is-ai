@@ -76,7 +76,7 @@ Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.json
 | `single-wave`        | none (one final crew only) | 1 for the whole run                        |
 | `full-orchestration` | cadence (`## Step 2d`)     | 1 per wave, `max_corrective_waves` per run |
 
-**One corrective per wave, then rethink.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped means the approach is wrong: a `rethink`, not a second patch. It earns the one fresh-context retry on the next ranked alternate (`2b-retry`), then STOPs.
+**One corrective per wave, then rethink.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped means the approach is wrong: a `rethink`, not a second patch. It earns the one fresh-context retry on the next ranked alternate (`2b-retry`), then STOPs. `max_corrective_waves` likewise needs a gating finding pending.
 
 **One re-crew, scoped, terminal.** A corrective is re-checked exactly once, by the agents whose findings it targeted plus any whose domain its diff touched (`references/protocol-detail.md` `## Step 3`). That re-crew answers CLEARED / NOT-CLEARED on those findings and nothing else. New findings it raises batch. NOT-CLEARED is a STOP to the user, never another corrective. Without this the ladder is infinite: each corrective grows the diff, the re-crew reviews the bigger diff, and the new blocker earns the next corrective — observed at five correctives on one wave.
 
@@ -160,7 +160,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
 | `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
-Then, in order: pipe the classified outcome (`references/state-schemas.md` `## loop-counters outcome`) to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -`, which applies this table, writes the snapshot atomically, and names any tripped rail; run `~/.claude/scripts/loop-finding-audit.sh`; act on the governor, the usage-window guard, and the crew trigger. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
+Then, in order: pipe the classified outcome (`references/state-schemas.md` `## loop-counters outcome`) to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -`, which applies this table, writes the snapshot atomically, and names any tripped rail; run `~/.claude/scripts/loop-finding-audit.sh`; act on the governor, the usage-window guard, and the crew trigger. Before the next dispatch, `loop-counters.sh --state <run-state.json> --next <kind>`; a STOP there dispatches nothing. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
 
 **2d. Crew trigger check.** ONE trigger, evaluated after every wave:
 
@@ -231,16 +231,16 @@ Resume mode (`/loop-de-looper resume`):
 
 The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuck-wave retries are not**. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
 
-Checked by `loop-counters.sh` in step 2c, acted on after the finding audit and before the crew trigger. A rail trips at its limit; `max_correctives_per_wave` only with a gating finding pending:
+A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; both corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave (`references/state-schemas.md` `## loop-counters outcome`):
 
-| Rail                           | Default | Hit →                                                                                    |
-| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
-| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`) |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves reached the ceiling                            |
-| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable          |
-| `consecutive_no_progress`      | 3       | STOP + escalate: waves without shipping net-new queue work (thrash)                      |
-| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                    |
-| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                   |
+| Rail                           | Default | Hit →                                                                                                    |
+| ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
+| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`)                 |
+| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves reached the ceiling                                            |
+| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                          |
+| `consecutive_no_progress`      | 3       | `rethink`: one 2b-retry on the next ranked alternate, then STOP + escalate: retry spent, still thrashing |
+| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                                    |
+| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                                   |
 
 The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent three waves rebuilding a scanner around it). The floor is the primary defense against that shape now — oracle completeness is a batched class — and this rail is the backstop for when a finding gets dressed as correctness.
 

@@ -156,7 +156,18 @@ lc-scaffolding-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$shipped a
 lc-scaffolding-not-counted|loop-counters.sh|loop-counters.test.sh|s/scaffolding_only_correctives"\) \+ 1/scaffolding_only_correctives") + 0/
 lc-batched-not-derived|loop-counters.sh|loop-counters.test.sh|s/\| \.counters\.batched_findings = \(\(\.cleanup_batch \/\/ \[\]\) \| length\)/| ./
 lc-per-wave-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("correctives_this_wave"\) >= /at("correctives_this_wave") > /
-lc-per-wave-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and/true and/
+lc-per-wave-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("correctives_this_wave"\)/true and at("correctives_this_wave")/
+lc-corrective-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("corrective_waves"\)/true and at("corrective_waves")/
+lc-total-gates-cleanup|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective","retry","cleanup")) and at/
+lc-total-skips-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","retry")) and at/
+lc-total-skips-retry|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective")) and at/
+lc-retries-gate-any-dispatch|loop-counters.sh|loop-counters.test.sh|s/\$next == "retry" and at\("wave_retries"\)/true and at("wave_retries")/
+lc-no-progress-never-retries|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="STOP + escalate: retry spent, still thrashing"; verdict="STOP";;/
+lc-no-progress-retry-unbounded|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="rethink: one 2b-retry on the next ranked alternate, then STOP"; verdict="rethink";;/
+lc-next-kind-unchecked|loop-counters.sh|loop-counters.test.sh|s/''\|queue\|corrective\|retry\|cleanup\) ;;/*) ;;/
+lc-next-outcome-not-exclusive|loop-counters.sh|loop-counters.test.sh|s/if \[ -n "\$OUTCOME" \] && \[ -n "\$NEXT" \]; then/if false; then/
+lc-next-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the dispatch rails"/ || true/
+lc-spec-thrash-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/then STOP \+ escalate: retry spent, still thrashing/then STOP + escalate: retry spent, still looping/
 lc-total-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("total_waves"\) >= /at("total_waves") > /
 lc-corrective-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("corrective_waves"\) >= /at("corrective_waves") > /
 lc-no-progress-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("consecutive_no_progress"\) >= /at("consecutive_no_progress") > /

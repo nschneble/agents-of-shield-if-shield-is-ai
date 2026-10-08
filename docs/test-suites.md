@@ -292,7 +292,7 @@ A rail evaluation that errors refuses the same way, so a broken governor
 can never print `GOVERNOR: clear`; a jq shim that fails only that call is
 the arm.
 
-Six properties the governor's honesty depends on:
+Eight properties the governor's honesty depends on:
 
 - EVERY COUNTER MOVES BY THE TABLE, PER OUTCOME KIND. A direct fix is a
   corrective but not a dispatched wave; a retry is a dispatched wave but not a
@@ -302,13 +302,23 @@ Six properties the governor's honesty depends on:
 - EVERY RAIL IS PINNED AT ITS BOUNDARY, both directions: trips on reaching
   its limit, quiet one short of it. A `>=` turned `>` passes every arm that
   sits far from the limit.
-- THE PER-WAVE RAIL NEEDS A GATING FINDING. The wave's one corrective is the
-  budget, not a breach; only a second gating finding after it is a `rethink`.
-  And a STOP rail tripped beside a rethink wins.
+- BOTH CORRECTIVE RAILS NEED A GATING FINDING. The wave's one corrective is
+  the budget, not a breach; only a second gating finding after it is a
+  `rethink`. Likewise the run's sixth corrective shipping clean is clear;
+  `max_corrective_waves` trips only when a seventh would be needed. And a
+  STOP rail tripped beside a rethink wins.
+- A RAIL NEVER HALTS ON A UNIT THAT SUCCEEDED. The 25th wave and the 4th
+  retry, each shipped, read clear. `max_total_waves` and `max_wave_retries`
+  are checked by `--next`, before the dispatch they would refuse: a queue,
+  corrective or retry dispatch at the ceiling trips the first, a retry
+  dispatch at the limit the second, a queue dispatch never the second, and
+  `--next cleanup` neither. Every query leaves the snapshot byte-identical.
 - A RETHINK EARNS ONE RETRY PER WAVE. Outcomes are chained on one snapshot:
   queue, gating crew, gating corrective (rethink), then a gating retry must
   read STOP, as must a gating re-crew after a clean retry. A new queue wave
   resets `retries_this_wave`, so its own rethink earns its own retry.
+  `consecutive_no_progress` shares it: three unshipped queue waves read
+  rethink, an unshipped retry after them STOP, a net-new retry clear.
 - OVERRIDES LAND ON THEIR OWN RAIL. One assertion reads all six limits back
   from the `- budget:` line, so a crossed key mapping reddens; a `budget:`
   line under another heading is ignored; with no flag, the snapshot's own
@@ -318,9 +328,10 @@ Six properties the governor's honesty depends on:
 - THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
   appear in its `SKILL.md` governor row, so the two cannot drift apart.
 
-Every assertion was watched fail: 47 declared mutants in
+Every assertion was watched fail: 58 declared mutants in
 `scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
-comparison, override path and refusal guard, all killed. The first sweep
+comparison, rail condition, `--next` kind, override path and refusal
+guard, all killed. The first sweep
 found 13 survivors. Twelve were one harness bug — a `$?` read after a
 command substitution in the check's own description, which made every
 counter assertion pass. The thirteenth was the STOP-outranks-rethink guard,

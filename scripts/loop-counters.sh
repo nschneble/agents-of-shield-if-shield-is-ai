@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# loop-counters — applies one classified wave outcome to run-state.json
+# loop-counters — applies one classified wave outcome to run-state.json,
+# or, with --next, checks the dispatch rails before the next dispatch
 set -uo pipefail
 
 STATE=""
 OUTCOME=""
+NEXT=""
 CLAUDE_MD=""
 
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
@@ -12,10 +14,12 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --state)     needs_value --state "$#";     STATE="$2";     shift 2;;
     --outcome)   needs_value --outcome "$#";   OUTCOME="$2";   shift 2;;
+    --next)      needs_value --next "$#";      NEXT="$2";      shift 2;;
     --claude-md) needs_value --claude-md "$#"; CLAUDE_MD="$2"; shift 2;;
     -h|--help)
-      echo "usage: $0 --state PATH --outcome FILE|- [--claude-md PATH]" >&2
-      echo "  applies a wave outcome to the counters, then checks the governor" >&2
+      echo "usage: $0 --state PATH (--outcome FILE|- | --next KIND) [--claude-md PATH]" >&2
+      echo "  --outcome applies a wave outcome to the counters, then checks the governor" >&2
+      echo "  --next queue|corrective|retry|cleanup checks the rails gating that dispatch" >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   echo "unexpected arg: $1" >&2; exit 2;;
@@ -25,45 +29,54 @@ done
 refuse() { echo "$1" >&2; echo "NOTHING WRITTEN — $STATE left as it was"; exit 2; }
 
 [ -n "$STATE" ] || { echo "--state is required" >&2; exit 2; }
-[ -n "$OUTCOME" ] || { echo "--outcome is required" >&2; exit 2; }
+if [ -n "$OUTCOME" ] && [ -n "$NEXT" ]; then
+  echo "--outcome and --next are exclusive" >&2; exit 2
+fi
+[ -n "$OUTCOME$NEXT" ] || { echo "--outcome or --next is required" >&2; exit 2; }
+case "$NEXT" in
+  ''|queue|corrective|retry|cleanup) ;;
+  *) echo "--next must be queue|corrective|retry|cleanup, got '$NEXT'" >&2; exit 2;;
+esac
 
 [ -s "$STATE" ] || refuse "empty or missing run-state: $STATE"
 jq -e 'type == "object" and ((.counters // {}) | type == "object")' "$STATE" >/dev/null 2>&1 \
   || refuse "unparseable run-state, or counters is not an object: $STATE"
 
-if [ "$OUTCOME" = "-" ]; then
-  outcome=$(cat)
-else
-  [ -r "$OUTCOME" ] || refuse "unreadable outcome: $OUTCOME"
-  outcome=$(cat "$OUTCOME")
-fi
-printf '%s' "$outcome" | jq -se 'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 \
-  || refuse "outcome is not exactly one JSON object"
-outcome=$(printf '%s' "$outcome" | jq -c .)
+if [ -z "$NEXT" ]; then
+  if [ "$OUTCOME" = "-" ]; then
+    outcome=$(cat)
+  else
+    [ -r "$OUTCOME" ] || refuse "unreadable outcome: $OUTCOME"
+    outcome=$(cat "$OUTCOME")
+  fi
+  printf '%s' "$outcome" | jq -se 'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 \
+    || refuse "outcome is not exactly one JSON object"
+  outcome=$(printf '%s' "$outcome" | jq -c .)
 
-problems=$(jq -r --argjson o "$outcome" '
-  def bool($k): ($o | has($k) | not) or ($o[$k] | type == "boolean");
-  def count($v): ($v | type == "number") and $v >= 0 and ($v | floor) == $v;
-  [
-    ($o | keys - ["kind","shipped","files_changed","touched_product","net_new",
-                  "reopened","review_verdict","gating","wave"] | .[] | "unknown key: \(.)"),
-    (if ($o.kind | IN("queue","corrective","direct-fix","retry","crew-pass")) then empty
-     else "kind must be queue|corrective|direct-fix|retry|crew-pass" end),
-    (("shipped","touched_product","net_new","reopened","gating") | select(bool(.) | not) | "\(.) must be a boolean"),
-    (if ($o | has("review_verdict")) and ($o.review_verdict | type | IN("string","null") | not)
-     then "review_verdict must be a string or null" else empty end),
-    (if $o.kind == "crew-pass" then
-       (if count($o.wave) then empty else "crew-pass needs wave as a count" end),
-       ($o | keys - ["kind","wave","gating"] | .[] | "crew-pass does not take \(.)")
-     else
-       (if ($o | has("shipped")) then empty else "shipped is required" end),
-       (if $o.shipped == true and (count($o.files_changed) | not) then "a shipped outcome needs files_changed as a count" else empty end),
-       (if $o.shipped == true and ($o | has("touched_product") | not) then "a shipped outcome needs touched_product" else empty end),
-       (if $o.shipped != true and (($o.files_changed // 0) != 0 or $o.net_new == true) then "an unshipped outcome cannot carry files or net_new" else empty end)
-     end)
-  ] | .[]' "$STATE" 2>&1) || refuse "could not validate outcome: $problems"
-[ -z "$problems" ] || refuse "invalid outcome:
+  problems=$(jq -r --argjson o "$outcome" '
+    def bool($k): ($o | has($k) | not) or ($o[$k] | type == "boolean");
+    def count($v): ($v | type == "number") and $v >= 0 and ($v | floor) == $v;
+    [
+      ($o | keys - ["kind","shipped","files_changed","touched_product","net_new",
+                    "reopened","review_verdict","gating","wave"] | .[] | "unknown key: \(.)"),
+      (if ($o.kind | IN("queue","corrective","direct-fix","retry","crew-pass")) then empty
+       else "kind must be queue|corrective|direct-fix|retry|crew-pass" end),
+      (("shipped","touched_product","net_new","reopened","gating") | select(bool(.) | not) | "\(.) must be a boolean"),
+      (if ($o | has("review_verdict")) and ($o.review_verdict | type | IN("string","null") | not)
+       then "review_verdict must be a string or null" else empty end),
+      (if $o.kind == "crew-pass" then
+         (if count($o.wave) then empty else "crew-pass needs wave as a count" end),
+         ($o | keys - ["kind","wave","gating"] | .[] | "crew-pass does not take \(.)")
+       else
+         (if ($o | has("shipped")) then empty else "shipped is required" end),
+         (if $o.shipped == true and (count($o.files_changed) | not) then "a shipped outcome needs files_changed as a count" else empty end),
+         (if $o.shipped == true and ($o | has("touched_product") | not) then "a shipped outcome needs touched_product" else empty end),
+         (if $o.shipped != true and (($o.files_changed // 0) != 0 or $o.net_new == true) then "an unshipped outcome cannot carry files or net_new" else empty end)
+       end)
+    ] | .[]' "$STATE" 2>&1) || refuse "could not validate outcome: $problems"
+  [ -z "$problems" ] || refuse "invalid outcome:
 $problems"
+fi
 
 not_counts=$(jq -r '
   (.counters // {}) as $c
@@ -137,71 +150,87 @@ $(printf '%s\n' "$budget" | awk -F'\t' '{ print "  line " $1 ": " $2 }')"
   fi
 fi
 
-tmp="$STATE.tmp"
-trap 'rm -f "$tmp"' EXIT
+limits="limits from $limits_from: per-wave $L_PER_WAVE · total $L_TOTAL · corrective $L_CORRECTIVE · no-progress $L_NO_PROGRESS · retries $L_RETRIES · scaffolding $L_SCAFFOLDING"
 
-jq --argjson o "$outcome" '
-  def n($k): (.counters[$k] // 0);
-  ($o.shipped == true) as $shipped
-  | ($o.kind | IN("queue","corrective","retry")) as $wave
-  | ($o.kind | IN("corrective","direct-fix")) as $fix
-  | .counters = (.counters // {})
-  | if $wave and $shipped then .counters.waves_shipped = n("waves_shipped") + 1 else . end
-  | if $wave then .counters.waves_since_crew = n("waves_since_crew") + 1 else . end
-  | if $wave and $shipped then .counters.cumulative_files_changed = n("cumulative_files_changed") + $o.files_changed else . end
-  | if $o.kind == "crew-pass" then .counters.waves_since_crew = 0 | .counters.cumulative_files_changed = 0 | .last_crew_wave = $o.wave else . end
-  | if ($o | has("review_verdict")) then .counters.last_review_verdict = $o.review_verdict else . end
-  | if $wave then .counters.total_waves = n("total_waves") + 1 else . end
-  | if $fix then .counters.corrective_waves = n("corrective_waves") + 1 else . end
-  | if $o.kind == "queue" then .counters.correctives_this_wave = 0 | .counters.retries_this_wave = 0 else . end
-  | if $fix then .counters.correctives_this_wave = n("correctives_this_wave") + 1 else . end
-  | if $o.net_new == true then .counters.consecutive_no_progress = 0
-    elif $wave and (($shipped | not) or $o.reopened == true) then .counters.consecutive_no_progress = n("consecutive_no_progress") + 1
-    else . end
-  | if $o.kind == "retry" then .counters.wave_retries = n("wave_retries") + 1 | .counters.retries_this_wave = n("retries_this_wave") + 1 else . end
-  | if $shipped and $o.touched_product == true then .counters.scaffolding_only_correctives = 0
-    elif $fix and $shipped then .counters.scaffolding_only_correctives = n("scaffolding_only_correctives") + 1
-    else . end
-  | .counters.batched_findings = ((.cleanup_batch // []) | length)
-' "$STATE" > "$tmp" 2>/dev/null \
-  || refuse "jq could not apply the outcome to $STATE"
-jq -e 'type == "object" and (.counters | type == "object")' "$tmp" >/dev/null 2>&1 \
-  || refuse "the rewritten snapshot failed validation; $STATE left as it was"
+if [ -n "$NEXT" ]; then
+  tripped=$(jq -r --arg next "$NEXT" --argjson total "$L_TOTAL" --argjson ret "$L_RETRIES" '
+    (.counters // {}) as $c
+    | def at($k): ($c[$k] // 0);
+    (if ($next | IN("queue","corrective","retry")) and at("total_waves") >= $total then "max_total_waves\t\(at("total_waves"))\t\($total)" else empty end),
+    (if $next == "retry" and at("wave_retries") >= $ret then "max_wave_retries\t\(at("wave_retries"))\t\($ret)" else empty end)
+  ' "$STATE") || refuse "could not evaluate the dispatch rails"
+  echo "loop-counters — before a $NEXT dispatch — $STATE"
+  echo "  $limits"
+  [ "$NEXT" != cleanup ] || echo "  the cleanup batch wave is not gated by max_total_waves"
+  echo
+  written="nothing written"
+else
+  tmp="$STATE.tmp"
+  trap 'rm -f "$tmp"' EXIT
 
-tripped=$(jq -r --argjson o "$outcome" \
-  --argjson per "$L_PER_WAVE" --argjson total "$L_TOTAL" \
-  --argjson corr "$L_CORRECTIVE" --argjson nop "$L_NO_PROGRESS" \
-  --argjson ret "$L_RETRIES" --argjson scaf "$L_SCAFFOLDING" '
-  .counters as $c
-  | def at($k): ($c[$k] // 0);
-  (if at("total_waves") >= $total then "max_total_waves\t\(at("total_waves"))\t\($total)" else empty end),
-  (if at("corrective_waves") >= $corr then "max_corrective_waves\t\(at("corrective_waves"))\t\($corr)" else empty end),
-  (if at("consecutive_no_progress") >= $nop then "consecutive_no_progress\t\(at("consecutive_no_progress"))\t\($nop)" else empty end),
-  (if at("wave_retries") >= $ret then "max_wave_retries\t\(at("wave_retries"))\t\($ret)" else empty end),
-  (if at("scaffolding_only_correctives") >= $scaf then "scaffolding_only_correctives\t\(at("scaffolding_only_correctives"))\t\($scaf)" else empty end),
-  (if $o.gating == true and at("correctives_this_wave") >= $per then "max_correctives_per_wave\t\(at("correctives_this_wave"))\t\($per)\t\(at("retries_this_wave"))" else empty end)
-' "$tmp") || refuse "could not evaluate the governor rails; $STATE left as it was"
-mv -f "$tmp" "$STATE" || refuse "could not rename $tmp over $STATE"
+  jq --argjson o "$outcome" '
+    def n($k): (.counters[$k] // 0);
+    ($o.shipped == true) as $shipped
+    | ($o.kind | IN("queue","corrective","retry")) as $wave
+    | ($o.kind | IN("corrective","direct-fix")) as $fix
+    | .counters = (.counters // {})
+    | if $wave and $shipped then .counters.waves_shipped = n("waves_shipped") + 1 else . end
+    | if $wave then .counters.waves_since_crew = n("waves_since_crew") + 1 else . end
+    | if $wave and $shipped then .counters.cumulative_files_changed = n("cumulative_files_changed") + $o.files_changed else . end
+    | if $o.kind == "crew-pass" then .counters.waves_since_crew = 0 | .counters.cumulative_files_changed = 0 | .last_crew_wave = $o.wave else . end
+    | if ($o | has("review_verdict")) then .counters.last_review_verdict = $o.review_verdict else . end
+    | if $wave then .counters.total_waves = n("total_waves") + 1 else . end
+    | if $fix then .counters.corrective_waves = n("corrective_waves") + 1 else . end
+    | if $o.kind == "queue" then .counters.correctives_this_wave = 0 | .counters.retries_this_wave = 0 else . end
+    | if $fix then .counters.correctives_this_wave = n("correctives_this_wave") + 1 else . end
+    | if $o.net_new == true then .counters.consecutive_no_progress = 0
+      elif $wave and (($shipped | not) or $o.reopened == true) then .counters.consecutive_no_progress = n("consecutive_no_progress") + 1
+      else . end
+    | if $o.kind == "retry" then .counters.wave_retries = n("wave_retries") + 1 | .counters.retries_this_wave = n("retries_this_wave") + 1 else . end
+    | if $shipped and $o.touched_product == true then .counters.scaffolding_only_correctives = 0
+      elif $fix and $shipped then .counters.scaffolding_only_correctives = n("scaffolding_only_correctives") + 1
+      else . end
+    | .counters.batched_findings = ((.cleanup_batch // []) | length)
+  ' "$STATE" > "$tmp" 2>/dev/null \
+    || refuse "jq could not apply the outcome to $STATE"
+  jq -e 'type == "object" and (.counters | type == "object")' "$tmp" >/dev/null 2>&1 \
+    || refuse "the rewritten snapshot failed validation; $STATE left as it was"
 
-echo "loop-counters — $STATE"
-echo "  limits from $limits_from: per-wave $L_PER_WAVE · total $L_TOTAL · corrective $L_CORRECTIVE · no-progress $L_NO_PROGRESS · retries $L_RETRIES · scaffolding $L_SCAFFOLDING"
-jq -r '.counters | to_entries[] | "  \(.key)\t\(.value)"' "$STATE" | expand -t 34
-echo
+  tripped=$(jq -r --argjson o "$outcome" \
+    --argjson per "$L_PER_WAVE" --argjson corr "$L_CORRECTIVE" \
+    --argjson nop "$L_NO_PROGRESS" --argjson scaf "$L_SCAFFOLDING" '
+    .counters as $c
+    | def at($k): ($c[$k] // 0);
+    (if $o.gating == true and at("corrective_waves") >= $corr then "max_corrective_waves\t\(at("corrective_waves"))\t\($corr)" else empty end),
+    (if at("consecutive_no_progress") >= $nop then "consecutive_no_progress\t\(at("consecutive_no_progress"))\t\($nop)\t\(at("retries_this_wave"))" else empty end),
+    (if at("scaffolding_only_correctives") >= $scaf then "scaffolding_only_correctives\t\(at("scaffolding_only_correctives"))\t\($scaf)" else empty end),
+    (if $o.gating == true and at("correctives_this_wave") >= $per then "max_correctives_per_wave\t\(at("correctives_this_wave"))\t\($per)\t\(at("retries_this_wave"))" else empty end)
+  ' "$tmp") || refuse "could not evaluate the governor rails; $STATE left as it was"
+  mv -f "$tmp" "$STATE" || refuse "could not rename $tmp over $STATE"
+
+  echo "loop-counters — $STATE"
+  echo "  $limits"
+  jq -r '.counters | to_entries[] | "  \(.key)\t\(.value)"' "$STATE" | expand -t 34
+  echo
+  written="snapshot written"
+fi
 
 verdict="clear"
+retry_or_stop() { # stop-action
+  if [ "$wave_retried" -ge 1 ]; then
+    action="$1"; verdict="STOP"
+  else
+    action="rethink: one 2b-retry on the next ranked alternate, then STOP"
+    [ "$verdict" = "STOP" ] || verdict="rethink"
+  fi
+}
 while IFS=$'\t' read -r rail count limit wave_retried; do
   [ -n "$rail" ] || continue
   case "$rail" in
-    max_correctives_per_wave)
-      if [ "$wave_retried" -ge 1 ]; then
-        action="STOP + escalate: rethink again after the wave's one 2b-retry"; verdict="STOP"
-      else
-        action="rethink: one 2b-retry on the next ranked alternate, then STOP"
-        [ "$verdict" = "STOP" ] || verdict="rethink"
-      fi;;
+    max_correctives_per_wave) retry_or_stop "STOP + escalate: rethink again after the wave's one 2b-retry";;
+    consecutive_no_progress)  retry_or_stop "STOP + escalate: retry spent, still thrashing";;
     max_total_waves)         action="STOP + escalate: queue + corrective waves reached the ceiling"; verdict="STOP";;
     max_corrective_waves)    action="STOP + escalate: too many floor-gated fixes; drift is structural"; verdict="STOP";;
-    consecutive_no_progress) action="STOP + escalate: waves without shipping net-new queue work"; verdict="STOP";;
     max_wave_retries)        action="STOP + escalate: the goal is systematically too hard for the executor"; verdict="STOP";;
     scaffolding_only_correctives) action="STOP + escalate: consecutive correctives touched only test scaffolding"; verdict="STOP";;
   esac
@@ -209,5 +238,5 @@ while IFS=$'\t' read -r rail count limit wave_retried; do
 done <<< "$tripped"
 [ -z "$tripped" ] || echo
 
-echo "GOVERNOR: $verdict — snapshot written"
+echo "GOVERNOR: $verdict — $written"
 [ "$verdict" = "clear" ]
