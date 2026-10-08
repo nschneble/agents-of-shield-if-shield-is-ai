@@ -233,14 +233,14 @@ The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuc
 
 Evaluated in step 2c after `run-state.json` is written and the finding audit has run, before the crew trigger:
 
-| Rail                           | Default | Hit →                                                                                           |
-| ------------------------------ | ------- | ----------------------------------------------------------------------------------------------- |
-| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`)        |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                                  |
-| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                 |
-| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                           |
-| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                           |
-| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                          |
+| Rail                           | Default | Hit →                                                                                    |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`) |
+| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                           |
+| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable          |
+| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                    |
+| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                    |
+| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                   |
 
 The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent three waves rebuilding a scanner around it). The floor is the primary defense against that shape now — oracle completeness is a batched class — and this rail is the backstop for when a finding gets dressed as correctness.
 
