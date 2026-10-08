@@ -24,7 +24,7 @@ Three conditions had to hold at once, and removing any one of them stopped it:
 
 Phase B has all three. Its input is memory files that rhyme with each other by
 design; its five conditions are named but its distillation condition ("the
-same underlying rule") is open-ended in practice; and `### Phase B` opens with
+same underlying rule") is open-ended in practice; and `### Phase B` instructs
 "Detect five conditions", which presupposes there are conditions to detect.
 
 Two consequences the procedure below is built around. **A near-empty namespace
@@ -100,7 +100,7 @@ the report. Same rules, same enumeration discipline, no softening:
    reason it forbids a clean verdict in a real run.
 
 At this size no delegation is warranted, so running the audit inline IS the
-real Phase B path, not a stand-in. **Where a Task tool is available, dispatch
+real Phase B path, not a stand-in. **Where an Agent tool is available, dispatch
 each arm to a fresh subagent holding Read + Grep and nothing else, which gets
 the file list and Phase B's rules and NOT the expected set.** Blind is about
 what the arm knows, never about what it can check — withhold the expected set,

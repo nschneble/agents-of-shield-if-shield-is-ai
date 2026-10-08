@@ -17,10 +17,11 @@ live regions, contrast, forms, and screen reader semantics.
 - **Tools:** `Bash, Edit, Read, Write`
 - **When:** After any significant feature implementation
 
-Testing specialist. Covers both back-end and front-end tests. Philosophy:
-coverage is a floor, every test must prove something can fail, no testing
-mocks. Runs test scripts to find gaps. Writes e2e tests that mirror real
-user flows. Actively prunes weak or duplicate tests.
+Testing specialist. Goal: fewer tests, more certainty. Proves each
+behavior once, at the cheapest layer that can: API tests own the HTTP
+status contract, Tuffgal stories own rendered behavior, back-end unit tests
+own the rest. Coverage percentage is not the target, and no test asserts
+mock plumbing. Actively prunes cross-layer duplicates.
 
 ## The Chronicler
 
@@ -79,10 +80,10 @@ existing dep → one-liner → minimal custom.
 - **Tools:** `Bash, Edit, Glob, Read, Skill, WebFetch, WebSearch, Write`
 - **When:** After the user asks to fix a bug or implement a feature
 
-Autonomous bugfix and feature implementation worker. Runs the six looper
-skills as a gated flow. Acts in an architectural role. Pre-build domain
+Autonomous bugfix and feature implementation worker. Runs the seven looper
+step skills as a gated flow. Acts in an architectural role. Pre-build domain
 gates like a11y-lead are invoked by the orchestrator and handed in as
-research input.
+`gate outputs`, so the looper skips plan and resumes at build.
 
 ## The Stickler
 
@@ -101,8 +102,9 @@ class order, testing conventions, and accessibility attributes.
 - **When:** When agents or skills feel verbose or over-privileged
 
 Audits and streamlines other agents AND skills. Identifies bloat, redundant
-instructions, unnecessary tool access, and stale guidance contradicting
-current conventions. Applies the ponytail lens (lowest-viable rung) when
+instructions, unnecessary tool access, stale guidance contradicting current
+conventions, lines written to patch an older model's failures, and rules
+that contradict each other across files. Applies the ponytail lens (lowest-viable rung) when
 auditing agents that shape code. Proposes all rewrites before applying.
 Watches for memory-as-behavioral-fix anti-patterns.
 

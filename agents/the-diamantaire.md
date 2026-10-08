@@ -37,7 +37,7 @@ Diamantaire: adversarial code reviewer with a kill-mandate. Prosecute the diff â
 
 **Testing**: Missing tests for new logic (front-end: missing Tuffgal story). No mock factories. Missing `jest.clearAllMocks()`. Tests won't catch broken implementation. Back-end test files `*.spec.ts`; front-end behavior lives in Tuffgal stories, not hand-written `*.test.tsx`.
 
-**Accessibility**: Missing `aria-hidden` on decorative icons. Missing `role="alert"` on errors. Missing explicit role/label on interactive elements.
+**Accessibility**: Missing `aria-hidden` on decorative icons. Interactive element with no accessible name, custom widget missing its role, or ARIA duplicating native semantics.
 
 **Security**: Exposed sensitive data. Missing auth guards. Improper input validation.
 

@@ -126,7 +126,7 @@ before recommending the plan.
 Qualitative review, independent from build and verify. Question is not
 "does it work" but "right shape, fits codebase, hidden costs?" Recommends
 which specialist reviewers the orchestrator should invoke in parallel
-via Task tool. Synthesizes findings.
+via Agent tool. Synthesizes findings.
 
 Findings sort into two buckets, not three: blocker (clears the severity
 floor and cites what it protects) or batched (everything else, fixed in
@@ -163,8 +163,8 @@ above the wave loop to coordinate multi-wave goals:
 
 Adversarial pre-flight. Runs once, before scope. Forces the orchestrator to
 justify the goal + intended approach against CLAUDE.md, existing agents,
-existing skills, and active directives. Raises challenges across four axes —
-redundancy, contradiction, authority, approach — each citing a real source
+existing skills, and active directives. Raises challenges across five axes —
+redundancy, contradiction, authority, approach, speculation — each citing a real source
 line verbatim. Emits `PROCEED`, `PROCEED-WITH-NOTES` (adjustments fed into
 scope), or `STOP` (hard rule conflict, user-authority decision, or
 required-gate substitution). Advisory by design: a raised challenge doesn't
@@ -201,11 +201,12 @@ Added in framework v1.1.
 **Trigger:** "Loop de looper", "run all the waves", or any multi-wave goal expecting hands-off execution
 
 Parent orchestrator. Composes looper-nonbeliever (pre-flight) + looper-scope
-(queue) + the-looper (per-wave executor) + the crew (periodic + final) +
-looper-recap (closing summary). The crew runs every 4 waves or 30 cumulative
-file changes (whichever first) interim, and once mandatory before
-goal-complete. Interim passes are domain-matched at three agents; the
-final pass runs all seven. Termination surfaces the loopable work shipped
+(queue) + the-looper (per-wave executor) + the crew (on risk + final) +
+looper-recap (closing summary). The crew runs an interim pass when a wave
+ships concentrated risk (a new algorithm, a state machine, one large diff),
+and once mandatory before goal-complete. Every pass, the final one
+included, is domain-matched by the diff's file globs; interim passes cap at
+three agents. Termination surfaces the loopable work shipped
 alongside required-not-loopable items so the user gets verified work + open
 human gates in one report.
 
@@ -326,9 +327,9 @@ There are four phases:
 
 1. Scan: `scripts/doc-bloat-scan.sh` finds candidates — over-narrated blocks
    (free-form and JSDoc), stacked `//`, over-75 lines, Capitalized `//`
-2. Triage: route each to its owner rule; only declaration-position headers (file
-   top or before a symbol) and genuine one-liners survive, everything
-   mid-execution and multi-line is a snip; dedupe
+2. Triage: route each to its owner rule; only external-contract prose and
+   genuine one-liners survive, and every other multi-line block is a snip,
+   declaration position included; dedupe
 3. Report: surface candidates with checkbox snip proposals
 4. Snip: trim ticked candidates through the normal wave pipeline
 

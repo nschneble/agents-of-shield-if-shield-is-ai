@@ -119,7 +119,7 @@ Triggered by `apply` (or auto, for the narrow dep-bump class). Defend does NOT p
      - **The fix tightens an existing check without changing the contract** (e.g. adding a missing authz guard to an endpoint whose signature is unchanged) → plan may NOT escalate on its own, since there is no public-API-contract delta to trip the trigger. Defend does **not** additionally mandate a security gate beyond what plan and build already require; it notes the finding's authz class in the run report so the present human knows a security-sensitive change landed through the normal pipeline and can request a review if they want one.
 2. **Route it**: `looper-build` (smallest change) → `looper-verify` (assertion oracle holds + suite green; the executable completion gate where a repro oracle exists) → `looper-review` (independent qualitative pass; must return `ship` or `fix-blockers-then-ship` with no blockers before `looper-commit`'s pre-flight will land it) → `looper-commit` (lands the fix on the draft PR). In a `loop-de-looper` context, hand each as a queued wave to the orchestrator's `the-looper` dispatch instead of invoking the skills directly.
 3. **Idempotent** — a finding whose fix is already present is a no-op, never a double-patch. Re-running `apply` on the same run is safe.
-4. **Honor tool availability** — if defend cannot actually invoke `looper-plan`/`looper-build`/`looper-verify`/`looper-review`/`looper-commit` (no Skill/Task tool), it logs `ran: false` on the patch record and hands the constructed brief back for the user/orchestrator to run — NEVER a claimed-but-unrun patch. Same `task_tool_available: false ⇒ ran: false` discipline as custodian.
+4. **Honor tool availability** — if defend cannot actually invoke `looper-plan`/`looper-build`/`looper-verify`/`looper-review`/`looper-commit` (no Skill/Agent tool), it logs `ran: false` on the patch record and hands the constructed brief back for the user/orchestrator to run — NEVER a claimed-but-unrun patch. Same `task_tool_available: false ⇒ ran: false` discipline as custodian.
 
 The narrow auto-patch-eligible class runs steps 1–2 without waiting for a tick — but with one hard mechanical gate BEFORE it commits. Triage classified the finding `auto-patch-eligible` from a _prediction_ that the fix would be manifest/lockfile-confined; that prediction is made before any fix exists, so it is re-checked against the REAL diff once `looper-build` has produced it. After build, before `looper-commit`, enumerate the changed paths:
 
@@ -168,7 +168,7 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 - **`verified_by: executable`** only when a scanner hit or an assertion-style repro backed the verdict; a cited code-read judgment is `verified_by: llm` — never dressed up as a check that never ran. `null` only when a patch record has `ran: false`.
 - **`verdict`** is the triage judgment cited VERBATIM from the evidence, never paraphrased — the same rule `gates.jsonl` holds for its own verdict field (`loop-de-looper` → `## Gate artifacts`, "agent's own words, verbatim — no paraphrase").
 - **`outcome`** is `promote`/`refute` for the triage real-vs-noise decision; `null` on a bare recon/find enumeration record.
-- **`task_tool_available`/`ran` are patch-record fields only** (`phase: "patch"`). They track whether defend could invoke a sub-skill (`looper-plan`/`build`/`verify`/`review`/`commit`) via the Task/Skill tool: `task_tool_available: false ⇒ ran: false ⇒ no invented outcome` — a patch defend could not run is logged unavailable, never as a claimed-but-unrun fix. Recon/find/triage/report records leave both `null`; a scanner missing from `PATH` is a SEPARATE concern, tracked by the adapter table's own `command -v` presence-detection (`## Stack detection + adapter table`), not by these fields.
+- **`task_tool_available`/`ran` are patch-record fields only** (`phase: "patch"`). They track whether defend could invoke a sub-skill (`looper-plan`/`build`/`verify`/`review`/`commit`) via the Agent/Skill tool: `task_tool_available: false ⇒ ran: false ⇒ no invented outcome` — a patch defend could not run is logged unavailable, never as a claimed-but-unrun fix. Recon/find/triage/report records leave both `null`; a scanner missing from `PATH` is a SEPARATE concern, tracked by the adapter table's own `command -v` presence-detection (`## Stack detection + adapter table`), not by these fields.
 
 ## Safety rails
 
@@ -178,7 +178,7 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 - **No execution of untrusted input in v1** — neither the hunt nor patch verification ever runs a weaponized exploit payload. Find is a code read + optional scanner invocation; triage's executable oracle and patch's repro are **assertion-style** — they assert the fix invariant (query parameterized, path canonicalized, URL allowlisted) or run a controlled benign probe (`## Triage` → "what 'repro' means"), NOT fuzzing or PoC-execution of malformed inputs. That keeps defend off the sandbox/isolation requirement the harness carries for its exploit-crafting agents; an adapter that ever executed a PoC would need that isolation and is out of v1 scope.
 - **Real-vs-noise is gated, not asserted** — a candidate promotes to a finding only on an executable oracle or a corroborated, cited, reachable judgment; unconfirmed candidates are refuted to informational, never a patch proposal.
 - **Findings dedupe by root cause** — within-run and against prior runs, keyed on sink identity, not drift-prone line numbers.
-- **Tool availability honored** — unavailable scanner/skill ⇒ `ran: false`, no invented finding or claimed-but-unrun patch.
+- **Tool availability honored** — a missing scanner is logged in recon's available-scanner set; an unavailable sub-skill ⇒ `ran: false` on the patch record. Never an invented finding or a claimed-but-unrun patch.
 - **Report surface fits the mode** — interactive end-of-run report by default; a GitHub issue only on opt-in, sanitized on a public repo.
 
 ## Stop conditions / escalation to the user
@@ -186,7 +186,7 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 - **No stack detected AND no test command** — no verify oracle exists for any auto class and the LLM-read hunt is the only mode; run it, but STOP before any auto-patch and report that all findings are propose-only.
 - **A finding's fix requires an architectural change** (not a localized patch) — do NOT construct a patch wave; surface it as an informational finding with a note that it needs a scoped design decision, not a mechanical fix.
 - **Patch verify fails twice on the same finding, same root cause** — STOP that finding's remediation, report it as unpatched with the failure, leave the finding's checkbox for a human to reconsider (same verify-twice discipline as `looper-verify`).
-- **A scanner or sub-skill defend needs is unavailable** — log `ran: false`, continue the hunt in the degraded mode, and state the gap in the report; never fabricate the missing tool's output.
+- **A scanner or sub-skill defend needs is unavailable** — a scanner goes in recon's available-scanner set, a sub-skill gets `ran: false` on its patch record; continue in the degraded mode, and state the gap in the report; never fabricate the missing tool's output.
 - **The target is not the current repo / reaches outside it** — defend hunts the repo it is run in; it does not reach across repos (that is custodian's explicit-list domain).
 - **Conflicting authoritative severity/exploitability judgment defend can't arbitrate** — surface both readings to the user rather than picking one silently.
 
@@ -200,7 +200,7 @@ Under `local/defend/<run-id>/` (gitignored, same status as `local/loops/` and `l
 - Does NOT parse free-text approval — `P-<n>` checkboxes only, read back from the run report.
 - Does NOT promote a candidate to a reported finding without an executable oracle or a corroborated, cited, reachable judgment — unconfirmed candidates are refuted to informational.
 - Does NOT patch a finding whose fix is an architectural change, or double-patch a finding already fixed (idempotent).
-- Does NOT record a finding or a patch it didn't produce — unavailable tool ⇒ `ran: false`, no invented outcome.
+- Does NOT record a finding or a patch it didn't produce — unavailable sub-skill ⇒ `ran: false`, missing scanner ⇒ logged in recon, no invented outcome.
 - Does NOT open a GitHub issue per run — the default surface is an interactive end-of-run report; an issue is opt-in and sanitized on a public repo.
 - Does NOT run on a cron — on-demand only, unlike `looper-custodian`.
 - Does NOT reach beyond the repo it is run in.

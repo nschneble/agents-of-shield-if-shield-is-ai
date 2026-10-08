@@ -32,7 +32,7 @@ loop-de-looper(goal)
 └── looper-recap(run state)              → read-only closing summary, then exit report
 ```
 
-Crew = seven agents (named in `## Step 3`), invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
+Crew = seven agents (named in `## Step 3`), invoked in parallel via Agent tool per memory `[[the-crew-agent-group]]`.
 
 ## Goal contract
 
@@ -136,7 +136,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 
 ### Step 2: Per-wave loop
 
-**2a. Dispatch the-looper.** Run the cheap stale-candidate pre-check first, then invoke `the-looper` via Task tool with the wave brief, the goal contract verbatim, and the project target (branch, PR number). It returns a hand-back (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`). Every runtime-code brief includes `templates/wave-brief-standing.md` verbatim — the standing quality instructions that pre-empt the most common corrective. **Verbatim means all eight lines, not the subset that looks relevant to this wave.** Trim the brief's task-specific instructions to what's relevant; never trim the standing eight. Observed: a cleanup wave was briefed with only 2 of the 8 (comment budget, wave-number grep) because the other six looked like they didn't apply to a correction-only wave, and the omitted #7 ("on discovering an already-shipped factual claim is false, sweep every wording of it across the whole repo") is exactly the rule that would have caught a false claim that wave fixed in one doc but left standing, worded identically, in a sibling doc the brief never named. The final crew caught it instead, three reviewers independently. The rest of the brief-authoring rules — PR/push directives, claim verification, deletion-wave gate scope, extraction-wave LOC criteria — are in `references/protocol-detail.md` `## Step 2a`.
+**2a. Dispatch the-looper.** Run the cheap stale-candidate pre-check first, then invoke `the-looper` via Agent tool with the wave brief, the goal contract verbatim, and the project target (branch, PR number). It returns a hand-back (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`). Every runtime-code brief includes `templates/wave-brief-standing.md` verbatim — the standing quality instructions that pre-empt the most common corrective. **Verbatim means all eight lines, not the subset that looks relevant to this wave.** Trim the brief's task-specific instructions to what's relevant; never trim the standing eight. Observed: a cleanup wave was briefed with only 2 of the 8 (comment budget, wave-number grep) because the other six looked like they didn't apply to a correction-only wave, and the omitted #7 ("on discovering an already-shipped factual claim is false, sweep every wording of it across the whole repo") is exactly the rule that would have caught a false claim that wave fixed in one doc but left standing, worded identically, in a sibling doc the brief never named. The final crew caught it instead, three reviewers independently. The rest of the brief-authoring rules — PR/push directives, claim verification, deletion-wave gate scope, extraction-wave LOC criteria — are in `references/protocol-detail.md` `## Step 2a`.
 
 **2b. Handle escalation.** Classify the gate first: a **design gate** routes to the named specialist, whose output comes back as `gate outputs` on a re-dispatch; a **tooling gate** (write-block, permission denial, missing credential) is a USER decision no specialist can clear. Pre-mandated gates — scope-tagged or UI-glob-matched — fire up-front rather than via a round-trip. Mechanics and the UI-glob definition: `references/protocol-detail.md` `## Step 2b`.
 
@@ -149,8 +149,8 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | Counter                        | Updated when                                                                                                    |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `waves_shipped`                | wave commit succeeds                                                                                            |
-| `waves_since_crew`             | every wave; reset on crew pass. Reported, no longer a trigger (`## Step 2d`)                                    |
-| `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported, no longer a trigger                     |
+| `waves_since_crew`             | every wave; reset on crew pass. Reported; triggers only under `crew-cadence`                                    |
+| `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported; triggers only under `crew-cadence`      |
 | `last_review_verdict`          | from the-looper's review step                                                                                   |
 | `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
 | `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
@@ -174,7 +174,7 @@ Concentrated risk survives because it is the one signal that record does NOT cov
 
 ### Step 3: Crew pass (interim OR final)
 
-**EVERY pass is domain-matched by the diff's file globs — the final pass included.** Interim passes take three agents maximum; a corrective's re-crew is an interim pass under the same cap, narrower still (`## Corrective budget`). The roster, invoked in parallel via Task tool, one call per agent, same message: `the-auditor` (a11y), `the-chemist` (test coverage), `the-chronicler` (doc drift), `the-diamantaire` (correctness), `the-ghostwriter` (voice on prose surfaces), `the-improver` (refactor opportunities), `the-stickler` (conventions).
+**EVERY pass is domain-matched by the diff's file globs — the final pass included.** Interim passes take three agents maximum; a corrective's re-crew is an interim pass under the same cap, narrower still (`## Corrective budget`). The roster, invoked in parallel via Agent tool, one call per agent, same message: `the-auditor` (a11y), `the-chemist` (test coverage), `the-chronicler` (doc drift), `the-diamantaire` (correctness), `the-ghostwriter` (voice on prose surfaces), `the-improver` (refactor opportunities), `the-stickler` (conventions).
 
 **An agent whose globs miss the diff is not dispatched — and is not silent either.** Log it to `gates.jsonl` with `ran: false` and the glob that missed, and name it in the report beside the ones that ran. "Report all seven by name with each verdict" is unchanged; what changes is that four of those verdicts may be `not-applicable` with a reason you can audit. An all-seven final pass on a diff with no UI, no tests, and no product prose is not thoroughness: an agent handed a domain the diff cannot contain does not return empty, it reaches, and a reaching finding is where a corrective wave comes from.
 
@@ -303,7 +303,7 @@ Single canonical override block in the project CLAUDE.md:
 - usage-pause: pct=N   # 0 disables the usage-window guard
 ```
 
-The drift cadence is now opt-IN rather than a default to loosen. A project that genuinely wants periodic sweeps — a high-drift domain like a palette or an auth surface, where churn signals a wrong approach early — sets `crew-cadence` and gets the old behaviour. Omit it and the crew fires on concentrated risk and at the end, which is what the measured record supports (`## Step 2d`). The severity floor and the admissibility test are NOT tunable, and neither is domain matching — a project wanting a stricter bar tightens its own `CLAUDE.md` rules, which the crew already reads.
+The drift cadence is opt-in. A project that genuinely wants periodic sweeps — a high-drift domain like a palette or an auth surface, where churn signals a wrong approach early — sets `crew-cadence` to add the drift triggers. Omit it and the crew fires on concentrated risk and at the end, which is what the measured record supports (`## Step 2d`). The severity floor and the admissibility test are NOT tunable, and neither is domain matching — a project wanting a stricter bar tightens its own `CLAUDE.md` rules, which the crew already reads.
 
 ## Voice + style
 
@@ -316,7 +316,7 @@ Every report states the run's balance plainly: waves shipped against the goal co
 **Every halt names the next command — literally.** A STOP, an escalation, a budget-rail halt, a context-pressure handoff, or a required-not-loopable termination ends with the exact copy-paste line the user runs next:
 
 - Resumable halt (governor rail, context pressure, user-intervention pause) → `` `/loop-de-looper resume` ``
-- Usage-window pause → names BOTH the auto-resume and the manual override: "paused on the 5-hour window (96%), auto-resume scheduled ~HH:MM local when it clears; `` `/loop-de-looper resume` `` to force earlier if you've raised your limit."
+- Usage-window pause → names the reset and both paths: "paused on the 5-hour window (96%), clears ~HH:MM local; auto-resumes if this session stays open, else `` `/loop-de-looper resume` `` after then."
 - Custodian-style follow-on → `` `/looper-custodian apply #<issue>` ``
 - A user-authority decision the run can't make → state the decision, then the command that continues once they've decided.
 

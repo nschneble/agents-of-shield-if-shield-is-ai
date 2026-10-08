@@ -24,9 +24,9 @@ React: handlers `handle*`, callback props `on*`, prop interfaces end `Props`. Ne
 
 **Database**: Flag n+1 patterns. Flag unneeded joins or over-fetching.
 
-**Testing**: `jest.fn() as unknown as ServiceType`. Mock factories with spread overrides. `jest.clearAllMocks()` in `beforeEach`. `*.spec.ts` back-end, `*.test.tsx` front-end.
+**Testing**: `jest.fn() as unknown as ServiceType`. Mock factories with spread overrides. `jest.clearAllMocks()` in `beforeEach`. `*.spec.ts` back-end; front-end behavior lives in Tuffgal stories, not hand-written `*.test.tsx`.
 
-**Accessibility**: `aria-hidden="true"` on decorative icons. `role="alert"` on errors. Explicit `role`/`aria-selected`/`aria-label` on interactive elements.
+**Accessibility**: `aria-hidden="true"` on decorative icons. Every interactive element has an accessible name; native elements over explicit `role`, and no ARIA that duplicates implicit semantics. Custom widgets carry their `role`/`aria-selected`/`aria-label`.
 
 **Tailwind class order**: layout → sizes → margins → paddings → backgrounds → borders → text → fonts → focus/ring → rounded → shadows → transitions → cursors. Widths before heights, x before y, margins before padding, backgrounds before borders before text, colors before sizes, primary before states, primary before responsive.
 

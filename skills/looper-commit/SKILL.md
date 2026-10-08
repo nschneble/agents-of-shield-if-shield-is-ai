@@ -86,7 +86,7 @@ Three cases:
 
 ## Step 3: Create draft PR (only if no existing)
 
-> **Brief semantics.** A brief that says "don't flip to ready-for-review" does NOT suppress this step — draft _creation_ and the draft→ready _flip_ are different actions (see `## What looper-commit does NOT do`). Only an explicit `pr: skip` directive suppresses creation. In an orchestrated multi-wave run the brief carries `pr: create-on-wave-1` (this step runs, branch must be pushed first) or `pr: existing #N` (Step 2 detects it → this step is skipped, commit lands in the existing PR). Never read "no new PR needed" out of a directive that only forbids the ready flip. See loop-de-looper `## PR lifecycle + push ownership`.
+> **Brief semantics.** A brief that says "don't flip to ready-for-review" does NOT suppress this step — draft _creation_ and the draft→ready _flip_ are different actions (see `## What looper-commit does NOT do`). Only an explicit `pr: skip` directive suppresses creation. In an orchestrated multi-wave run the brief carries `pr: create-on-wave-1` (this step runs, branch must be pushed first) or `pr: existing #N` (Step 2 detects it → this step is skipped, commit lands in the existing PR). Never read "no new PR needed" out of a directive that only forbids the ready flip. See `skills/loop-de-looper/references/pr-lifecycle.md` `## One branch, one PR, created early`.
 
 Template precedence, first that applies:
 

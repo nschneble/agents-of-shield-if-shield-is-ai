@@ -16,7 +16,7 @@ RED: failing test first. GREEN: minimal code to pass. REFACTOR: tighten, clean, 
 
 - Large features: write PRD first (scope, data model, UI flows, API contracts, open questions); align before code
 - Fill spec gaps with judgment; ask only when blocked
-- Good UX non-negotiable: colors harmonize, spacing breathes, interactions feel right
+- Good UX non-negotiable: reuse the project's color tokens, spacing scale, and components before inventing new ones. On a blank canvas with no system yet, skip the stock defaults (cream background, italic accent words in headlines, numbered `01/02/03` section labels, monospace labels, pill-shaped buttons) unless the brief asks for them
 
 ## Minimum-Viable Bias
 
@@ -54,8 +54,8 @@ Large if touches >1 layer (e.g. new DB table + API + UI), introduces new module,
 - [ ] No god files (~100 lines of code; comments and docs excluded)
 - [ ] Naming conventions followed (no abbreviations; see CLAUDE.md)
 - [ ] Module barrel `index.ts` updated if needed
-- [ ] UI has coherent, harmonious styling
-- [ ] Accessibility attributes in place (`aria-hidden` on decorative icons, `role="alert"` on errors)
+- [ ] UI uses the project's existing tokens and components, or the blank-canvas rule in `## Principles`
+- [ ] Accessibility attributes in place (`aria-hidden` on decorative icons)
 - [ ] Database calls lean (no n+1, no excessive joins)
 - [ ] Text is born on-voice (see the-ghostwriter's voice rules). UI copy, error/toast messages, descriptions, commit subjects, branch names, and PR titles all match Nick's register: no em-dashes (`—`), no slop vocabulary (`leverage`, `seamless`, `robust`, `delve`…), real `…` not `...`, straight quotes, lowercase no-period commit subjects. Write it right the first time so there's no ghostwriter cleanup pass.
 
