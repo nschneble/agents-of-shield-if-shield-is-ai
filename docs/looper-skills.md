@@ -264,7 +264,8 @@ LOGGED — never that the runtime was serialized (decision 24,
 `docs/decisions/looper-custodian.md`):
 
 - **C** mines wave history across repos into a cited index
-- **A** GCs merged-branch artifacts under `local/loops/`
+- **A** GCs merged-branch artifacts under `local/loops/`, via
+  `scripts/custodian-reap.sh`
 - **B** audits memory for duplicates / contradictions / staleness
 - **E** researches external advances
 - **F** checks the run's own log order and opens the GitHub report
@@ -277,8 +278,9 @@ the cron.
 Governing rail: custodian proposes, human disposes. Read-only/regenerable
 work auto-applies. Anything that writes a memory or an agent lands as a
 checkbox and applies only through a human-checked `apply` step, which is
-previewable and reversible. Design rationale + full decision log live in
-`docs/decisions/looper-custodian.md`.
+previewable and reversible: `scripts/custodian-backup.sh` snapshots before the
+first edit and `undo` restores that snapshot. Design rationale + full decision
+log live in `docs/decisions/looper-custodian.md`.
 
 ---
 

@@ -121,10 +121,15 @@
 # outcome shape and the script's contract. The orchestrator stops doing
 # counter arithmetic and hand-editing run-state.json, the edit that once
 # dropped a comma and corrupted it.
+#
+# +127 always / +249 conditional custodian-run for custodian-reap.sh and
+# custodian-backup.sh: Phase A and Phase D name the commands and what each
+# verdict means, and decision 31 records why the destructive pair moved
+# out of prose. The model no longer decides by hand which dirs to delete.
 orchestrator-run	25016	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	19791	6830
+custodian-run	19918	7079
 defend-run	8086	0
 declutter-run	6661	0

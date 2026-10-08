@@ -897,3 +897,41 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     The same trigger was already named for `shadow` and had no detector.
     The checkbox mentions it rather than raising a second proposal, since
     the shadow verb stays on-demand.
+
+31. **A deterministic step is a script, not a paragraph the model
+    executes.** The prompt-audit guide in Anthropic's `claude-api` skill
+    (Group 4, "An LLM executor for a deterministic plan") says to count
+    the model-call sites and ask of each whether its inputs fully determine
+    its output. Phase A's reap and Phase D's snapshot and `undo` do: a
+    branch list, two `gh` queries, an index anti-join, a file copy. The
+    model was running them from prose anyway, and the archive shows the
+    cost. Its six backup dirs carry four `manifest.json` layouts (an
+    `entries` list, a `files` list, `namespaces`, and `entries` beside a
+    renamed date key), one dir has no manifest at all, and one run wrote a
+    `backup-file.sh` of its own into the date dir. A hand-written manifest
+    is one `undo` has to guess at.
+
+    These two moved first because they are the destructive pair. Reap
+    deletes the only copy of a run's records, and the 2026-07-13 incident
+    (decision 13) shows what one wrong reap costs. `undo` is the only way
+    back from an apply, so a snapshot whose shape depends on the model
+    that wrote it cannot be relied on. The same guide's keep-list says
+    fragile operations keep exact scripts, and code is the exact form.
+
+    `scripts/custodian-reap.sh` decides every dir, prints the plan, and
+    deletes only under `--apply`. `scripts/custodian-backup.sh` writes the
+    manifest only after every copy verifies, and its `undo` refuses rather
+    than guess. Both have a both-directions suite and declared mutants.
+    The spec now names the command and what each verdict means. The WHY
+    stays where it was.
+
+    The script surfaced cases the prose never decided, and each one keeps
+    rather than guesses. The default branch's own dir passes the ancestry
+    test trivially, so it is kept. A dir whose deletion would take a
+    nested branch's dir is kept. When `gh` fails, the dir is treated the
+    same as when `gh` is absent. An ancestry-merged dir still reaps
+    without `gh`, because ancestry is a positive signal, not a guess.
+    `undo` refuses a newest snapshot it cannot read and never falls back
+    to an older one, since that would revert a different apply. One gap
+    stays open and is stated in `phase-d-apply.md`: a file an apply
+    creates has nothing to snapshot, so `undo` leaves it in place.

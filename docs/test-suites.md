@@ -18,6 +18,31 @@ a violating fixture) AND green (clean fixture passes).
 **Self-contained fixtures.** Fixtures are written by the suite — never read
 from gitignored `local/`. Pure bash + jq, self-contained.
 
+## custodian-backup
+
+Both-directions test for Phase D's snapshot and `undo`.
+
+`undo` is the only reversal path for an apply, so the arms that matter most
+are the refusals. A snapshot that reads a file it cannot copy must exit 1
+and write no manifest. The `undo` that follows must then refuse rather than
+fall back to an older snapshot, because the older one belongs to a different
+apply. The same refusal holds for a newest manifest in a hand-written shape
+(the archive holds four), and for a snapshot missing one of its copies.
+Every refusal is checked to have restored nothing.
+
+The ordering fixture puts an older date and a lower seq beside the newest
+snapshot, each holding different content. A wrong pick then restores the
+wrong bytes. Shared content would let it pass unnoticed. The idempotence
+arm runs `undo` twice and requires `no-op` with nothing restored. The backup
+tree is checksummed before `undo` and must match exactly afterwards.
+
+The non-numeric `--issue` arm is layered: without the regex check, the
+manifest's `--argjson` still refuses. It was watched failing with both
+layers removed.
+
+Fixtures are memory files in a temp dir, and `CUSTODIAN_HOME` always points
+inside it. The real `local/custodian` is never read.
+
 ## custodian-guardrails
 
 Both-directions test for the guardrail replay.
@@ -122,6 +147,29 @@ split cleanly — they stay in this suite for convenience, not cohesion. The
 bulk is arithmetic, not slack — an arm costs two lines (the probe, then
 `check`), so the assertion floor at the foot of the suite already prices most
 of the body. Trim its prose before reaching for its code.
+
+## custodian-reap
+
+Both-directions test for Phase A's reap.
+
+One fixture git repo holds a branch for every verdict: ancestry-merged,
+squash-merged (a merged PR without ancestry), merged with an open PR,
+unmerged, deleted and unmerged, a slash branch, the default branch, a dir
+nesting another branch's dir, and two merged dirs the ingest guard must
+block. One has a `gates.jsonl` line missing from the index and the other a
+`gates.jsonl` that will not parse. The same roster runs in plan mode, which
+must leave the tree byte-identical, and in `--apply` mode, which must delete
+exactly the reap set and prune an emptied slash parent.
+
+`gh` is a stub on PATH that answers from a fixture table, so the real `gh`
+is never called. The absent case sets `GH_BIN` to a missing path rather
+than trimming PATH. GitHub-hosted runners come with `gh` installed, and a
+PATH trimmed enough to hide it could also hide `git` and `jq`. A failing
+stub must produce the same verdict as a missing one.
+
+Two of the exit-2 arms are layered: removing the non-repo or
+default-branch check alone leaves a later check that still exits 2. Each was
+watched failing with every layer removed.
 
 ## custodian-skill-lint
 

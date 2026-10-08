@@ -170,6 +170,28 @@ lc-repo-claude-md-unread|loop-counters.sh|loop-counters.test.sh|s/\[ -n "\$top" 
 lc-outcome-validation-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$problems" \] \|\| refuse/true || refuse/
 lc-write-in-place|loop-counters.sh|loop-counters.test.sh|s/"\$STATE" > "\$tmp" 2>/"\$STATE" > "\$STATE" 2>/
 lc-tmp-trap-off|loop-counters.sh|loop-counters.test.sh|s/trap 'rm -f "\$tmp"' EXIT/:/
+reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch" && ancestry=1/false \&\& ancestry=1/
+reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
+reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/
+reap-unmerged-reaped|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(unmerged\)"/verdict=reap; reason="kept (unmerged)"/
+reap-gh-absent-guessed|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(merge unverifiable/verdict=reap; reason="kept (merge unverifiable/
+reap-ingest-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/!\(\$0 in seen\)/0/
+reap-unreadable-gates-reaps|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| missing=unreadable\E/|| missing=0/
+reap-tmp-clear-dead|custodian-reap.sh|custodian-reap.test.sh|s/if \[ -e "\$dir\/run-state.json.tmp" \]; then/if false; then/
+reap-plan-mode-deletes|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$APPLY" -eq 1 \] \|\| continue/true || continue/
+reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
+reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
+reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/
+backup-copy-failure-ignored|custodian-backup.sh|custodian-backup.test.sh|s/\|\| \{ echo "copy failed: \$original" >&2; failed=\$\(\(failed \+ 1\)\); \}/|| true/
+backup-manifest-despite-partial|custodian-backup.sh|custodian-backup.test.sh|s/if \[ "\$failed" -gt 0 \]; then/if false; then/
+backup-seq-fixed|custodian-backup.sh|custodian-backup.test.sh|s/seq=\$\(\( \$\{seq:-0\} \+ 1 \)\)/seq=1/
+backup-tags-first-only|custodian-backup.sh|custodian-backup.test.sh|s/\Qtags: (map(.tag) | unique)\E/tags: [.[0].tag]/
+undo-picks-oldest|custodian-backup.sh|custodian-backup.test.sh|s/\Q-k2,2n | tail -1)\E/-k2,2n | head -1)/
+undo-always-restores|custodian-backup.sh|custodian-backup.test.sh|s/if \[ -f "\$original" \] && cmp -s "\$bdir\/\$backup" "\$original"; then/if false; then/
+undo-incomplete-not-refused|custodian-backup.sh|custodian-backup.test.sh|s/\[ -s "\$manifest" \] \|\| die "newest snapshot is incomplete[^"]*"/true/
+undo-shape-check-off|custodian-backup.sh|custodian-backup.test.sh|s/\Qjq -e '(.entries | type == "array")\E/jq -e 'true or (.entries | type == "array")/
+undo-preflight-off|custodian-backup.sh|custodian-backup.test.sh|s/\[ -f "\$bdir\/\$backup" \] \|\| die/true || die/
+undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 TABLE
 }
 
