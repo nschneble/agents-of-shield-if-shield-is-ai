@@ -264,10 +264,15 @@ The writer replaced a hand-edit, and the hand-edit's failure was a dropped
 comma that left `run-state.json` unparseable. So the arm that matters most is
 the refusal: thirteen malformed or misclassified outcomes — truncated JSON
 among them — each exit 2 with the existing snapshot byte-identical and no
-`.tmp` left beside it. A counter that is not a count makes jq fail mid-apply,
-which is the one path where a partial `.tmp` exists; it gets its own arm.
+`.tmp` left beside it. Every counter the writer reads or writes is checked
+before anything is applied, not only the ones this outcome moves: a
+fractional, negative, boolean, string or array counter would otherwise be
+written back shifted by one or trip a rail on a value that is not a count.
+A rail evaluation that errors refuses the same way, so a broken governor
+can never print `GOVERNOR: clear`; a jq shim that fails only that call is
+the arm.
 
-Four properties the governor's honesty depends on:
+Six properties the governor's honesty depends on:
 
 - EVERY COUNTER MOVES BY THE TABLE, PER OUTCOME KIND. A direct fix is a
   corrective but not a dispatched wave; a retry is a dispatched wave but not a
@@ -280,12 +285,20 @@ Four properties the governor's honesty depends on:
 - THE PER-WAVE RAIL NEEDS A GATING FINDING. The wave's one corrective is the
   budget, not a breach; only a second gating finding after it is a `rethink`.
   And a STOP rail tripped beside a rethink wins.
+- A RETHINK EARNS ONE RETRY PER WAVE. Outcomes are chained on one snapshot:
+  queue, gating crew, gating corrective (rethink), then a gating retry must
+  read STOP, as must a gating re-crew after a clean retry. A new queue wave
+  resets `retries_this_wave`, so its own rethink earns its own retry.
 - OVERRIDES LAND ON THEIR OWN RAIL. One assertion reads all six limits back
   from the `- budget:` line, so a crossed key mapping reddens; a `budget:`
   line under another heading is ignored; with no flag, the snapshot's own
-  repo `CLAUDE.md` is read.
+  repo `CLAUDE.md` is read. A template quoted in a code fence is skipped,
+  a fence closes only on a run at least as long as its opener, and a
+  second `budget:` line or a zero limit refuses.
+- THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
+  appear in its `SKILL.md` governor row, so the two cannot drift apart.
 
-Every assertion was watched fail: 36 declared mutants in
+Every assertion was watched fail: 47 declared mutants in
 `scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
 comparison, override path and refusal guard, all killed. The first sweep
 found 13 survivors. Twelve were one harness bug — a `$?` read after a

@@ -171,6 +171,17 @@ lc-repo-claude-md-unread|loop-counters.sh|loop-counters.test.sh|s/\[ -n "\$top" 
 lc-outcome-validation-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$problems" \] \|\| refuse/true || refuse/
 lc-write-in-place|loop-counters.sh|loop-counters.test.sh|s/"\$STATE" > "\$tmp" 2>/"\$STATE" > "\$STATE" 2>/
 lc-tmp-trap-off|loop-counters.sh|loop-counters.test.sh|s/trap 'rm -f "\$tmp"' EXIT/:/
+lc-retry-spent-ignored|loop-counters.sh|loop-counters.test.sh|s/if \[ "\$wave_retried" -ge 1 \]; then/if false; then/
+lc-wave-retry-not-counted|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = n\("retries_this_wave"\) \+ 1//
+lc-wave-retry-reset-off|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = 0//
+lc-counter-check-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$not_counts" \] \|\| refuse/true || refuse/
+lc-counter-check-drops-retries|loop-counters.sh|loop-counters.test.sh|s/"wave_retries","retries_this_wave"/"retries_this_wave"/
+lc-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the governor rails/ || true "could not evaluate the governor rails/
+lc-fence-skip-off|loop-counters.sh|loop-counters.test.sh|s/ && run\(t, c\) >= 3\) \{/ \&\& run(t, c) >= 99) {/
+lc-fence-closes-on-any-run|loop-counters.sh|loop-counters.test.sh|s/if \(c == fence_c && run\(t, c\) >= fence_n && /if (c == fence_c \&\& /
+lc-second-budget-ignored|loop-counters.sh|loop-counters.test.sh|s/\| grep -c \.\)" -gt 1 \]/| grep -c .)" -gt 99 ]/
+lc-zero-budget-accepted|loop-counters.sh|loop-counters.test.sh|s/\[ "\$val" -gt 0 \] \|\| refuse/true || refuse/
+lc-spec-ceiling-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/queue \+ corrective waves reached the ceiling/queue + corrective waves exceeded the ceiling/
 reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch" && ancestry=1/false \&\& ancestry=1/
 reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
 reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/

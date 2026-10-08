@@ -156,7 +156,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
 | `correctives_this_wave`        | +1 per corrective on the current wave; reset when the wave advances                                             |
 | `consecutive_no_progress`      | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
-| `wave_retries`                 | +1 on each stuck-wave retry dispatch; never reset                                                               |
+| `wave_retries`                 | +1 per stuck-wave retry dispatch, never reset; `retries_this_wave` too, reset when the wave advances            |
 | `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
 | `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
@@ -236,9 +236,9 @@ Checked by `loop-counters.sh` in step 2c, acted on after the finding audit and b
 | Rail                           | Default | Hit →                                                                                    |
 | ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
 | `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`) |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                           |
+| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves reached the ceiling                            |
 | `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable          |
-| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                    |
+| `consecutive_no_progress`      | 3       | STOP + escalate: waves without shipping net-new queue work (thrash)                      |
 | `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                    |
 | `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                   |
 

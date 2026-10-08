@@ -127,11 +127,21 @@ is "CREW PASS: is not a dispatch" total_waves 3
 check "CREW PASS: records last_crew_wave" $?
 
 # --- each rail, at its limit and one short of it ---
+skill_md="$here/../skills/loop-de-looper/SKILL.md"
+# the action the script prints must be the action the governor table names
+mirrored() { # rail
+  local action row
+  action=$(printf '%s\n' "$out" | grep "TRIPPED  $1 " | sed 's/^.* — //')
+  row=$(grep "^| \`$1\` " "$skill_md" | tr -d '`')
+  [ -n "$action" ] && case "$row" in *"$action"*) true;; *) false;; esac
+  check "MIRROR $1: SKILL.md's governor row carries '$action'" $?
+}
 rail() { # desc, rail, overrides-at, overrides-short, outcome
   run "$3" "$5"
   printf '%s\n' "$out" | grep -q "TRIPPED  $2 "
   check "RAIL $1: trips on reaching its limit" $?
   agree "RAIL $1 at limit:"
+  mirrored "$2"
   run "$4" "$5"
   ! printf '%s\n' "$out" | grep -q "TRIPPED  $2 "
   check "RAIL $1: stays quiet one short of it" $?
@@ -153,6 +163,7 @@ check "PER-WAVE: a gating finding after the wave's corrective is a rethink" $?
 printf '%s\n' "$out" | grep -q '^GOVERNOR: rethink'
 check "PER-WAVE: the headline says rethink, not STOP" $?
 agree "PER-WAVE rethink:"
+mirrored max_correctives_per_wave
 is "PER-WAVE: the snapshot is written before the rail is reported" corrective_waves 1
 
 run '{}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true}'
@@ -166,6 +177,55 @@ check "PER-WAVE: a gating finding on a NEW wave is its first, not a rethink" $?
 run '{"total_waves":24}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true,"gating":true}'
 printf '%s\n' "$out" | grep -q '^GOVERNOR: STOP'
 check "OUTRANK: a STOP rail outranks a rethink tripped beside it" $?
+
+# --- one wave, several outcomes in a row, on the same snapshot ---
+fresh() {
+  case_n=$((case_n + 1))
+  d="$temp_dir/case-$case_n"
+  mkdir -p "$d"
+  jq -n --argjson z "$zeros" '{counters: $z, cleanup_batch: []}' > "$d/run-state.json"
+}
+step() { # outcome-json, extra args...
+  printf '%s\n' "$1" > "$d/outcome.json"
+  shift
+  out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" \
+        --claude-md "$no_md" "$@" 2>&1)
+  rc=$?
+}
+headline() { printf '%s\n' "$out" | grep '^GOVERNOR' | sed 's/^GOVERNOR: \([a-zA-Z]*\).*/\1/'; }
+gating_crew='{"kind":"crew-pass","wave":1,"gating":true}'
+gating_retry='{"kind":"retry","shipped":true,"files_changed":1,"touched_product":true,"gating":true}'
+clean_retry='{"kind":"retry","shipped":true,"files_changed":1,"touched_product":true,"net_new":true}'
+
+fresh
+step "$shipped_q"; step "$gating_crew"; step "$gating_fix"
+h=$(headline); [ "$h" = rethink ]
+check "RETRY SPENT: the wave's first rethink earns its retry (got $h)" $?
+step "$gating_retry"
+h=$(headline); [ "$h" = STOP ]
+check "RETRY SPENT: a rethink after the wave's one retry is a STOP (got $h)" $?
+printf '%s\n' "$out" | grep -q 'TRIPPED  max_correctives_per_wave 1/1 — STOP + escalate'
+check "RETRY SPENT: the per-wave rail names STOP, not another retry" $?
+agree "RETRY SPENT:"
+is "RETRY SPENT: the retry is counted against its wave" retries_this_wave 1
+step "$gating_retry"
+h=$(headline); [ "$h" = STOP ]
+check "RETRY SPENT: a second retry's rethink is a STOP too (got $h)" $?
+
+fresh
+step "$shipped_q"; step "$gating_fix"; step "$clean_retry"
+h=$(headline); [ "$h" = clear ]
+check "RETRY SPENT: a retry that clears the finding is clear (got $h)" $?
+step "$gating_crew"
+h=$(headline); [ "$h" = STOP ]
+check "RETRY SPENT: a gating re-crew after a clean retry is a STOP (got $h)" $?
+
+fresh
+step "$shipped_q"; step "$gating_fix"; step "$clean_retry"; step "$shipped_q"
+is "RETRY SPENT: a new queue wave resets the wave's retries" retries_this_wave 0
+step "$gating_fix"
+h=$(headline); [ "$h" = rethink ]
+check "RETRY SPENT: the next wave's rethink earns its own retry (got $h)" $?
 
 # --- overrides, from the project CLAUDE.md ---
 md="$temp_dir/override.md"
@@ -241,6 +301,29 @@ out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude
 [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = '{"counters":{"total_waves":"three"}}' ] && [ ! -e "$d/run-state.json.tmp" ]
 check "REFUSE a non-count counter: jq fails mid-apply, snapshot untouched, no .tmp" $?
 
+# every counter is checked, not only the ones this outcome moves
+bad_counter() { # desc, counter-overrides-json, outcome-json
+  case_n=$((case_n + 1))
+  d="$temp_dir/case-$case_n"
+  mkdir -p "$d"
+  jq -n --argjson z "$zeros" --argjson over "$2" \
+    '{counters: ($z + $over), cleanup_batch: []}' > "$d/run-state.json"
+  printf '%s\n' "$3" > "$d/outcome.json"
+  local pristine; pristine=$(cat "$d/run-state.json")
+  out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
+  [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ] && [ ! -e "$d/run-state.json.tmp" ]
+  check "REFUSE counter $1: exits 2, snapshot byte-identical (got $rc)" $?
+}
+bad_counter "total_waves 2.5" '{"total_waves":2.5}' "$shipped_q"
+bad_counter "total_waves -30" '{"total_waves":-30}' "$shipped_q"
+bad_counter "total_waves false" '{"total_waves":false}' "$shipped_q"
+bad_counter "total_waves null" '{"total_waves":null}' "$shipped_q"
+bad_counter "wave_retries true" '{"wave_retries":true}' "$shipped_q"
+bad_counter "wave_retries \"9\"" '{"wave_retries":"9"}' "$shipped_q"
+bad_counter "corrective_waves [1]" '{"corrective_waves":[1]}' "$shipped_q"
+bad_counter "retries_this_wave 0.5" '{"retries_this_wave":0.5}' "$shipped_q"
+bad_counter "batched_findings -1" '{"batched_findings":-1}' "$shipped_q"
+
 printf '{"counters":{"total_waves":1},' > "$d/run-state.json"
 out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = '{"counters":{"total_waves":1},' ]
@@ -254,6 +337,89 @@ for bad in 'max-waves=ten' 'max-wavez=30'; do
   [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
   check "REFUSE budget '$bad': exits 2 and writes nothing" $?
 done
+
+budget_run() { # claude-md-text
+  printf '%s' "$1" > "$temp_dir/budget.md"
+  case_n=$((case_n + 1))
+  d="$temp_dir/case-$case_n"
+  mkdir -p "$d"
+  jq -n --argjson z "$zeros" '{counters: $z, cleanup_batch: []}' > "$d/run-state.json"
+  printf '%s\n' "$shipped_q" > "$d/outcome.json"
+  pristine=$(cat "$d/run-state.json")
+  out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$temp_dir/budget.md" 2>&1); rc=$?
+}
+defaults_line="limits from defaults: per-wave 1 · total 25 · corrective 6 · no-progress 3 · retries 4 · scaffolding 2"
+
+budget_run '# project
+
+How to tune the loop:
+
+```md
+## Loop de Looper
+- budget: max-waves=N
+```
+'
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF "$defaults_line"
+check "FENCE: a budget template quoted in a code fence is not read (exit $rc)" $?
+
+budget_run '# project
+
+~~~~
+## Loop de Looper
+- budget: max-waves=N
+```
+~~~
+~~~~
+
+## Loop de Looper
+- budget: max-waves=30
+'
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q "limits from .*: per-wave 1 · total 30 "
+check "FENCE: a longer fence closes only on its own run; the real line lands (exit $rc)" $?
+
+budget_run '# project
+
+## loop de looper
+- budget: max-waves=30
+'
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF "$defaults_line"
+check "CASE: a lowercase heading is not the section; the defaults line prints (exit $rc)" $?
+
+budget_run '## Loop de Looper
+- budget: max-waves=30
+- crew-agents: interim=3
+- budget: max-corrective=7
+'
+[ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ] \
+  && printf '%s\n' "$out" | grep -q 'line 2' && printf '%s\n' "$out" | grep -q 'line 4'
+check "REFUSE a second budget line: exits 2, names both lines, writes nothing (exit $rc)" $?
+
+budget_run '## Loop de Looper
+- budget: max-waves=0
+'
+[ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
+check "REFUSE budget 'max-waves=0': exits 2 and writes nothing (exit $rc)" $?
+
+budget_run '## Loop de Looper
+- budget: max-retries=00
+'
+[ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
+check "REFUSE budget 'max-retries=00': a zero is a zero however it is spelled (exit $rc)" $?
+
+# a jq shim failing only the rail call, the one passing --argjson per
+shim="$temp_dir/shim"
+mkdir -p "$shim"
+real_jq=$(command -v jq)
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = per ] && exit 5; done\nexec %q "$@"\n' "$real_jq" > "$shim/jq"
+chmod +x "$shim/jq"
+fresh
+printf '%s\n' "$shipped_q" > "$d/outcome.json"
+pristine=$(cat "$d/run-state.json")
+out=$(PATH="$shim:$PATH" "$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ] && [ ! -e "$d/run-state.json.tmp" ]
+check "FAIL CLOSED: a rail evaluation that errors exits 2 and writes nothing (exit $rc)" $?
+! printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "FAIL CLOSED: an unevaluated governor never reads clear" $?
 
 out=$("$runner" --outcome "$d/outcome.json" 2>&1); rc=$?
 [ "$rc" -eq 2 ]

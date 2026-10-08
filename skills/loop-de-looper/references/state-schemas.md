@@ -128,6 +128,7 @@ violation. When receipts cover a meaningful span, G3 can retire into it.
     "correctives_this_wave": 0,
     "consecutive_no_progress": 0,
     "wave_retries": 0,
+    "retries_this_wave": 0,
     "scaffolding_only_correctives": 0,
     "batched_findings": 1
   },
@@ -172,15 +173,15 @@ What the orchestrator pipes to `~/.claude/scripts/loop-counters.sh --state <run-
 }
 ```
 
-`queue` is any new wave the queue advances to, the cleanup batch wave included, and is what resets `correctives_this_wave`. `direct-fix` is a corrective that is not a dispatched wave (`SKILL.md` `## Corrective budget`), so it moves the corrective counters and nothing that counts waves. `crew-pass` takes only `wave` (and optionally `gating`): it resets the two crew-cadence counters and sets `last_crew_wave`. `batched_findings` is recomputed from `cleanup_batch` on every call.
+`queue` is any new wave the queue advances to, the cleanup batch wave included, and is what resets `correctives_this_wave` and `retries_this_wave`. `direct-fix` is a corrective that is not a dispatched wave (`SKILL.md` `## Corrective budget`), so it moves the corrective counters and nothing that counts waves. `crew-pass` takes only `wave` (and optionally `gating`): it resets the two crew-cadence counters and sets `last_crew_wave`. `batched_findings` is recomputed from `cleanup_batch` on every call.
 
 Contract:
 
-- **Refuses rather than corrupts.** Unparseable or unknown-keyed outcome, an outcome contradicting itself (unshipped with files or `net_new`), an unparseable snapshot, or a counter that is not a count: exit 2, `NOTHING WRITTEN`, the snapshot byte-identical.
+- **Refuses rather than corrupts.** Unparseable or unknown-keyed outcome, an outcome contradicting itself (unshipped with files or `net_new`), an unparseable snapshot, any counter it reads or writes that is present but not a non-negative integer (absent reads as 0), or a rail evaluation that errors: exit 2, `NOTHING WRITTEN`, the snapshot byte-identical.
 - **Atomic.** Writes `run-state.json.tmp`, validates it with `jq`, renames it over the snapshot. A `.tmp` left behind is crash residue the custodian clears.
 - **Persists, then reports the governor.** Exit 0 `GOVERNOR: clear`; exit 1 after writing, `GOVERNOR: STOP` or `GOVERNOR: rethink`, each tripped rail on a `TRIPPED` line with the rail table's action. A STOP rail outranks a rethink.
-- **Rails trip when the counter reaches the limit**; `max_correctives_per_wave` only when `gating` is also true — the wave's one corrective is the budget, a gating finding after it is the rethink.
-- **Limits** default to `SKILL.md` `## Budget governor` and are overridden by the `- budget:` line under `## Loop de Looper` in the project `CLAUDE.md` (the snapshot's repo root, or `--claude-md`). An unknown key or a non-integer value refuses, exit 2: a typo silently running the default is the failure.
+- **Rails trip when the counter reaches the limit**; `max_correctives_per_wave` only when `gating` is also true — the wave's one corrective is the budget, a gating finding after it is the rethink. Once `retries_this_wave` is 1, that rethink is a STOP: the wave's one `2b-retry` is spent.
+- **Limits** default to `SKILL.md` `## Budget governor` and are overridden by the `- budget:` line under `## Loop de Looper` in the project `CLAUDE.md` (the snapshot's repo root, or `--claude-md`); fenced code blocks are skipped, so a quoted template is not read. An unknown key, a value that is not a positive integer, or a second `- budget:` line in the section refuses, exit 2: a typo silently running the default is the failure.
 
 ## wave-N.jsonl line shapes
 
