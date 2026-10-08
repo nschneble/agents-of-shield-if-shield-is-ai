@@ -44,7 +44,7 @@ Run summary — <branch>
 - On you: <required-not-loopable items, or "nothing — done">.
 ```
 
-Fill every line from real inputs. A line with nothing to report says so ("Checks: none ran — Task tool unavailable") — don't drop it. A handful of lines; if it needs scrolling, it's no longer a recap.
+Fill every line from real inputs. A line with nothing to report says so ("Checks: none ran — Agent tool unavailable") — don't drop it. A handful of lines; if it needs scrolling, it's no longer a recap.
 
 ## What looper-recap does NOT do
 

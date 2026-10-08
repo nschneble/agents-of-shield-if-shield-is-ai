@@ -14,13 +14,13 @@ Skeptic gate. Runs ONCE, before `looper-scope`. Input = raw goal + intended appr
 1. Raw goal (user input or orchestrator handoff)
 2. Intended approach (orchestrator's one-paragraph plan: how it means to run this)
 3. `CLAUDE.md` — every standing rule + hard constraint
-4. Existing agents at `~/Developer/Repos/.../agents/` — names + descriptions
-5. Existing skills (`skills/*/SKILL.md`) — names + descriptions
+4. Existing agents at `~/.claude/agents/` — names + descriptions
+5. Existing skills (`~/.claude/skills/*/SKILL.md`) — names + descriptions
 6. Active directives: hooks, system reminders, project memory `MEMORY.md` + `project-*` entries
 
 ## The interrogation
 
-Generate challenges across four axes. For each, the orchestrator answers or folds.
+Generate challenges across five axes. For each, the orchestrator answers or folds.
 
 | Axis              | Challenge it raises                                                                                                                                                                     | Verdict on fold                              |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |

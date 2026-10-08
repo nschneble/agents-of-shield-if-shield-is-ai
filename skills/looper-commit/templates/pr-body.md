@@ -19,5 +19,5 @@ Why this change, in 1–2 sentences.
 - Substantive change 2
 ```
 
-Add an `## Additional notes` section when the diff hides something
-non-obvious.
+Leave out `## Additional notes` unless it clears the bar in
+`templates/pr-guidelines.md`.

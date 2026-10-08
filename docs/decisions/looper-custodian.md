@@ -876,3 +876,24 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     a cite repeated within one file — and nothing forces anyone to act on
     them, which is what advisory means. That is the trade: the arm stops
     being able to block, and starts being able to see.
+
+30. **A model change is a maintenance event nothing else notices.** Agents
+    pin `model: opus`, a tier alias, so a new Opus arrives without a single
+    byte of this repo changing, and every line tuned to the old one stays
+    in place. The prompt-audit guide in Anthropic's `claude-api` skill
+    names the remedy: re-audit prompts at every model release, because a
+    patch that held on one generation over-applies on the next.
+
+    So the `start` line records the run's exact model ID, never the alias,
+    and Phase B compares it with the newest earlier run that wrote one. A
+    difference raises one `D-turncoat-<n>`; the turncoat's new
+    `## Fit findings` section carries the model-staleness pass it hands
+    off to. Custodian still only proposes: it detects the switch, the human
+    decides whether the pass runs. A missing earlier value seeds the
+    baseline and proposes nothing, and a run that cannot state its own ID
+    writes no field — a guessed ID would raise a pass on a change that
+    never happened.
+
+    The same trigger was already named for `shadow` and had no detector.
+    The checkbox mentions it rather than raising a second proposal, since
+    the shadow verb stays on-demand.

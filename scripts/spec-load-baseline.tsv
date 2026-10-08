@@ -109,10 +109,16 @@
 # whether any snapshot on disk currently triggers it. Two crew agents
 # split GATING vs BATCHED on the identical defect over exactly this
 # question; the floor's own text supported only one of the two readings.
-orchestrator-run	24205	1898
+#
+# PR #96 prompt audit: +155 orchestrator-run, +50 orchestrated-wave, +46
+# crew-agent, +396 custodian-run, +52 defend-run, +14 declutter-run. The
+# custodian's model-change trigger and the turncoat's fit findings are new
+# rules; the rest is drift repair, mirrors brought in line with the file
+# that owns each rule, and the conditional custodian figure grew with them.
+orchestrator-run	24360	1898
 pre-flight	2452	2617
-orchestrated-wave	17600	10314
-crew-agent	13692	0
-custodian-run	19395	6385
-defend-run	8034	0
-declutter-run	6647	0
+orchestrated-wave	17650	10317
+crew-agent	13738	0
+custodian-run	19791	6830
+defend-run	8086	0
+declutter-run	6661	0

@@ -32,7 +32,7 @@ loop-de-looper(goal)
 └── looper-recap(run state)              → read-only closing summary, then exit report
 ```
 
-Crew = seven agents (named in `## Step 3`), invoked in parallel via Task tool per memory `[[the-crew-agent-group]]`.
+Crew = seven agents (named in `## Step 3`), invoked in parallel via Agent tool per memory `[[the-crew-agent-group]]`.
 
 ## Goal contract
 
@@ -76,11 +76,11 @@ Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.json
 | `single-wave`        | none (one final crew only) | 1 for the whole run                        |
 | `full-orchestration` | cadence (`## Step 2d`)     | 1 per wave, `max_corrective_waves` per run |
 
-**One corrective per wave, then batch.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped is recorded to `cleanup_batch` and surfaced in the report — the wave advances. A wave needing two correctives is a wave whose approach is wrong; that is a `rethink`, not a third patch.
+**One corrective per wave, then rethink.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped means the approach is wrong: a `rethink`, not a second patch. It earns the one fresh-context retry on the next ranked alternate (`2b-retry`), then STOPs.
 
 **One re-crew, scoped, terminal.** A corrective is re-checked exactly once, by the agents whose findings it targeted plus any whose domain its diff touched (`references/protocol-detail.md` `## Step 3`). That re-crew answers CLEARED / NOT-CLEARED on those findings and nothing else. New findings it raises batch. NOT-CLEARED is a STOP to the user, never another corrective. Without this the ladder is infinite: each corrective grows the diff, the re-crew reviews the bigger diff, and the new blocker earns the next corrective — observed at five correctives on one wave.
 
-**A direct fix counts as a corrective — cheaper to execute, not cheaper to account for.** The orchestrator may resolve a gating post-build or crew finding by editing the file itself instead of dispatching `the-looper`, when the fix is small (single file, roughly 1-20 lines), fully specified by the finding (no design judgment beyond applying it), and verified with a build + the relevant test run before commit. That path still increments `correctives_this_wave` / `corrective_waves` and binds to the same `max_correctives_per_wave` / `max_corrective_waves` rails as a dispatched corrective wave — a direct fix that would blow either rail gets batched or escalated exactly like a dispatched one would. A finding that doesn't meet the criteria — multi-file, ambiguous, or unverified before commit — gets a real `the-looper` dispatch. Observed: a run applied roughly a dozen small direct fixes against gate findings, all correct and verified, but `corrective_waves` ended the run at `0` — the rails were never mechanically exercised because nothing incremented them.
+**A direct fix counts as a corrective — cheaper to execute, not cheaper to account for.** The orchestrator may resolve a gating post-build or crew finding by editing the file itself instead of dispatching `the-looper`, when the fix is small (single file, roughly 1-20 lines), fully specified by the finding (no design judgment beyond applying it), and verified with a build + the relevant test run before commit. That path still increments `correctives_this_wave` / `corrective_waves` and binds to the same `max_correctives_per_wave` / `max_corrective_waves` rails as a dispatched corrective wave — a direct fix that would blow either rail gets the same `rethink` or escalation a dispatched one would. A finding that doesn't meet the criteria — multi-file, ambiguous, or unverified before commit — gets a real `the-looper` dispatch. Observed: a run applied roughly a dozen small direct fixes against gate findings, all correct and verified, but `corrective_waves` ended the run at `0` — the rails were never mechanically exercised because nothing incremented them.
 
 **A direct edit is not exempt from review once it touches security-relevant surface, no matter how small it looks or when in the run it happens — mid-run corrective or a post-termination follow-up edit alike.** Fine without review: prose, comments, config values, doc wording, string literals with no external interaction. NOT fine without review: any change where (a) the input comes from a user or the network and (b) the output lands somewhere that renders or executes it — an HTTP response body a client's own tooling prints, a header, a log line an admin's terminal renders, a shell command, a file path. That combination is security-relevant regardless of line count, and it needs at minimum a targeted `the-diamantaire` pass before being considered done — build-clean, tests-green, and even a purpose-built verify script passing are NOT substitutes, because none of them were built to check for this class of defect. Observed: after a run had already terminated (queue shipped, final crew clean, PR open), the orchestrator made three small follow-up edits directly with no crew pass; two were inert wording fixes, the third interpolated an unvalidated request parameter and a raw request header into a response body a git client prints straight to the pusher's terminal — a terminal-escape-injection surface on an anonymous route. It built clean, passed the full test suite, and passed a purpose-built verify script twice; none of those gates were built to catch this class of defect. Caught only by the user, on the next turn.
 
@@ -136,7 +136,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 
 ### Step 2: Per-wave loop
 
-**2a. Dispatch the-looper.** Run the cheap stale-candidate pre-check first, then invoke `the-looper` via Task tool with the wave brief, the goal contract verbatim, and the project target (branch, PR number). It returns a hand-back (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`). Every runtime-code brief includes `templates/wave-brief-standing.md` verbatim — the standing quality instructions that pre-empt the most common corrective. **Verbatim means all eight lines, not the subset that looks relevant to this wave.** Trim the brief's task-specific instructions to what's relevant; never trim the standing eight. Observed: a cleanup wave was briefed with only 2 of the 8 (comment budget, wave-number grep) because the other six looked like they didn't apply to a correction-only wave, and the omitted #7 ("on discovering an already-shipped factual claim is false, sweep every wording of it across the whole repo") is exactly the rule that would have caught a false claim that wave fixed in one doc but left standing, worded identically, in a sibling doc the brief never named. The final crew caught it instead, three reviewers independently. The rest of the brief-authoring rules — PR/push directives, claim verification, deletion-wave gate scope, extraction-wave LOC criteria — are in `references/protocol-detail.md` `## Step 2a`.
+**2a. Dispatch the-looper.** Run the cheap stale-candidate pre-check first, then invoke `the-looper` via Agent tool with the wave brief, the goal contract verbatim, and the project target (branch, PR number). It returns a hand-back (`shipped`, `deferred`, `gate needed pre-build`, `gates needed post-build`, `ranked alternates`, `learn`, `flags`). Every runtime-code brief includes `templates/wave-brief-standing.md` verbatim — the standing quality instructions that pre-empt the most common corrective. **Verbatim means all eight lines, not the subset that looks relevant to this wave.** Trim the brief's task-specific instructions to what's relevant; never trim the standing eight. Observed: a cleanup wave was briefed with only 2 of the 8 (comment budget, wave-number grep) because the other six looked like they didn't apply to a correction-only wave, and the omitted #7 ("on discovering an already-shipped factual claim is false, sweep every wording of it across the whole repo") is exactly the rule that would have caught a false claim that wave fixed in one doc but left standing, worded identically, in a sibling doc the brief never named. The final crew caught it instead, three reviewers independently. The rest of the brief-authoring rules — PR/push directives, claim verification, deletion-wave gate scope, extraction-wave LOC criteria — are in `references/protocol-detail.md` `## Step 2a`.
 
 **2b. Handle escalation.** Classify the gate first: a **design gate** routes to the named specialist, whose output comes back as `gate outputs` on a re-dispatch; a **tooling gate** (write-block, permission denial, missing credential) is a USER decision no specialist can clear. Pre-mandated gates — scope-tagged or UI-glob-matched — fire up-front rather than via a round-trip. Mechanics and the UI-glob definition: `references/protocol-detail.md` `## Step 2b`.
 
@@ -149,8 +149,8 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | Counter                        | Updated when                                                                                                    |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `waves_shipped`                | wave commit succeeds                                                                                            |
-| `waves_since_crew`             | every wave; reset on crew pass. Reported, no longer a trigger (`## Step 2d`)                                    |
-| `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported, no longer a trigger                     |
+| `waves_since_crew`             | every wave; reset on crew pass. Reported; triggers only under `crew-cadence`                                    |
+| `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported; triggers only under `crew-cadence`      |
 | `last_review_verdict`          | from the-looper's review step                                                                                   |
 | `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
 | `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
@@ -174,7 +174,7 @@ Concentrated risk survives because it is the one signal that record does NOT cov
 
 ### Step 3: Crew pass (interim OR final)
 
-**EVERY pass is domain-matched by the diff's file globs — the final pass included.** Interim passes take three agents maximum; a corrective's re-crew is an interim pass under the same cap, narrower still (`## Corrective budget`). The roster, invoked in parallel via Task tool, one call per agent, same message: `the-auditor` (a11y), `the-chemist` (test coverage), `the-chronicler` (doc drift), `the-diamantaire` (correctness), `the-ghostwriter` (voice on prose surfaces), `the-improver` (refactor opportunities), `the-stickler` (conventions).
+**EVERY pass is domain-matched by the diff's file globs — the final pass included.** Interim passes take three agents maximum; a corrective's re-crew is an interim pass under the same cap, narrower still (`## Corrective budget`). The roster, invoked in parallel via Agent tool, one call per agent, same message: `the-auditor` (a11y), `the-chemist` (test coverage), `the-chronicler` (doc drift), `the-diamantaire` (correctness), `the-ghostwriter` (voice on prose surfaces), `the-improver` (refactor opportunities), `the-stickler` (conventions).
 
 **An agent whose globs miss the diff is not dispatched — and is not silent either.** Log it to `gates.jsonl` with `ran: false` and the glob that missed, and name it in the report beside the ones that ran. "Report all seven by name with each verdict" is unchanged; what changes is that four of those verdicts may be `not-applicable` with a reason you can audit. An all-seven final pass on a diff with no UI, no tests, and no product prose is not thoroughness: an agent handed a domain the diff cannot contain does not return empty, it reaches, and a reaching finding is where a corrective wave comes from.
 
@@ -233,14 +233,14 @@ The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuc
 
 Evaluated in step 2c after `run-state.json` is written and the finding audit has run, before the crew trigger:
 
-| Rail                           | Default | Hit →                                                                                           |
-| ------------------------------ | ------- | ----------------------------------------------------------------------------------------------- |
-| `max_correctives_per_wave`     | 1       | batch the finding, advance the wave (`## Corrective budget`) — the only rail that is not a STOP |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                                  |
-| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                 |
-| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                           |
-| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                           |
-| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                          |
+| Rail                           | Default | Hit →                                                                                    |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`) |
+| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                           |
+| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable          |
+| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                    |
+| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                    |
+| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                   |
 
 The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent three waves rebuilding a scanner around it). The floor is the primary defense against that shape now — oracle completeness is a batched class — and this rail is the backstop for when a finding gets dressed as correctness.
 
@@ -303,7 +303,7 @@ Single canonical override block in the project CLAUDE.md:
 - usage-pause: pct=N   # 0 disables the usage-window guard
 ```
 
-The drift cadence is now opt-IN rather than a default to loosen. A project that genuinely wants periodic sweeps — a high-drift domain like a palette or an auth surface, where churn signals a wrong approach early — sets `crew-cadence` and gets the old behaviour. Omit it and the crew fires on concentrated risk and at the end, which is what the measured record supports (`## Step 2d`). The severity floor and the admissibility test are NOT tunable, and neither is domain matching — a project wanting a stricter bar tightens its own `CLAUDE.md` rules, which the crew already reads.
+The drift cadence is opt-in. A project that genuinely wants periodic sweeps — a high-drift domain like a palette or an auth surface, where churn signals a wrong approach early — sets `crew-cadence` to add the drift triggers. Omit it and the crew fires on concentrated risk and at the end, which is what the measured record supports (`## Step 2d`). The severity floor and the admissibility test are NOT tunable, and neither is domain matching — a project wanting a stricter bar tightens its own `CLAUDE.md` rules, which the crew already reads.
 
 ## Voice + style
 
@@ -316,7 +316,7 @@ Every report states the run's balance plainly: waves shipped against the goal co
 **Every halt names the next command — literally.** A STOP, an escalation, a budget-rail halt, a context-pressure handoff, or a required-not-loopable termination ends with the exact copy-paste line the user runs next:
 
 - Resumable halt (governor rail, context pressure, user-intervention pause) → `` `/loop-de-looper resume` ``
-- Usage-window pause → names BOTH the auto-resume and the manual override: "paused on the 5-hour window (96%), auto-resume scheduled ~HH:MM local when it clears; `` `/loop-de-looper resume` `` to force earlier if you've raised your limit."
+- Usage-window pause → names the reset and both paths: "paused on the 5-hour window (96%), clears ~HH:MM local; auto-resumes if this session stays open, else `` `/loop-de-looper resume` `` after then."
 - Custodian-style follow-on → `` `/looper-custodian apply #<issue>` ``
 - A user-authority decision the run can't make → state the decision, then the command that continues once they've decided.
 

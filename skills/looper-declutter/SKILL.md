@@ -56,7 +56,7 @@ The detector is the ONLY mechanical scan; it never edits and never gates (exit 0
 
 ### Triage — route + rank (read-only)
 
-For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md says the same. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip. An `unterminated-block` never enters triage at all — it cites a parse state, not a comment, and the candidates below it in that file are provisional.
+For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md is looser — it allows a file-top block of up to four lines — and this rule wins: a repo's own caps override global ones. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip. An `unterminated-block` never enters triage at all — it cites a parse state, not a comment, and the candidates below it in that file are provisional.
 
 **What survives:**
 
@@ -92,12 +92,12 @@ An interactive end-of-run report to the user (like defend), plus a persisted `lo
 
 ### Snip — trim through the normal pipeline (gated)
 
-Triggered by `apply`. Declutter does NOT edit directly — it feeds ticked candidates through the standard wave loop (`looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit`), the same chain every wave uses. Comment-only changes are a **doc wave** (`looper-build` doc-wave branch: `Edit`, run `format` + markdown lint, skip test/build).
+Triggered by `apply`. Declutter does NOT edit directly — it feeds ticked candidates through the standard wave loop (`looper-plan` → `looper-build` → `looper-verify` → `looper-review` → `looper-commit`), the same chain every wave uses. Comment-only changes still touch source files, so `looper-build` runs them as a code wave (`format` → `lint` → `test` → `build`); the green suite is part of what proves a snip behavior-preserving.
 
 - **Group one wave per file.** All of a file's ticked snips are one cohesive, behavior-preserving change — not one wave per comment.
 - **Behavior-preserving, always.** A snip only edits comment text; it never touches code. `looper-verify` confirms the diff is comment-only (no token outside a comment moved) and the suite stays green; a snip that changes a non-comment byte is reverted.
 - **Idempotent** — a comment already trimmed is a no-op. Re-running `apply` on the same run is safe.
-- **Honor tool availability** — if declutter cannot invoke the pipeline skills (no Skill/Task tool), it logs `ran: false` and hands the brief back, never a claimed-but-unrun snip. Same discipline as custodian and defend.
+- **Honor tool availability** — if declutter cannot invoke the pipeline skills (no Skill/Agent tool), it logs `ran: false` and hands the brief back, never a claimed-but-unrun snip. Same discipline as custodian and defend.
 
 ## Snip routing — reuse owners, never duplicate them
 
@@ -114,7 +114,7 @@ Every phase logs to `local/declutter/<run-id>/findings.jsonl` before the report,
 - **Snip routes through the normal pipeline** — never a bespoke editor; the PR diff is the preview, git/PR-close the reversal.
 - **The detector is self-contained** — pure bash + awk, no third-party tool, no hosted dependency (`[[no-third-party-hosted-tool-reliance]]`).
 - **Repo-scoped** — declutter hunts the repo it is run in; it does not reach across repos (that is custodian's explicit-list domain). On a public target, the same report sanitization discipline as custodian applies.
-- **Tool availability honored** — unavailable Skill/Task ⇒ `ran: false`, no invented snip.
+- **Tool availability honored** — unavailable Skill/Agent ⇒ `ran: false`, no invented snip.
 
 ## Stop conditions / escalation to the user
 

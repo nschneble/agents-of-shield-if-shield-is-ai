@@ -122,7 +122,7 @@ violation. When receipts cover a meaningful span, G3 can retire into it.
     "waves_shipped": 1,
     "waves_since_crew": 1,
     "cumulative_files_changed": 6,
-    "last_review_verdict": "clean",
+    "last_review_verdict": "ship",
     "total_waves": 1,
     "corrective_waves": 0,
     "correctives_this_wave": 0,

@@ -31,10 +31,10 @@ Invoked by `loop-de-looper` at termination. Read the run's real trail — `local
 
 1. **sizing**: Did nonbeliever size the goal right _in hindsight_? A `full-orchestration` run that collapsed to one real wave was over-sized; a `single-wave` that ballooned into a corrective queue was under-sized. Either is a nonbeliever-skill lesson, not a wave lesson.
 2. **scope**: Did the queue hold, or did a wave turn out to depend on a later one (dependency order wrong)? Were waves the right grain — any that should have split, or merged? Did the run need a mid-flight re-scope (sign scope mis-decomposed up front)? Pilot-first honored for cross-cutting?
-3. **crew cadence**: Did crew passes fire at the right drift? Too often (parallel passes burned on near-empty diffs) or too late (a blocker surfaced large that an earlier pass would have caught small)? Were the `waves=4 / files=30` triggers right for THIS domain, or should CLAUDE.md carry an override?
+3. **crew cadence**: Did crew passes fire at the right point? Too often (parallel passes burned on near-empty diffs) or too late (a blocker surfaced large that an earlier pass would have caught small)? Was the concentrated-risk trigger (`loop-de-looper` step 2d) right for THIS domain, or should CLAUDE.md carry an override?
 4. **escalation routing**: Did specialist gates fire when plan emitted ESCALATE, and clear in one round? Any thrash — same gate requested twice, which should have gone to the user sooner? Was Task-tool unavailability logged honestly (`ran: false`), never invented?
 5. **PR + termination**: PR created early (wave 1) or orphaned to "the end"? Did termination fire at the right point — section 5 (required-not-loopable) surfaced explicitly, not silently skipped? Gate artifacts complete on disk, or did a narrated gate never hit `gates.jsonl`?
-6. **state durability**: Did in-context queue/counters survive the run, or did a compaction lose them and force a git-log re-derive? Recurring loss is a persistence-layer lesson (the v2 state-JSON), not a one-off.
+6. **state durability**: Did in-context queue/counters survive the run, or did a compaction lose them and force a git-log re-derive? Recurring loss is a persistence-layer lesson (`run-state.json`, `loop-de-looper` `## State tracking`), not a one-off.
 
 A finding here lands in the **Loop de Looper body** or **Agent body** row of the table below — orchestration patterns, not project facts. If the same orchestration step misfires across multiple runs, that is a skill edit, not another memory.
 
@@ -91,5 +91,3 @@ Discipline: the guardrail is _proposed_, not silently installed — same propose
 ## Honest self-assessment
 
 Step repeatedly fails same way across multiple loops → skill needs editing, not another memory. Agent orchestration logic the issue → propose agent edit. Failure environmental (missing tool, missing access) → say plain, don't paper over.
-
-Looper improves only when learn brutally honest about what went wrong.

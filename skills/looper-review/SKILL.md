@@ -41,7 +41,7 @@ Every finding is cited `file:line` + reason + suggested fix if obvious, then sor
 - **🚫 Blocker**: in a gating class (correctness regression in this run's diff, security, data loss, a11y regression on shipped UI, a false user-visible string) AND admissible — it cites a goal-contract ask it protects, or a `file:line` this run changed. These stop the wave.
 - **📋 Batched**: everything else. Docs, comments, naming, conventions, LOC, test hygiene, oracle shape, refactor opportunities, voice, commit/PR prose, and anything pre-existing this run did not cause. Real findings, reported in full, fixed in the run's terminal cleanup wave.
 
-The old middle category is gone on purpose. "⚠ Warning: should fix soon, ship-blockable if it keeps surfacing" is a blocker on a delay, and a reviewer with an incentive to re-surface is a reviewer that eventually gets its wave. A finding either meets the floor now or it batches.
+There is no third bucket. A "fix soon, block if it keeps surfacing" finding is a blocker on a delay, and a reviewer with an incentive to re-surface is a reviewer that eventually gets its wave. A finding either meets the floor now or it batches.
 
 **Severity is not the same axis as confidence.** A finding can be certain, well-cited, and still batched. Reviewers reach for Blocker to make sure a real defect gets fixed — the batch is what makes that unnecessary: nothing is dropped, it is scheduled.
 

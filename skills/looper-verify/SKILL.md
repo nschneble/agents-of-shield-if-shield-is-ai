@@ -14,7 +14,7 @@ Functional verification only. Does change do what spec said? Distinct from revie
    - **Features:** run feature end-to-end. Browser for UI (start dev server, click through). curl/HTTP for APIs. Real DB for migrations.
    - **Library/tool fixes:** "end-to-end" means the entry point a real caller invokes (`tuffgal run`, the CLI, the documented API) — never a targeted probe of the internal function the fix touches or wraps, a probe that can be entirely correct and still miss a gate that runs BEFORE it: a schedule validator, a config assert, a schema check that rejects the input before the fixed code is ever reached. Observed: a seeded-cookie fixture verified through the library's storage-state resolver, shipped on that evidence, then refused by the schedule validation a real run performs first — a second distinct blocker and a second escalation round-trip.
 4. Cover golden path + 2–3 edge cases per spec + common sense
-5. Confirm no regressions in adjacent functionality. Run existing tests if available.
+5. Confirm no regressions in adjacent functionality. Run the existing suite only when build has not already run it on this change (standalone use); inside a wave, build's green run stands.
 
 ## Executable verification function (where an oracle exists)
 
@@ -47,7 +47,7 @@ A failure that recurred is one `looper-learn` may graduate into a **durable chec
 - Start `npm run dev` (or project equivalent), click through feature in real browser
 - If visual regression tests exist (Tuffgal, Percy, Chromatic), run them; human approval of baseline diffs owed to user, not auto-claimed
 - Screenshot or describe what observed. Do NOT claim "works" without seeing it work. Type-check + test pass = correctness; UI verification need eyeballs.
-- Accessibility: keyboard-test feature (Tab/Shift-Tab through focusable elements, Enter/Space to activate). Screen-reader testing owed to post-build a11y-lead review pass, not verify, but flag if focus order or ARIA seem off.
+- Accessibility: keyboard-test feature (Tab/Shift-Tab through focusable elements, Enter/Space to activate). Screen-reader semantics are owed to the pre-build accessibility-lead gate and `the-auditor`'s crew pass, not verify, but flag if focus order or ARIA seem off.
 
 ## For API changes specifically
 
