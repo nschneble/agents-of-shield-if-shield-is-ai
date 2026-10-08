@@ -134,6 +134,7 @@ wq-closes-null-counted-bad|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|
 wq-asks-container-noun-collapsed|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type == "array" then "yes" else "no" end\E%"yes"%
 wq-has-closes-null-uncounted|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null)] | length\E%select(has("closes"))] | length%
 unanimity-census-warns-always|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=1/
+lsa-total-ignores-retries|loop-state-audit.sh|loop-state-audit.test.sh|s/ \+ retry_dispatches \)\)"/ ))"/
 lc-shipped-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_shipped"\) \+ 1/waves_shipped") + 0/
 lc-since-crew-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_since_crew"\) \+ 1/waves_since_crew") + 0/
 lc-files-not-summed|loop-counters.sh|loop-counters.test.sh|s/n\("cumulative_files_changed"\) \+ \$o\.files_changed/n("cumulative_files_changed")/
