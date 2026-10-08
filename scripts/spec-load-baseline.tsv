@@ -129,10 +129,14 @@
 # custodian-backup.sh: Phase A and Phase D name the commands and what each
 # verdict means, and decision 31 records why the destructive pair moved
 # out of prose. The model no longer decides by hand which dirs to delete.
+# Its corrective adds +171 always / +161 conditional. phase-detail.md says
+# ancestry needs a recorded commit and a merged PR needs the local tip, and
+# phase-d-apply.md that undo takes --issue and a symlink stays a link. Each
+# replaces a rule the first cut stated and a review refuted.
 orchestrator-run	25117	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	19918	7079
+custodian-run	20089	7240
 defend-run	8086	0
 declutter-run	6661	0

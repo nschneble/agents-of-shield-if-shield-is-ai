@@ -6,15 +6,23 @@ REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 
 usage() {
-  echo "usage: $0 snapshot --issue N [--date YYYY-MM-DD] --tag TAG FILE... [--tag TAG FILE...]" >&2
-  echo "       $0 undo" >&2
+  echo "usage: $0 snapshot --issue N [--date YYYY-MM-DD] [--tag TAG FILE...]..." >&2
+  echo "       $0 undo --issue N" >&2
   echo "  snapshot copies every file before an apply edits it; undo restores the latest" >&2
 }
 die() { echo "$1" >&2; exit 2; }
 needs_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
 
+same() { # copy, original -> 0 when they match; a symlink matches by target
+  if [ -L "$1" ] || [ -L "$2" ]; then
+    [ -L "$1" ] && [ -L "$2" ] && [ "$(readlink "$1")" = "$(readlink "$2")" ]
+  else
+    cmp -s "$1" "$2"
+  fi
+}
+
 snapshot() {
-  local issue="" day="" tag="" f pairs="" n=0
+  local issue="" day="" tag="" f pairs=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --issue) needs_value --issue "$#"; issue="$2"; shift 2;;
@@ -23,17 +31,16 @@ snapshot() {
       --*) die "unknown flag: $1";;
       *)
         [ -n "$tag" ] || die "$1 has no --tag before it"
-        [ -f "$1" ] || die "not a regular file: $1"
+        [ -L "$1" ] || [ -f "$1" ] || die "not a regular file or symlink: $1"
         f="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
         pairs="$pairs$f	$tag
 "
-        n=$((n + 1)); shift;;
+        shift;;
     esac
   done
   [[ "$issue" =~ ^[0-9]+$ ]] || die "--issue needs a number"
   [ -n "$day" ] || day=$(date +%Y-%m-%d)
   [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "--date needs YYYY-MM-DD"
-  [ "$n" -gt 0 ] || die "nothing to snapshot: no FILE given"
 
   local dir="$CUSTODIAN_HOME/$day" seq bdir manifest
   mkdir -p "$dir" || die "cannot create $dir"
@@ -41,7 +48,6 @@ snapshot() {
     | sed -nE 's|.*/backup-[0-9]+-([0-9]+)$|\1|p' | sort -n | tail -1)
   seq=$(( ${seq:-0} + 1 ))
   bdir="$dir/backup-$issue-$seq"
-  mkdir "$bdir" || die "cannot create $bdir"
 
   manifest=$(printf '%s' "$pairs" | jq -R -s --argjson issue "$issue" --arg date "$day" \
     --argjson seq "$seq" '
@@ -51,13 +57,14 @@ snapshot() {
              tags: (map(.tag) | unique)})
       | {issue: $issue, date: $date, seq: $seq, entries: .}') \
     || die "cannot build manifest"
+  mkdir "$bdir" || die "cannot create $bdir"
 
   local original backup failed=0 count=0
   while IFS='	' read -r original backup; do
     count=$((count + 1))
     mkdir -p "$(dirname "$bdir/$backup")" \
-      && cp -p "$original" "$bdir/$backup" 2>/dev/null \
-      && cmp -s "$original" "$bdir/$backup" \
+      && cp -P -p "$original" "$bdir/$backup" 2>/dev/null \
+      && same "$bdir/$backup" "$original" \
       || { echo "copy failed: $original" >&2; failed=$((failed + 1)); }
   done < <(printf '%s' "$manifest" | jq -r '.entries[] | [.original, .backup] | @tsv')
 
@@ -73,35 +80,46 @@ snapshot() {
 }
 
 undo() {
-  [ $# -eq 0 ] || die "undo takes no arguments"
-  local latest bdir manifest
+  local issue=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --issue) needs_value --issue "$#"; issue="$2"; shift 2;;
+      *) die "unexpected arg: $1";;
+    esac
+  done
+  [[ "$issue" =~ ^[0-9]+$ ]] || die "undo needs --issue N"
+  local latest bdir manifest newest
   latest=$(find "$CUSTODIAN_HOME" -mindepth 2 -maxdepth 2 -type d -name 'backup-*' 2>/dev/null \
     | sed -nE 's|^(.*/([0-9]{4}-[0-9]{2}-[0-9]{2})/backup-[0-9]+-([0-9]+))$|\2	\3	\1|p' \
     | sort -t '	' -k1,1 -k2,2n | tail -1)
   [ -n "$latest" ] || die "no snapshot under $CUSTODIAN_HOME"
   bdir=${latest##*	}
+  newest=${bdir##*/backup-}; newest=${newest%-*}
+  [ "$newest" = "$issue" ] || die "newest snapshot is for issue $newest, not $issue: $bdir"
   manifest="$bdir/manifest.json"
   [ -s "$manifest" ] || die "newest snapshot is incomplete, no manifest: $bdir"
-  jq -e '(.entries | type == "array") and (.entries | length > 0)
+  jq -e '(.entries | type == "array")
          and all(.entries[]; (.original | type == "string") and (.backup | type == "string"))' \
     "$manifest" >/dev/null 2>&1 \
     || die "manifest is not in the shape this script writes; restore by hand: $manifest"
 
-  local original backup tags restored=0 unchanged=0 failed=0
+  local original backup tags tmp restored=0 unchanged=0 failed=0
   while IFS='	' read -r original backup _; do
-    [ -f "$bdir/$backup" ] || die "snapshot is missing $backup; nothing restored"
+    [ -L "$bdir/$backup" ] || [ -f "$bdir/$backup" ] || die "snapshot is missing $backup; nothing restored"
   done < <(jq -r '.entries[] | [.original, .backup] | @tsv' "$manifest")
 
   while IFS='	' read -r original backup tags; do
-    if [ -f "$original" ] && cmp -s "$bdir/$backup" "$original"; then
+    if same "$bdir/$backup" "$original"; then
       printf 'unchanged\t%s\t%s\n' "$original" "$tags"
       unchanged=$((unchanged + 1)); continue
     fi
-    if mkdir -p "$(dirname "$original")" && cp "$bdir/$backup" "$original" 2>/dev/null \
-        && cmp -s "$bdir/$backup" "$original"; then
+    tmp="$original.undo-$$"
+    if mkdir -p "$(dirname "$original")" && cp -P -p "$bdir/$backup" "$tmp" 2>/dev/null \
+        && mv -f "$tmp" "$original" && same "$bdir/$backup" "$original"; then
       printf 'restored\t%s\t%s\n' "$original" "$tags"
       restored=$((restored + 1))
     else
+      rm -f "$tmp"
       printf 'failed\t%s\t%s\n' "$original" "$tags"
       failed=$((failed + 1))
     fi

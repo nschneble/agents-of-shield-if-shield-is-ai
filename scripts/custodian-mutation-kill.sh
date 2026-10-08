@@ -182,7 +182,18 @@ lc-fence-closes-on-any-run|loop-counters.sh|loop-counters.test.sh|s/if \(c == fe
 lc-second-budget-ignored|loop-counters.sh|loop-counters.test.sh|s/\| grep -c \.\)" -gt 1 \]/| grep -c .)" -gt 99 ]/
 lc-zero-budget-accepted|loop-counters.sh|loop-counters.test.sh|s/\[ "\$val" -gt 0 \] \|\| refuse/true || refuse/
 lc-spec-ceiling-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/queue \+ corrective waves reached the ceiling/queue + corrective waves exceeded the ceiling/
-reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch" && ancestry=1/false \&\& ancestry=1/
+reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch"; then/false; then/
+reap-ancestry-without-record|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -z "\$recorded" \]; then\n\s*tip_note="kept \(merged tip, no recorded commit\)"/elif [ -z "\$recorded" ]; then ancestry=1/
+reap-record-off-default-counts|custodian-reap.sh|custodian-reap.test.sh|s/elif on_default "\$recorded"; then/elif true; then/
+reap-unreadable-run-state-ignored|custodian-reap.sh|custodian-reap.test.sh|s/("\$1\/run-state.json" 2>\/dev\/null) \|\| return 1/$1 || true/
+reap-unterminated-line-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
+history-unterminated-line-uncounted|custodian-history.sh|custodian-guardrails.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
+reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT#refs\/heads\/\}/:/
+reap-default-remote-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT#\*\/\}/:/g
+reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 2>\/dev\/null/-print 2>\/dev\/null | tr "\\n" "\\0"/; s/case "\$dir" in "\$loops"\/\?\*\) ;; \*\) continue ;; esac/:/
+reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
+reap-pr-tip-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(true)/
+reap-deleted-branch-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(.headRefOid == \$tip)/
 reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
 reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/
 reap-unmerged-reaped|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(unmerged\)"/verdict=reap; reason="kept (unmerged)"/
@@ -199,7 +210,14 @@ backup-manifest-despite-partial|custodian-backup.sh|custodian-backup.test.sh|s/i
 backup-seq-fixed|custodian-backup.sh|custodian-backup.test.sh|s/seq=\$\(\( \$\{seq:-0\} \+ 1 \)\)/seq=1/
 backup-tags-first-only|custodian-backup.sh|custodian-backup.test.sh|s/\Qtags: (map(.tag) | unique)\E/tags: [.[0].tag]/
 undo-picks-oldest|custodian-backup.sh|custodian-backup.test.sh|s/\Q-k2,2n | tail -1)\E/-k2,2n | head -1)/
-undo-always-restores|custodian-backup.sh|custodian-backup.test.sh|s/if \[ -f "\$original" \] && cmp -s "\$bdir\/\$backup" "\$original"; then/if false; then/
+undo-always-restores|custodian-backup.sh|custodian-backup.test.sh|s/if same "\$bdir\/\$backup" "\$original"; then/if false; then/
+undo-other-issue-restored|custodian-backup.sh|custodian-backup.test.sh|s/\[ "\$newest" = "\$issue" \] \|\| die/true || die/
+snapshot-zero-files-refused|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[\[ "\$day" =~ [^\n]*\n)/$1  [ -n "\$pairs" ] || die "nothing to snapshot"\n/
+undo-empty-manifest-refused|custodian-backup.sh|custodian-backup.test.sh|s/\Q(.entries | type == "array")\E\n/(.entries | type == "array") and (.entries | length > 0)\n/
+snapshot-dir-before-manifest|custodian-backup.sh|custodian-backup.test.sh|s/(  manifest=\$\(printf .*?\|\| die "cannot build manifest"\n)(  mkdir "\$bdir" \|\| die "cannot create \$bdir"\n)/$2$1/s
+snapshot-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$original"/cp -p "\$original"/
+undo-link-compared-by-content|custodian-backup.sh|custodian-backup.test.sh|s/if \[ -L "\$1" \] \|\| \[ -L "\$2" \]; then/if false; then/
+undo-restore-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$bdir\/\$backup" "\$tmp"/cp -p "\$bdir\/\$backup" "\$tmp"/
 undo-incomplete-not-refused|custodian-backup.sh|custodian-backup.test.sh|s/\[ -s "\$manifest" \] \|\| die "newest snapshot is incomplete[^"]*"/true/
 undo-shape-check-off|custodian-backup.sh|custodian-backup.test.sh|s/\Qjq -e '(.entries | type == "array")\E/jq -e 'true or (.entries | type == "array")/
 undo-preflight-off|custodian-backup.sh|custodian-backup.test.sh|s/\[ -f "\$bdir\/\$backup" \] \|\| die/true || die/

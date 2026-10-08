@@ -36,9 +36,18 @@ wrong bytes. Shared content would let it pass unnoticed. The idempotence
 arm runs `undo` twice and requires `no-op` with nothing restored. The backup
 tree is checksummed before `undo` and must match exactly afterwards.
 
+The issue fixture replays the review's case: two applies, then one that
+only creates files, then a hand edit. `undo --issue` for the create-only
+apply must be a no-op that leaves the hand edit, and `undo` for the earlier
+issue must refuse. A `jq` shim that fails only the manifest build proves a
+refused snapshot leaves no empty backup dir to block the next `undo`. The
+symlink fixture replaces the link with a file holding the same bytes, so a
+content compare would wrongly call it unchanged.
+
 The non-numeric `--issue` arm is layered: without the regex check, the
 manifest's `--argjson` still refuses. It was watched failing with both
-layers removed.
+layers removed. So is `undo` with no `--issue`: the issue match refuses it
+too.
 
 Fixtures are memory files in a temp dir, and `CUSTODIAN_HOME` always points
 inside it. The real `local/custodian` is never read.
@@ -160,6 +169,17 @@ block. One has a `gates.jsonl` line missing from the index and the other a
 `gates.jsonl` that will not parse. The same roster runs in plan mode, which
 must leave the tree byte-identical, and in `--apply` mode, which must delete
 exactly the reap set and prune an emptied slash parent.
+
+Every ancestry-merged dir names its own commit in a `run-state.json`, because
+the review's case hid behind a helper that always committed. `fresh` is
+created from main with no commit, `stray` records a commit off main, and
+`garbled` has a `run-state.json` that will not parse; all three have merged
+tips and must keep. `reused` has a merged PR for another tip, `gonepr` a
+merged PR and no local branch, and `tail` an unterminated last `gates.jsonl`
+line missing from the index. A dot-dir must print `skip`. The newline case
+runs from a decoy working dir holding `bar/`, beside a file named
+`x<newline>bar`. The guardrails suite holds the matching ingest fixture,
+since it is the one that drives `custodian-history.sh`.
 
 `gh` is a stub on PATH that answers from a fixture table, so the real `gh`
 is never called. The absent case sets `GH_BIN` to a missing path rather

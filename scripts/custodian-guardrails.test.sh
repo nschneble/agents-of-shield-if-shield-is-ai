@@ -136,7 +136,9 @@ check "INJECT: the report's own last total is still the real one" $?
 histscript="$here/custodian-history.sh"
 simroot="$temp_dir/simroot"; simhome="$temp_dir/simhome"
 mkdir -p "$simroot/linklater/local/loops/legacy-src" \
-         "$simroot/linklater/local/loops/modern-null" "$simhome"
+         "$simroot/linklater/local/loops/modern-null" \
+         "$simroot/linklater/local/loops/unterminated" "$simhome"
+printf '{"wave":1}\n{"wave":2}\n{"wave":3}' > "$simroot/linklater/local/loops/unterminated/gates.jsonl"
 # legacy-era SOURCE line: ran==true crew line with NO verified_by / outcome key
 # (would trip the raw G2 lint) — the pre-schema shape.
 echo '{"wave":1,"kind":"crew","agent":"the-auditor","task_tool_available":true,"ran":true,"verdict":"clean","blockers":0,"summary":"old run"}' \
@@ -153,6 +155,8 @@ jq -e 'select(.branch=="legacy-src") | (has("verified_by") | not)' "$simindex" >
 check "REBUILD: legacy source line stays key-absent (classifies legacy) after rebuild" $?
 jq -e 'select(.branch=="modern-null") | has("verified_by")' "$simindex" >/dev/null 2>&1
 check "REBUILD: modern verified_by:null line keeps the key (classifies modern) after rebuild" $?
+[ "$(jq -r 'select(.branch=="unterminated") | .cite | sub(".*:"; "")' "$simindex" | tr '\n' ' ')" = "1 2 3 " ]
+check "REBUILD: an unterminated last gates line gets its own line number" $?
 
 # Numeric-mtime invariant (portable stat). Every ingested record must carry a real
 # epoch, not the mount-point string GNU `stat -f %m` returns — that non-integer

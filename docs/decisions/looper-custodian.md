@@ -929,9 +929,24 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     rather than guesses. The default branch's own dir passes the ancestry
     test trivially, so it is kept. A dir whose deletion would take a
     nested branch's dir is kept. When `gh` fails, the dir is treated the
-    same as when `gh` is absent. An ancestry-merged dir still reaps
-    without `gh`, because ancestry is a positive signal, not a guess.
-    `undo` refuses a newest snapshot it cannot read and never falls back
-    to an older one, since that would revert a different apply. One gap
-    stays open and is stated in `phase-d-apply.md`: a file an apply
-    creates has nothing to snapshot, so `undo` leaves it in place.
+    same as when `gh` is absent. `undo` refuses a newest snapshot it
+    cannot read and never falls back to an older one, since that would
+    revert a different apply. One gap stays open and is stated in
+    `phase-d-apply.md`: a file an apply creates has nothing to snapshot,
+    so `undo` leaves it in place.
+
+    A correctness review then refuted the first cut, each finding
+    reproduced in a fixture. Ancestry alone cannot tell a fast-forward
+    merge from a branch that never committed: `custodian-94-e-followups`
+    was created from main, shipped no commit, and planned as merged. So
+    ancestry now counts only when the dir's records name a shipped
+    commit and every one is in the default branch, and a merged PR
+    counts only for the local tip, since a branch name can be reused.
+    `undo` takes `--issue` and refuses another issue's snapshot. A
+    create-only apply writes an empty manifest, so its `undo` is a no-op
+    instead of reverting the apply before it. The rest were mechanical:
+    an unterminated last `gates.jsonl` line shared its predecessor's
+    cite in both ingest and the guard, a newline in a file name split
+    into a relative path `rm -rf` resolved against the working dir, and
+    a symlinked original was copied as its target. `phase-detail.md` and
+    `phase-d-apply.md` state each rule.

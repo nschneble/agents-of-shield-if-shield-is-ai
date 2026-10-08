@@ -37,6 +37,15 @@ fi
 [ -n "$DEFAULT" ] || { echo "cannot resolve the default branch; pass --default" >&2; exit 2; }
 git -C "$REPO_ROOT" rev-parse --verify --quiet "$DEFAULT^{commit}" >/dev/null \
   || { echo "default branch does not resolve: $DEFAULT" >&2; exit 2; }
+DEFAULT_REF=$DEFAULT
+DEFAULT=${DEFAULT#refs/heads/}
+case "$DEFAULT" in
+  refs/remotes/*) DEFAULT=${DEFAULT#refs/remotes/}; DEFAULT=${DEFAULT#*/};;
+  *) if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$DEFAULT" \
+       && git -C "$REPO_ROOT" show-ref --verify --quiet "refs/remotes/$DEFAULT"; then
+       DEFAULT=${DEFAULT#*/}
+     fi;;
+esac
 
 mode=plan
 [ "$APPLY" -eq 1 ] && mode=apply
@@ -47,8 +56,8 @@ if [ ! -d "$loops" ]; then
   exit 0
 fi
 
-merged_branches=$(git -C "$REPO_ROOT" branch --merged "$DEFAULT" --format='%(refname:short)') \
-  || { echo "git branch --merged $DEFAULT failed" >&2; exit 2; }
+merged_branches=$(git -C "$REPO_ROOT" branch --merged "$DEFAULT_REF" --format='%(refname:short)') \
+  || { echo "git branch --merged $DEFAULT_REF failed" >&2; exit 2; }
 
 # unreadable index reads as empty, so the guard keeps rather than reaps
 indexed=""
@@ -56,30 +65,58 @@ if [ -s "$INDEX" ]; then
   indexed=$(jq -r '.cite // empty' "$INDEX" 2>/dev/null) || indexed=""
 fi
 
-gh_prs() { # branch, state -> comma-joined PR numbers; fails if gh can't say
+gh_prs() { # branch, state, tip ('' = any) -> PR numbers; fails if gh can't
   local raw
   command -v "$GH_BIN" >/dev/null 2>&1 || return 1
-  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state "$2" --head "$1" --json number 2>/dev/null) \
+  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state "$2" --head "$1" --json number,headRefOid 2>/dev/null) \
     || return 1
-  printf '%s' "$raw" | jq -er 'if type == "array" then map(.number | tostring) | join(",") else error end' \
-    2>/dev/null
+  printf '%s' "$raw" | jq -er --arg tip "$3" 'if type == "array"
+    then map(select($tip == "" or .headRefOid == $tip) | .number | tostring) | join(",")
+    else error end' 2>/dev/null
 }
+
+terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
 
 uncited_count() { # gates path, branch -> lines whose cite is not indexed
   local cites
-  cites=$(jq -r --arg cbase "$repo_name/local/loops/$2/gates.jsonl" \
-    '$cbase + ":" + (input_line_number | tostring)' "$1" 2>/dev/null) || return 1
+  cites=$(terminated "$1" | jq -r --arg cbase "$repo_name/local/loops/$2/gates.jsonl" \
+    '$cbase + ":" + (input_line_number | tostring)' 2>/dev/null) || return 1
   [ -n "$cites" ] || { echo 0; return 0; }
   awk 'NR == FNR { seen[$0] = 1; next } !($0 in seen)' \
     <(printf '%s\n' "$indexed") <(printf '%s\n' "$cites") | grep -c . || true
 }
 
-branch_dirs=$(find "$loops" -mindepth 2 -type f ! -name .DS_Store 2>/dev/null \
-  | sed 's|/[^/]*$||' | sort -u)
+recorded_commits() { # dir -> commits its records say the run shipped
+  if [ -e "$1/run-state.json" ]; then
+    jq -r '.queue[]? | objects | .commit | strings' "$1/run-state.json" 2>/dev/null || return 1
+  fi
+  if [ -e "$1/gates.jsonl" ]; then
+    jq -rR 'fromjson? | objects | .commit | strings' "$1/gates.jsonl" 2>/dev/null
+  fi
+  return 0
+}
+
+on_default() { # commits, one per line -> 0 when every one is in the default
+  local c
+  while IFS= read -r c; do
+    [[ "$c" =~ ^[0-9a-f]{4,40}$ ]] || return 1
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$c" "$DEFAULT_REF" 2>/dev/null || return 1
+  done <<< "$1"
+}
+
+branch_dirs=()
+while IFS= read -r -d '' dir; do
+  case "$dir" in "$loops"/?*) ;; *) continue ;; esac
+  branch=${dir#"$loops/"}
+  if ! git check-ref-format "refs/heads/$branch"; then
+    printf 'skip\t%q\tnot a branch name\n' "$branch"; continue
+  fi
+  branch_dirs+=("$dir")
+done < <(find "$loops" -mindepth 2 -type f ! -name .DS_Store -print0 2>/dev/null \
+  | while IFS= read -r -d '' f; do printf '%s\0' "${f%/*}"; done | sort -zu)
 
 reaped=0; kept=0; cleared=0; failed=0
-while IFS= read -r dir; do
-  [ -n "$dir" ] || continue
+for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
   branch=${dir#"$loops/"}
 
   if [ -e "$dir/run-state.json.tmp" ]; then
@@ -91,24 +128,40 @@ while IFS= read -r dir; do
     fi
   fi
 
-  nested=$(printf '%s\n' "$branch_dirs" | awk -v p="$dir/" 'index($0, p) == 1 { print; exit }')
+  nested=""
+  for other in "${branch_dirs[@]}"; do
+    case "$other" in "$dir"/*) nested=$other; break ;; esac
+  done
   verdict=keep
   if [ "$branch" = "$DEFAULT" ]; then
     reason="kept (default branch)"
   elif [ -n "$nested" ]; then
     reason="kept (nests branch dir ${nested#"$loops/"})"
   else
+    tip=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "refs/heads/$branch") || tip=""
     gh_ok=1; open=""; merged_pr=""
-    open=$(gh_prs "$branch" open) || gh_ok=0
-    if [ "$gh_ok" -eq 1 ]; then merged_pr=$(gh_prs "$branch" merged) || gh_ok=0; fi
-    ancestry=0
-    printf '%s\n' "$merged_branches" | grep -qxF -- "$branch" && ancestry=1
+    open=$(gh_prs "$branch" open "") || gh_ok=0
+    if [ "$gh_ok" -eq 1 ]; then merged_pr=$(gh_prs "$branch" merged "$tip") || gh_ok=0; fi
+    ancestry=0; tip_note=""
+    if printf '%s\n' "$merged_branches" | grep -qxF -- "$branch"; then
+      if ! recorded=$(recorded_commits "$dir"); then
+        tip_note="kept (run-state.json unreadable)"
+      elif [ -z "$recorded" ]; then
+        tip_note="kept (merged tip, no recorded commit)"
+      elif on_default "$recorded"; then
+        ancestry=1
+      else
+        tip_note="kept (recorded commit off $DEFAULT)"
+      fi
+    fi
     if [ "$gh_ok" -eq 1 ] && [ -n "$open" ]; then
       reason="kept (open PR #$open)"
     elif [ "$ancestry" -eq 1 ]; then
       verdict=reap; reason="merged (ancestry)"
     elif [ "$gh_ok" -eq 1 ] && [ -n "$merged_pr" ]; then
       verdict=reap; reason="merged (PR #$merged_pr)"
+    elif [ -n "$tip_note" ]; then
+      reason=$tip_note
     elif [ "$gh_ok" -eq 0 ]; then
       reason="kept (merge unverifiable — gh absent)"
     else
@@ -135,9 +188,7 @@ while IFS= read -r dir; do
   while [ "$parent" != "$loops" ] && rmdir "$parent" 2>/dev/null; do
     parent=$(dirname "$parent")
   done
-done <<EOF
-$branch_dirs
-EOF
+done
 
 printf 'summary\t%s\treap=%d keep=%d clear=%d failed=%d mode=%s\n' \
   "$repo_name" "$reaped" "$kept" "$cleared" "$failed" "$mode"

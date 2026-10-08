@@ -46,6 +46,8 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
   printf '%s\n' "${files[@]}" | sort -u | jq -R . | jq -cs .
 }
 
+terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
+
 ingest() {
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
   local cand new gates branch mtime files_json repo rr n
@@ -65,7 +67,7 @@ ingest() {
       # numeric guard: a non-integer here aborts jq --argjson under set -e
       mtime=$(file_mtime "$gates"); [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
       files_json=$(resolve_files "$rr" "$gates")
-      jq -c \
+      terminated "$gates" | jq -c \
         --arg repo "$repo" --arg branch "$branch" \
         --argjson files "$files_json" --argjson mtime "$mtime" \
         --arg cbase "$repo/local/loops/$branch/gates.jsonl" '
@@ -82,7 +84,7 @@ ingest() {
         }
         # copied only if source has the key: feeds the legacy exemption
         + (if has("verified_by") then {verified_by} else {} end)
-        + (if has("outcome")     then {outcome}     else {} end)' "$gates" >> "$cand"
+        + (if has("outcome")     then {outcome}     else {} end)' >> "$cand"
     done < <(find "$rr/local/loops" -name gates.jsonl 2>/dev/null)
   done
   # anti-join by cite: keep only candidates not already in the index

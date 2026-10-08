@@ -35,8 +35,9 @@ while [ $# -gt 0 ]; do
     *) shift;;
   esac
 done
-n=$(awk -F'\t' -v s="$state" -v h="$head" '$1 == s && $2 == h { print $3; exit }' "$GH_STUB_DB")
-if [ -n "$n" ]; then printf '[{"number":%s}]\n' "$n"; else echo '[]'; fi
+row=$(awk -F'\t' -v s="$state" -v h="$head" '$1 == s && $2 == h { print $3 "\t" $4; exit }' "$GH_STUB_DB")
+n=${row%%$'\t'*}; oid=${row#*$'\t'}
+if [ -n "$n" ]; then printf '[{"number":%s,"headRefOid":"%s"}]\n' "$n" "$oid"; else echo '[]'; fi
 STUB
 chmod +x "$stub_bin/gh"
 
@@ -52,13 +53,18 @@ gates() { # branch, line count — a gates.jsonl with n lines
     printf '{"wave":%d,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n' "$i"
   done > "$loops/$1/gates.jsonl"
 }
-index_all() { # branch — index every line of its gates.jsonl under its cite
-  local n i
-  n=$(grep -c . "$loops/$1/gates.jsonl")
-  for i in $(seq 1 "$n"); do
+index_upto() { # branch, n — index lines 1..n of its gates.jsonl under their cites
+  local i
+  for i in $(seq 1 "$2"); do
     printf '{"cite":"repo/local/loops/%s/gates.jsonl:%d"}\n' "$1" "$i"
   done >> "$home/history-index.jsonl"
 }
+index_all() { index_upto "$1" "$(grep -c . "$loops/$1/gates.jsonl")"; }
+record() { # dir, commit — a run-state.json naming one shipped commit
+  mkdir -p "$loops/$1"
+  jq -n --arg c "$2" '{queue: [{wave: 1, status: "shipped", commit: $c}]}' > "$loops/$1/run-state.json"
+}
+sha() { gitq rev-parse "$1"; }
 
 build() { # builds $repo with the full branch roster
   repo="$temp_dir/$1/repo"; home="$temp_dir/$1/custodian"; loops="$repo/local/loops"
@@ -66,19 +72,33 @@ build() { # builds $repo with the full branch roster
   git init -q -b main "$repo" || die_temp "git init failed in $repo"
   echo seed > "$repo/seed.txt"
   gitq add -A && gitq commit -q -m seed || die_temp "seed commit failed"
-  for b in anc anc-open sq wip gone fix/slash ungated broken nest; do
+  for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest stray garbled tail reused; do
     branch_commit "$b" || die_temp "branch $b failed"
   done
-  for b in anc anc-open fix/slash ungated broken nest; do gitq merge -q --ff-only "$b" 2>/dev/null \
+  for b in anc anc-open fix/slash ungated broken nest stray garbled tail; do
+    gitq merge -q --ff-only "$b" 2>/dev/null \
     || gitq merge -q --no-edit "$b" || die_temp "merge $b failed"; done
-  gitq branch -q -D gone || die_temp "delete gone failed"
+  gitq branch -q fresh main || die_temp "branch fresh failed"
+  for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest tail reused; do
+    record "$b" "$(sha "$b")"
+  done
+  record stray "$(sha wip)"
+  mkdir -p "$loops/fresh" "$loops/garbled"
+  echo '{"queue":[{"wave":1,"status":"shipped-no-commit","commit":null}]}' > "$loops/fresh/run-state.json"
+  echo '{not json' > "$loops/garbled/run-state.json"
+  printf 'merged\tsq\t12\t%s\nmerged\treused\t30\t%s\nmerged\tgonepr\t31\t%s\n' \
+    "$(sha sq)" "$(sha anc)" "$(sha gonepr)" > "$temp_dir/$1/gh.tsv"
+  printf 'open\tanc-open\t7\t\nopen\twip\t\t\n' >> "$temp_dir/$1/gh.tsv"
+  gitq branch -q -D gone gonepr || die_temp "delete gone failed"
   for b in anc anc-open sq fix/slash; do gates "$b" 2; index_all "$b"; done
-  gates ungated 2; printf '{"cite":"repo/local/loops/ungated/gates.jsonl:1"}\n' >> "$home/history-index.jsonl"
-  mkdir -p "$loops/broken"; printf '{"wave":1}\nnot json\n' > "$loops/broken/gates.jsonl"
-  for b in wip gone main nest nest/inner; do mkdir -p "$loops/$b"; echo '{}' > "$loops/$b/run-state.json"; done
+  gates ungated 2; index_upto ungated 1
+  gates tail 3; index_upto tail 2
+  printf '%s' "$(cat "$loops/tail/gates.jsonl")" > "$loops/tail/gates.jsonl"
+  printf '{"wave":1}\nnot json\n' > "$loops/broken/gates.jsonl"
+  for b in main nest/inner; do mkdir -p "$loops/$b"; echo '{}' > "$loops/$b/run-state.json"; done
+  mkdir -p "$loops/.claude/.cc-writes"; echo x > "$loops/.claude/.cc-writes/w"
   echo '{}' > "$loops/wip/run-state.json.tmp"
   echo '{}' > "$loops/anc/run-state.json.tmp"
-  printf 'open\tanc-open\t7\nmerged\tsq\t12\nopen\twip\t\n' > "$temp_dir/$1/gh.tsv"
 }
 run() { # command and args, run with the fixture env
   out=$(env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
@@ -103,13 +123,30 @@ has $'keep\tmain\tkept (default branch)'; check "PLAN: the default branch's dir 
 has $'keep\tnest\tkept (nests branch dir nest/inner)'; check "PLAN: a dir nesting another branch dir is kept" $?
 has $'clear\twip\trun-state.json.tmp'; check "PLAN: orphaned tmp on a kept dir is cleared" $?
 has $'clear\tanc\trun-state.json.tmp'; check "PLAN: orphaned tmp on a reaped dir is cleared" $?
-has $'summary\trepo\treap=3 keep=8 clear=2 failed=0 mode=plan'; check "PLAN: summary counts every dir" $?
+has $'keep\tfresh\tkept (merged tip, no recorded commit)'
+check "PLAN: a branch with no commit of its own is not merged by ancestry" $?
+has $'keep\tstray\tkept (recorded commit off main)'; check "PLAN: a recorded commit off main blocks ancestry" $?
+has $'keep\tgarbled\tkept (run-state.json unreadable)'; check "PLAN: an unreadable run-state blocks ancestry" $?
+has $'keep\ttail\tkept (unindexed — ingest gap)'; check "PLAN: an unterminated last gates line is its own cite" $?
+has $'keep\treused\tkept (unmerged)'; check "PLAN: a merged PR for another tip of the name does not count" $?
+has $'reap\tgonepr\tmerged (PR #31)'; check "PLAN: a deleted branch's merged PR counts" $?
+has $'skip\t.claude/.cc-writes\tnot a branch name'; check "PLAN: a dot-dir is skipped, not a branch dir" $?
+! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t\\.claude'; check "PLAN: a dot-dir gets no verdict" $?
+has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=plan'; check "PLAN: summary counts every dir" $?
 [ "$(tree)" = "$before" ]; check "PLAN: deletes nothing without --apply" $?
+
+# --- --default spelled as a ref still guards the default branch's dir ---
+gitq update-ref refs/remotes/origin/main main
+for spelling in origin/main refs/heads/main refs/remotes/origin/main; do
+  run "$runner" --default "$spelling"
+  has $'keep\tmain\tkept (default branch)'; check "DEFAULT: --default $spelling keeps the main dir" $?
+done
 
 # --- gh absent or failing: never a guessed merge ---
 run env GH_BIN="$temp_dir/no-such-gh" "$runner"
 has $'keep\tsq\tkept (merge unverifiable — gh absent)'; check "GH ABSENT: squash merge is kept, not guessed" $?
-has $'reap\tanc\tmerged (ancestry)'; check "GH ABSENT: ancestry alone still reaps" $?
+has $'reap\tanc\tmerged (ancestry)'; check "GH ABSENT: recorded ancestry still reaps" $?
+has $'keep\tfresh\tkept (merged tip, no recorded commit)'; check "GH ABSENT: a bare merged tip still keeps" $?
 has $'keep\twip\tkept (merge unverifiable — gh absent)'; check "GH ABSENT: unmerged reads unverifiable" $?
 run env GH_STUB_FAIL=1 "$runner"
 has $'keep\tsq\tkept (merge unverifiable — gh absent)'; check "GH FAILING: squash merge is kept, not guessed" $?
@@ -125,16 +162,29 @@ mv "$home/held.jsonl" "$home/history-index.jsonl"
 case=apply; build "$case"
 run "$runner" --apply
 [ "$rc" -eq 0 ]; check "APPLY: exits 0 (got $rc)" $?
-has $'summary\trepo\treap=3 keep=8 clear=2 failed=0 mode=apply'; check "APPLY: summary names apply mode" $?
-[ ! -e "$loops/anc" ] && [ ! -e "$loops/sq" ]; check "APPLY: merged dirs are gone" $?
+has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=apply'; check "APPLY: summary names apply mode" $?
+[ ! -e "$loops/anc" ] && [ ! -e "$loops/sq" ] && [ ! -e "$loops/gonepr" ]; check "APPLY: merged dirs are gone" $?
 [ ! -e "$loops/fix" ]; check "APPLY: an emptied slash parent is pruned" $?
 [ -d "$loops/anc-open" ] && [ -d "$loops/ungated" ] && [ -d "$loops/broken" ] \
-  && [ -d "$loops/main" ] && [ -d "$loops/gone" ] && [ -d "$loops/nest/inner" ]
+  && [ -d "$loops/main" ] && [ -d "$loops/gone" ] && [ -d "$loops/nest/inner" ] \
+  && [ -d "$loops/fresh" ] && [ -d "$loops/tail" ] && [ -d "$loops/reused" ] \
+  && [ -d "$loops/.claude/.cc-writes" ]
 check "APPLY: every kept dir survives" $?
 [ ! -e "$loops/wip/run-state.json.tmp" ] && [ -e "$loops/wip/run-state.json" ]
 check "APPLY: tmp cleared, the kept snapshot beside it untouched" $?
 run "$runner" --apply
-has $'summary\trepo\treap=0 keep=8 clear=0 failed=0 mode=apply'; check "APPLY: a second apply reaps nothing" $?
+has $'summary\trepo\treap=0 keep=13 clear=0 failed=0 mode=apply'; check "APPLY: a second apply reaps nothing" $?
+
+# --- a newline in a file name never yields a dir outside local/loops ---
+case=newline; build "$case"
+branch_commit bar && gitq merge -q --ff-only bar || die_temp "branch bar failed"
+decoy="$temp_dir/$case/cwd"; mkdir -p "$decoy/bar"
+jq -n --arg c "$(sha bar)" '{queue: [{commit: $c}]}' > "$decoy/bar/run-state.json"
+echo x > "$loops/wip/x"$'\n'"bar"
+out=$(cd "$decoy" && env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
+  PATH="$stub_bin:$PATH" "$runner" --apply 2>&1)
+[ -e "$decoy/bar/run-state.json" ]; check "NEWLINE: a dir named by a split path is never deleted" $?
+! printf '%s\n' "$out" | grep -q $'\tbar\t'; check "NEWLINE: the split fragment gets no verdict" $?
 
 # --- a deletion that fails exits 1 ---
 if [ "$(id -u)" -ne 0 ]; then
@@ -142,7 +192,7 @@ if [ "$(id -u)" -ne 0 ]; then
   chmod a-w "$loops/fix"
   run "$runner" --apply
   [ "$rc" -eq 1 ]; check "LOCKED: a failed deletion exits 1 (got $rc)" $?
-  has $'summary\trepo\treap=3 keep=8 clear=2 failed=1 mode=apply'; check "LOCKED: summary counts the failure" $?
+  has $'summary\trepo\treap=4 keep=13 clear=2 failed=1 mode=apply'; check "LOCKED: summary counts the failure" $?
   chmod u+w "$loops/fix"
 fi
 
