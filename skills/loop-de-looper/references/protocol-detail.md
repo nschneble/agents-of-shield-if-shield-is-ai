@@ -60,7 +60,7 @@ Before bubbling a **retryable** stop up to Step 4, attempt EXACTLY ONE fresh-con
 
 **Retryable** (non-deterministic — a fresh attempt can plausibly differ): `verify fails twice` on the same root cause; review verdict `rethink`; a wave that tripped `consecutive_no_progress`.
 
-**NOT retryable** (deterministic — a retry hits the same wall and burns a dispatch): tooling gate / write-block / permission denial, nonbeliever STOP, scope refusal, a budget governor rail, or a design `gate needed pre-build`. These bubble up immediately.
+**NOT retryable** (deterministic — a retry hits the same wall and burns a dispatch): tooling gate / write-block / permission denial, nonbeliever STOP, scope refusal, a budget governor rail other than `max_correctives_per_wave` (a `rethink`), or a design `gate needed pre-build`. These bubble up immediately.
 
 Mechanics:
 

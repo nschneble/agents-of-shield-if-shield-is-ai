@@ -56,7 +56,7 @@ The detector is the ONLY mechanical scan; it never edits and never gates (exit 0
 
 ### Triage — route + rank (read-only)
 
-For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md says the same. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip. An `unterminated-block` never enters triage at all — it cites a parse state, not a comment, and the candidates below it in that file are provisional.
+For each candidate, decide keep-vs-snip and which owner's rule the snip applies (`## Snip routing`). The bar is AGGRESSIVE. the-chronicler's standing rule is already absolute — "One line is the ceiling for internal code. Anywhere." (`the-chronicler.md` `## Comment Style Rules`), on top of a zero default where a comment ships only if one of four named earners fires (`## Internal code`). The global CLAUDE.md is looser — it allows a file-top block of up to four lines — and this rule wins: a repo's own caps override global ones. Declutter ENFORCES those rules; it does not soften them. Exactly two things survive; everything else is a snip. An `unterminated-block` never enters triage at all — it cites a parse state, not a comment, and the candidates below it in that file are provisional.
 
 **What survives:**
 
