@@ -155,6 +155,33 @@ This file is the one of the three that gets overwritten, so it is the only one t
 
 `usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
 
+## loop-counters outcome
+
+What the orchestrator pipes to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -` at step 2c: one JSON object, the hand-back already classified. The script owns the arithmetic; the classification — did the wave ship, is a finding gating — stays the model's.
+
+```json
+{
+  "kind": "queue", // "queue" | "corrective" | "direct-fix" | "retry" | "crew-pass"
+  "shipped": true, // the wave's commit landed; required except on crew-pass
+  "files_changed": 6, // required when shipped
+  "touched_product": true, // the commit touched a product file; required when shipped
+  "net_new": true, // shipped net-new queue work; optional
+  "reopened": false, // re-opened the same blocker; optional
+  "review_verdict": "ship", // from the-looper's review step; optional
+  "gating": false // a floor-gated finding on this wave awaits a corrective; optional
+}
+```
+
+`queue` is any new wave the queue advances to, the cleanup batch wave included, and is what resets `correctives_this_wave`. `direct-fix` is a corrective that is not a dispatched wave (`SKILL.md` `## Corrective budget`), so it moves the corrective counters and nothing that counts waves. `crew-pass` takes only `wave` (and optionally `gating`): it resets the two crew-cadence counters and sets `last_crew_wave`. `batched_findings` is recomputed from `cleanup_batch` on every call.
+
+Contract:
+
+- **Refuses rather than corrupts.** Unparseable or unknown-keyed outcome, an outcome contradicting itself (unshipped with files or `net_new`), an unparseable snapshot, or a counter that is not a count: exit 2, `NOTHING WRITTEN`, the snapshot byte-identical.
+- **Atomic.** Writes `run-state.json.tmp`, validates it with `jq`, renames it over the snapshot. A `.tmp` left behind is crash residue the custodian clears.
+- **Persists, then reports the governor.** Exit 0 `GOVERNOR: clear`; exit 1 after writing, `GOVERNOR: STOP` or `GOVERNOR: rethink`, each tripped rail on a `TRIPPED` line with the rail table's action. A STOP rail outranks a rethink.
+- **Rails trip when the counter reaches the limit**; `max_correctives_per_wave` only when `gating` is also true — the wave's one corrective is the budget, a gating finding after it is the rethink.
+- **Limits** default to `SKILL.md` `## Budget governor` and are overridden by the `- budget:` line under `## Loop de Looper` in the project `CLAUDE.md` (the snapshot's repo root, or `--claude-md`). An unknown key or a non-integer value refuses, exit 2: a typo silently running the default is the failure.
+
 ## wave-N.jsonl line shapes
 
 The per-wave step journal — one file per wave in the same branch-keyed dir, named for its wave (`wave-3.jsonl`), appended by `the-looper`, never by the orchestrator. Two line kinds.

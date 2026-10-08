@@ -218,7 +218,9 @@ changed. Everything else is recorded to a cleanup batch and worked in one
 terminal wave. One corrective per wave, one scoped re-crew, and the crew
 may not add queue items. `scripts/loop-finding-audit.sh` fails a run whose
 correctives cannot be accounted for that way, so the rule is checked
-rather than merely written down.
+rather than merely written down. The run counters and the budget
+governor's rails are applied by `scripts/loop-counters.sh` from the
+classified hand-back, never by hand-editing the snapshot.
 
 Added in framework v1.1. Severity floor + goal contract added in v1.4.
 

@@ -134,6 +134,42 @@ wq-closes-null-counted-bad|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|
 wq-asks-container-noun-collapsed|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type == "array" then "yes" else "no" end\E%"yes"%
 wq-has-closes-null-uncounted|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null)] | length\E%select(has("closes"))] | length%
 unanimity-census-warns-always|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=1/
+lc-shipped-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_shipped"\) \+ 1/waves_shipped") + 0/
+lc-since-crew-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_since_crew"\) \+ 1/waves_since_crew") + 0/
+lc-files-not-summed|loop-counters.sh|loop-counters.test.sh|s/n\("cumulative_files_changed"\) \+ \$o\.files_changed/n("cumulative_files_changed")/
+lc-crew-reset-off|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.waves_since_crew = 0 \| \.counters\.cumulative_files_changed = 0 \| /then /
+lc-last-crew-wave-dropped|loop-counters.sh|loop-counters.test.sh|s/ \| \.last_crew_wave = \$o\.wave//
+lc-verdict-dropped|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.last_review_verdict = \$o\.review_verdict else/then . else/
+lc-total-not-counted|loop-counters.sh|loop-counters.test.sh|s/total_waves"\) \+ 1/total_waves") + 0/
+lc-total-counts-direct-fix|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) as/IN("queue","corrective","retry","direct-fix")) as/
+lc-corrective-not-counted|loop-counters.sh|loop-counters.test.sh|s/corrective_waves"\) \+ 1/corrective_waves") + 0/
+lc-direct-fix-not-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("corrective","direct-fix"\)\) as/IN("corrective")) as/
+lc-advance-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$o\.kind == "queue" then/if false then/
+lc-retry-resets-this-wave|loop-counters.sh|loop-counters.test.sh|s/if \$o\.kind == "queue" then/if (\$o.kind | IN("queue","retry")) then/
+lc-this-wave-not-counted|loop-counters.sh|loop-counters.test.sh|s/correctives_this_wave"\) \+ 1/correctives_this_wave") + 0/
+lc-no-progress-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$o\.net_new == true then/if false then/
+lc-no-progress-not-counted|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress"\) \+ 1/consecutive_no_progress") + 0/
+lc-reopened-ignored|loop-counters.sh|loop-counters.test.sh|s/or \$o\.reopened == true\)/or false)/
+lc-retries-not-counted|loop-counters.sh|loop-counters.test.sh|s/wave_retries"\) \+ 1/wave_retries") + 0/
+lc-scaffolding-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$shipped and \$o\.touched_product == true then/if false then/
+lc-scaffolding-not-counted|loop-counters.sh|loop-counters.test.sh|s/scaffolding_only_correctives"\) \+ 1/scaffolding_only_correctives") + 0/
+lc-batched-not-derived|loop-counters.sh|loop-counters.test.sh|s/\| \.counters\.batched_findings = \(\(\.cleanup_batch \/\/ \[\]\) \| length\)/| ./
+lc-per-wave-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("correctives_this_wave"\) >= /at("correctives_this_wave") > /
+lc-per-wave-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and/true and/
+lc-total-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("total_waves"\) >= /at("total_waves") > /
+lc-corrective-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("corrective_waves"\) >= /at("corrective_waves") > /
+lc-no-progress-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("consecutive_no_progress"\) >= /at("consecutive_no_progress") > /
+lc-retries-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("wave_retries"\) >= /at("wave_retries") > /
+lc-scaffolding-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("scaffolding_only_correctives"\) >= /at("scaffolding_only_correctives") > /
+lc-rethink-outranks-stop|loop-counters.sh|loop-counters.test.sh|s/\[ "\$verdict" = "STOP" \] \|\| verdict="rethink"/verdict="rethink"/
+lc-tripped-exits-zero|loop-counters.sh|loop-counters.test.sh|s/\[ "\$verdict" = "clear" \]/true/
+lc-budget-line-ignored|loop-counters.sh|loop-counters.test.sh|s%in_loop && /\^- budget:/%in_loop && /^- zzz:/%
+lc-budget-any-section|loop-counters.sh|loop-counters.test.sh|s%in_loop = \(\$0 ~ /\^## Loop de Looper\[\[:space:\]\]\*\$/\)%in_loop = 1%
+lc-budget-key-crossed|loop-counters.sh|loop-counters.test.sh|s/max-waves\)( +)L_TOTAL=/max-waves)$1L_CORRECTIVE=/
+lc-repo-claude-md-unread|loop-counters.sh|loop-counters.test.sh|s/\[ -n "\$top" \] && \[ -e "\$top\/CLAUDE\.md" \] && CLAUDE_MD="\$top\/CLAUDE\.md"/:/
+lc-outcome-validation-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$problems" \] \|\| refuse/true || refuse/
+lc-write-in-place|loop-counters.sh|loop-counters.test.sh|s/"\$STATE" > "\$tmp" 2>/"\$STATE" > "\$STATE" 2>/
+lc-tmp-trap-off|loop-counters.sh|loop-counters.test.sh|s/trap 'rm -f "\$tmp"' EXIT/:/
 TABLE
 }
 

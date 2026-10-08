@@ -208,6 +208,44 @@ Four properties the audit's honesty depends on:
   the run exits 2 even with every surviving arm green — a caller
   gating on `$?` must never read a half-run audit as a clean one.
 
+## loop-counters
+
+Both-directions test for the step-2c counter writer and budget governor.
+
+The writer replaced a hand-edit, and the hand-edit's failure was a dropped
+comma that left `run-state.json` unparseable. So the arm that matters most is
+the refusal: thirteen malformed or misclassified outcomes — truncated JSON
+among them — each exit 2 with the existing snapshot byte-identical and no
+`.tmp` left beside it. A counter that is not a count makes jq fail mid-apply,
+which is the one path where a partial `.tmp` exists; it gets its own arm.
+
+Four properties the governor's honesty depends on:
+
+- EVERY COUNTER MOVES BY THE TABLE, PER OUTCOME KIND. A direct fix is a
+  corrective but not a dispatched wave; a retry is a dispatched wave but not a
+  corrective and keeps its wave's correctives; only a new queue wave resets
+  them. Each of those distinctions has an arm, because each is a one-word
+  edit to the writer.
+- EVERY RAIL IS PINNED AT ITS BOUNDARY, both directions: trips on reaching
+  its limit, quiet one short of it. A `>=` turned `>` passes every arm that
+  sits far from the limit.
+- THE PER-WAVE RAIL NEEDS A GATING FINDING. The wave's one corrective is the
+  budget, not a breach; only a second gating finding after it is a `rethink`.
+  And a STOP rail tripped beside a rethink wins.
+- OVERRIDES LAND ON THEIR OWN RAIL. One assertion reads all six limits back
+  from the `- budget:` line, so a crossed key mapping reddens; a `budget:`
+  line under another heading is ignored; with no flag, the snapshot's own
+  repo `CLAUDE.md` is read.
+
+Every assertion was watched fail: 36 declared mutants in
+`scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
+comparison, override path and refusal guard, all killed. The first sweep
+found 13 survivors. Twelve were one harness bug — a `$?` read after a
+command substitution in the check's own description, which made every
+counter assertion pass. The thirteenth was the STOP-outranks-rethink guard,
+unreachable while the per-wave rail was evaluated first; it is evaluated
+last now, so the guard is what decides.
+
 ## loop-receipts
 
 Both-directions test for the receipt check, and for the hook that writes what

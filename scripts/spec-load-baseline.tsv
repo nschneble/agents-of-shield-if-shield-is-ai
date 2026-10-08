@@ -115,7 +115,13 @@
 # custodian's model-change trigger and the turncoat's fit findings are new
 # rules; the rest is drift repair, mirrors brought in line with the file
 # that owns each rule, and the conditional custodian figure grew with them.
-orchestrator-run	24360	1898
+#
+# +656 orchestrator-run for scripts/loop-counters.sh: step 2c pipes the
+# classified outcome to the script, and state-schemas.md gains the
+# outcome shape and the script's contract. The orchestrator stops doing
+# counter arithmetic and hand-editing run-state.json, the edit that once
+# dropped a comma and corrupted it.
+orchestrator-run	25016	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
