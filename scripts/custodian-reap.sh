@@ -8,6 +8,7 @@ CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/l
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
 GH_BIN="${GH_BIN:-gh}"
 DEFAULT=""
+remote=""
 APPLY=0
 
 usage() {
@@ -31,7 +32,7 @@ if [ -z "$DEFAULT" ]; then
   origin_head=$(git -C "$REPO_ROOT" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)
   # a dangling origin/HEAD, left by a rename and prune, names nothing
   if [ -n "$origin_head" ] && git -C "$REPO_ROOT" show-ref --verify --quiet "$origin_head"; then
-    DEFAULT=$origin_head
+    DEFAULT=$origin_head; remote=origin
   fi
 fi
 [ -n "$DEFAULT" ] || { echo "origin/HEAD is unset or dangling; pass --default or run git remote set-head origin --auto" >&2; exit 2; }
@@ -45,9 +46,12 @@ DEFAULT_REF=$(git -C "$REPO_ROOT" rev-parse --symbolic-full-name "$DEFAULT" 2>/d
 case "$DEFAULT_REF" in
   refs/heads/?*)          DEFAULT=${DEFAULT_REF#refs/heads/};;
   refs/remotes/?*/?*)
-    remote=$(git -C "$REPO_ROOT" remote | awk -v r="${DEFAULT_REF#refs/remotes/}" \
-      'index(r, $0 "/") == 1 && length($0) > length(best) { best = $0 } END { print best }')
-    [ -n "$remote" ] || { echo "--default $DEFAULT names no configured remote" >&2; exit 2; }
+    if [ -z "${remote:-}" ]; then
+      remote=$(git -C "$REPO_ROOT" remote | awk -v r="${DEFAULT_REF#refs/remotes/}" 'index(r, $0 "/") == 1')
+      [ -n "$remote" ] || { echo "--default $DEFAULT names no configured remote" >&2; exit 2; }
+      [ "$(printf '%s\n' "$remote" | wc -l)" -eq 1 ] \
+        || { echo "--default $DEFAULT matches more than one remote name; pass refs/heads/<branch>" >&2; exit 2; }
+    fi
     DEFAULT=${DEFAULT_REF#refs/remotes/"$remote"/};;
   *) echo "--default $DEFAULT does not name a branch" >&2; exit 2;;
 esac
@@ -173,7 +177,7 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
       elif on_default "$recorded"; then
         ancestry=1
       else
-        tip_note="kept (recorded commit off $DEFAULT)"
+        tip_note="kept (recorded commit off ${DEFAULT_REF#refs/*/})"
       fi
     fi
     if [ "$gh_ok" -eq 1 ] && [ -n "$open" ]; then

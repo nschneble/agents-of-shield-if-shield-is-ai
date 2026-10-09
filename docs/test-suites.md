@@ -184,7 +184,9 @@ merged PR its local tip has moved past, and must name it. `--default`
 spelled `origin/HEAD` must keep `main`, and `HEAD`, `@`, a sha or `main~0`
 must exit 2 with a feature branch checked out. So must an unset or
 dangling `origin/HEAD`, even with a `main` present, and a remote ref under
-no configured remote; `up/stream/main` must keep `main`. Every fixture repo
+no configured remote or under two nested ones; `up/stream/main` must keep
+`main`, and auto-detect must strip exactly `origin` beside a remote named
+`origin/release`. An unpushed merge into local `main` must not reap. Every fixture repo
 sets `origin/HEAD` the way a clone does. The newline case
 runs from a decoy working dir holding `bar/`, beside a file named
 `x<newline>bar`. The guardrails suite holds the matching ingest fixture,

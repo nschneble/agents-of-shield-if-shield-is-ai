@@ -128,7 +128,7 @@ has $'clear\twip\trun-state.json.tmp'; check "PLAN: orphaned tmp on a kept dir i
 has $'clear\tanc\trun-state.json.tmp'; check "PLAN: orphaned tmp on a reaped dir is cleared" $?
 has $'keep\tfresh\tkept (merged tip, no recorded commit)'
 check "PLAN: a branch with no commit of its own is not merged by ancestry" $?
-has $'keep\tstray\tkept (recorded commit off main)'; check "PLAN: a recorded commit off main blocks ancestry" $?
+has $'keep\tstray\tkept (recorded commit off origin/main)'; check "PLAN: a recorded commit off main blocks ancestry" $?
 has $'keep\tgarbled\tkept (run-state.json unreadable)'; check "PLAN: an unreadable run-state blocks ancestry" $?
 has $'keep\ttail\tkept (unindexed — ingest gap)'; check "PLAN: an unterminated last gates line is its own cite" $?
 has $'keep\treused\tkept (unmerged)'; check "PLAN: a merged PR for another tip of the name does not count" $?
@@ -187,6 +187,23 @@ run "$runner"
 [ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tunpushed\tmerged (ancestry)'
 check "DEFAULT: an unpushed merge into local main does not reap (got $rc)" $?
 gitq update-ref refs/heads/main "$pre_main" && gitq checkout -q main
+
+# --- a remote nested in origin's name never re-splits origin's ref ---
+gitq config remote.origin/release.url "$temp_dir/no-such-release.git"
+gitq update-ref refs/remotes/origin/release/main main
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)'
+check "DEFAULT: a nested remote leaves origin/HEAD on origin/main alone (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/release/main
+run "$runner"
+[ "$rc" -eq 0 ] && ! has $'keep\tmain\tkept (default branch)'
+check "DEFAULT: auto-detect strips exactly origin from origin/release/main (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+run "$runner" --default origin/release/main
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: a ref two remote names could split is refused (got $rc)" $?
+gitq update-ref -d refs/remotes/origin/release/main
+gitq config --remove-section remote.origin/release
 
 # --- an unset or dangling origin/HEAD is refused, never guessed ---
 gitq branch master main
