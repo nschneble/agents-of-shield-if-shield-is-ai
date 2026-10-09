@@ -940,8 +940,10 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     merge from a branch that never committed: `custodian-94-e-followups`
     was created from main, shipped no commit, and planned as merged. So
     ancestry now counts only when the dir's records name a shipped
-    commit and every one is in the default branch, and a merged PR
-    counts only for the local tip, since a branch name can be reused.
+    commit and every one is in the default branch. A merged PR must
+    match the local tip when one exists, since a branch name can be
+    reused; with no local branch, any merged PR of that name counts,
+    which archiving makes safe.
     `undo` takes `--issue` and refuses another issue's snapshot. A
     create-only apply writes an empty manifest, so its `undo` is a no-op
     instead of reverting the apply before it. The rest were mechanical:
