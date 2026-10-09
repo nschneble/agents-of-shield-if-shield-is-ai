@@ -182,7 +182,10 @@ merged PR and no local branch, and `tail` an unterminated last `gates.jsonl`
 line missing from the index. A dot-dir must print `skip`. `ahead` has a
 merged PR its local tip has moved past, and must name it. `--default`
 spelled `origin/HEAD` must keep `main`, and `HEAD`, `@`, a sha or `main~0`
-must exit 2 with a feature branch checked out. The newline case
+must exit 2 with a feature branch checked out. So must an unset or
+dangling `origin/HEAD`, even with a `main` present, and a remote ref under
+no configured remote; `up/stream/main` must keep `main`. Every fixture repo
+sets `origin/HEAD` the way a clone does. The newline case
 runs from a decoy working dir holding `bar/`, beside a file named
 `x<newline>bar`. The guardrails suite holds the matching ingest fixture,
 since it is the one that drives `custodian-history.sh`.

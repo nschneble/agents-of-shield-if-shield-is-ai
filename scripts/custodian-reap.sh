@@ -34,10 +34,7 @@ if [ -z "$DEFAULT" ]; then
     DEFAULT=${origin_head#refs/remotes/origin/}
   fi
 fi
-if [ -z "$DEFAULT" ] && git -C "$REPO_ROOT" show-ref --verify --quiet refs/heads/main; then
-  DEFAULT=main
-fi
-[ -n "$DEFAULT" ] || { echo "cannot resolve the default branch; pass --default" >&2; exit 2; }
+[ -n "$DEFAULT" ] || { echo "origin/HEAD is unset or dangling; pass --default or run git remote set-head origin --auto" >&2; exit 2; }
 case "$(printf '%s' "$DEFAULT" | tr '[:upper:]' '[:lower:]')" in
   head|@) echo "--default $DEFAULT names the checkout, not the default branch" >&2; exit 2;;
 esac

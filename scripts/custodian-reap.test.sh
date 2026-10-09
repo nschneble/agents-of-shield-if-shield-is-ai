@@ -72,6 +72,8 @@ build() { # builds $repo with the full branch roster
   git init -q -b main "$repo" || die_temp "git init failed in $repo"
   echo seed > "$repo/seed.txt"
   gitq add -A && gitq commit -q -m seed || die_temp "seed commit failed"
+  gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+    && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "origin/HEAD failed"
   for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest stray garbled tail reused; do
     branch_commit "$b" || die_temp "branch $b failed"
   done
@@ -136,7 +138,6 @@ has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=plan'; check "PLAN: su
 [ "$(tree)" = "$before" ]; check "PLAN: deletes nothing without --apply" $?
 
 # --- --default spelled as a ref still guards the default branch's dir ---
-gitq remote add origin "$temp_dir/no-such-origin.git"
 gitq update-ref refs/remotes/origin/main main
 for spelling in origin/main refs/heads/main refs/remotes/origin/main; do
   run "$runner" --default "$spelling"
@@ -174,12 +175,16 @@ run "$runner" --default nowhere/main
 [ "$rc" -eq 2 ]; check "DEFAULT: a remote ref under no configured remote is refused (got $rc)" $?
 gitq update-ref -d refs/remotes/nowhere/main
 
-# --- a dangling origin/HEAD falls back instead of naming a stale branch ---
+# --- an unset or dangling origin/HEAD is refused, never guessed ---
 gitq branch master main
 gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
 run "$runner"
-[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tmain\t'
-check "DEFAULT: a dangling origin/HEAD falls back to main, keeping its dir (got $rc)" $?
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: a dangling origin/HEAD is refused, not guessed (got $rc)" $?
+gitq symbolic-ref --delete refs/remotes/origin/HEAD
+run "$runner"
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: an unset origin/HEAD is refused, though a main exists (got $rc)" $?
 gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 gitq branch -D -q master
 
@@ -260,6 +265,7 @@ out=$(GIT_CEILING_DIRECTORIES="$temp_dir" REPO_ROOT="$temp_dir/notrepo" CUSTODIA
 [ "$rc" -eq 2 ]; check "USAGE: a non-repo exits 2 (got $rc)" $?
 repo="$temp_dir/bare"; mkdir -p "$repo"; git init -q -b main "$repo"
 gitq commit -q --allow-empty -m seed
+gitq update-ref refs/remotes/origin/main main && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 run "$runner"
 [ "$rc" -eq 0 ] && has $'summary\tbare\treap=0 keep=0 clear=0 failed=0 mode=plan (no local/loops)'
 check "EMPTY: a repo with no local/loops reports zero and exits 0" $?

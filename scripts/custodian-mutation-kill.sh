@@ -212,6 +212,7 @@ reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAUL
 reap-default-head-accepted|custodian-reap.sh|custodian-reap.test.sh|s/  head\|@\) echo/  NOMATCHZZZ) echo/; s/grep -qxF -e "\$given"/true || grep -qxF -e "$given"/
 reap-default-case-blind|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -e "\$given"/grep -qixF -e "$given"/
 reap-default-dangling-origin-head|custodian-reap.sh|custodian-reap.test.sh|s/ && git -C "\$REPO_ROOT" show-ref --verify --quiet "\$origin_head"//
+reap-default-guesses-main|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$DEFAULT" \] \|\| \{ echo "origin\/HEAD is unset/[ -n "$DEFAULT" ] || DEFAULT=main; true || { echo "origin\/HEAD is unset/
 reap-default-slashed-remote-first-slash|custodian-reap.sh|custodian-reap.test.sh|s/remotes\/"\$remote"\/\};;/remotes\/}; DEFAULT=\$\{DEFAULT#*\/};;/
 reap-default-unknown-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$remote" \] \|\| \{ echo "--default \$DEFAULT names no configured remote" >&2; exit 2; \}/remote=\$\{DEFAULT_REF#refs\/remotes\/\}; remote=\$\{remote%%\/*\}/
 reap-default-commit-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\*\) echo "--default \$DEFAULT does not name a branch" >&2; exit 2;;/*) DEFAULT_REF=\$DEFAULT;;/
