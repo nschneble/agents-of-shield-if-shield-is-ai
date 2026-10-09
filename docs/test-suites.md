@@ -190,6 +190,10 @@ no configured remote or under two nested ones; `up/stream/main` must keep
 may `main` when origin/HEAD points under another remote. The check that
 DEFAULT_REF is exactly `refs/heads/<DEFAULT>` or `refs/remotes/<remote>/<DEFAULT>`
 is a backstop behind the resolution above it, so its mutant removes both.
+Two refusals carry no mutant: a dangling origin/HEAD, and a `--default`
+that resolves to a commit rather than a branch. Each is refused by two
+later checks as well (the resolve check, then the DEFAULT_REF guard or
+the exact-spelling check), so removing any one leaves the arm green.
 A PR merged into a feature branch, for a live or a deleted branch, must not
 reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a

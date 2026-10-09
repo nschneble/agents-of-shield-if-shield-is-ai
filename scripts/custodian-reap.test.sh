@@ -99,8 +99,11 @@ build() { # builds $repo with the full branch roster
   gitq branch -q -D gone gonepr || die_temp "delete gone failed"
   for b in anc anc-open sq fix/slash; do gates "$b" 2; index_all "$b"; done
   gates ungated 2; index_upto ungated 1
-  gates tail 3; index_upto tail 2
-  printf '%s' "$(cat "$loops/tail/gates.jsonl")" > "$loops/tail/gates.jsonl"
+  # lines 2 and 3 identical, so only the line number tells them apart
+  mkdir -p "$loops/tail"
+  printf '{"wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n{"wave":2,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n{"wave":2,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}' \
+    > "$loops/tail/gates.jsonl"
+  index_upto tail 2
   printf '{"wave":1}\nnot json\n' > "$loops/broken/gates.jsonl"
   for b in main nest/inner; do mkdir -p "$loops/$b"; echo '{}' > "$loops/$b/run-state.json"; done
   mkdir -p "$loops/.claude/.cc-writes"; echo x > "$loops/.claude/.cc-writes/w"
