@@ -251,6 +251,10 @@ reap-apply-deletes|custodian-reap.sh|custodian-reap.test.sh|s/! mv -- "\$dir" "\
 reap-archive-overwrites|custodian-reap.sh|custodian-reap.test.sh|s/while \[ -e "\$dest" \] \|\| \[ -L "\$dest" \]; do/while false; do/
 reap-archive-enumerated|custodian-reap.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
 history-ingests-archive|custodian-history.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
+history-archive-unwalked|custodian-history.sh|custodian-guardrails.test.sh|s/\[ "\$include_archive" -eq 1 \] \|\| continue/continue/
+history-strips-any-suffix|custodian-history.sh|custodian-guardrails.test.sh|s/\[ -d "\$\{1%\.\*\}" \]/true/
+guardrails-audits-archive|custodian-guardrails.sh|custodian-guardrails.test.sh|s{\Q | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
+unanimity-audits-archive|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
 reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
 reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/

@@ -977,3 +977,10 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     re-audited. Emptying it is a separate human step; nothing in the
     custodian deletes from it. The decision rules stay as the filter,
     unchanged.
+
+    A plain `rebuild` still drops archived dirs' records, since ingest
+    prunes the archive. `custodian-history.sh rebuild --include-archive`
+    is the opt-in way back: it indexes archived lines under their archived
+    cites, and every audit that reads the index drops a cite under
+    `local/loops/.archive/`, so those lines are queryable but never
+    re-audited.

@@ -175,6 +175,57 @@ check "REBUILD e2e: rebuilt legacy line is NOT a violation (exemption survived r
 printf '%s\n' "$simout" | grep -q 'modern-null'
 check "REBUILD e2e: rebuilt modern verified_by:null line IS checked (G2 fires, null != absent)" $?
 
+# --- REBUILD --include-archive: archived dirs come back under their real
+#     cites, and plain rebuild still leaves them out. ---
+archroot="$temp_dir/archroot"; archhome="$temp_dir/archhome"
+aloops="$archroot/linklater/local/loops"; aday="$aloops/.archive/2026-10-01"
+g2line='{"wave":1,"kind":"crew","agent":"the-stickler","task_tool_available":true,"ran":true,"verdict":"clean","outcome":null,"verified_by":null,"blockers":0,"summary":"reviewed"}'
+mkdir -p "$aloops/live" "$aday/foo" "$aday/foo.2" "$aday/x.2" "$aday/fix/auth" "$archhome"
+for d in "$aloops/live" "$aday/foo" "$aday/foo.2" "$aday/x.2" "$aday/fix/auth"; do
+  printf '%s\n%s\n' "$g2line" "$g2line" > "$d/gates.jsonl"
+done
+archindex="$archhome/history-index.jsonl"
+arebuild() { REPOS_ROOT="$archroot" CUSTODIAN_HOME="$archhome" "$histscript" "$@" >/dev/null 2>&1; }
+
+arebuild rebuild
+[ "$(jq -r .cite "$archindex" | sort | paste -sd' ' -)" = "linklater/local/loops/live/gates.jsonl:1 linklater/local/loops/live/gates.jsonl:2" ]
+check "ARCHIVE: plain rebuild indexes the live dir only" $?
+
+arebuild rebuild --include-archive
+want="fix/auth linklater/local/loops/.archive/2026-10-01/fix/auth/gates.jsonl:1
+fix/auth linklater/local/loops/.archive/2026-10-01/fix/auth/gates.jsonl:2
+foo linklater/local/loops/.archive/2026-10-01/foo.2/gates.jsonl:1
+foo linklater/local/loops/.archive/2026-10-01/foo.2/gates.jsonl:2
+foo linklater/local/loops/.archive/2026-10-01/foo/gates.jsonl:1
+foo linklater/local/loops/.archive/2026-10-01/foo/gates.jsonl:2
+live linklater/local/loops/live/gates.jsonl:1
+live linklater/local/loops/live/gates.jsonl:2
+x.2 linklater/local/loops/.archive/2026-10-01/x.2/gates.jsonl:1
+x.2 linklater/local/loops/.archive/2026-10-01/x.2/gates.jsonl:2"
+[ "$(jq -r '.branch + " " + .cite' "$archindex" | sort)" = "$want" ]
+check "ARCHIVE: --include-archive cites archived lines by path, strips .<n> only beside <branch>" $?
+[ "$(jq -r .branch "$archindex" | head -2 | paste -sd' ' -)" = "live live" ]
+check "ARCHIVE: --include-archive walks the archive after the live dirs" $?
+
+before=$(cat "$archindex")
+arebuild rebuild --bogus; rc=$?
+[ "$rc" -eq 2 ] && [ "$(cat "$archindex")" = "$before" ]
+check "ARCHIVE: rebuild with an unknown argument exits 2, index untouched (got $rc)" $?
+arebuild ingest --include-archive; rc=$?
+[ "$rc" -eq 2 ]
+check "ARCHIVE: ingest refuses --include-archive (got $rc)" $?
+arebuild query x --include-archive; rc=$?
+[ "$rc" -eq 2 ]
+check "ARCHIVE: query refuses --include-archive (got $rc)" $?
+[ "$(REPOS_ROOT="$archroot" CUSTODIAN_HOME="$archhome" "$histscript" query --repo linklater --limit 99 | grep -c '^linklater/local/loops/.archive/')" -eq 8 ]
+check "ARCHIVE: query returns archived records" $?
+
+archout=$("$runner" --index "$archindex")
+printf '%s\n' "$archout" | grep -q 'VIOLATION  linklater/local/loops/live/gates.jsonl:1'
+check "ARCHIVE e2e: a live G2 line is still a violation" $?
+! printf '%s\n' "$archout" | grep -q '\.archive/'
+check "ARCHIVE e2e: the identical archived line is never re-audited" $?
+
 # --- G2 ⇔ state-schemas.md SYNC (settles the-stickler W1). The runner's G2 must
 #     select the SAME lines as the canonical provenance lint in state-schemas.md
 #     ## Provenance lint. Chosen over a byte-identical comment quote because the only

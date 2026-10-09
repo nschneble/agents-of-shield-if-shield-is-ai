@@ -55,9 +55,11 @@ corpus="$work/corpus.jsonl"
 index_lines=0
 if [ "$WANT_INDEX" -eq 1 ]; then
   [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
-  jq -cRn '[inputs | fromjson? // empty | select(type == "object")]
-           | .[] | . + {source: "index"}' "$INDEX" >> "$corpus"
-  index_lines=$(jq -Rn '[inputs | fromjson? // empty | select(type == "object")] | length' "$INDEX")
+  # archived gate lines are never re-audited (decision 32)
+  live_rows='[inputs | fromjson? // empty | select(type == "object")
+              | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)]'
+  jq -cRn "$live_rows | .[] | . + {source: \"index\"}" "$INDEX" >> "$corpus"
+  index_lines=$(jq -Rn "$live_rows | length" "$INDEX")
 fi
 
 census_files=0
