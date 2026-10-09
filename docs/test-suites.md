@@ -195,7 +195,11 @@ reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
 `gates.jsonl` rewritten under reused cites must be kept, including one that
 differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every
-field ingest writes, in ingest's normal form, since the guard compares them. Every fixture repo
+field ingest writes, in ingest's normal form, since the guard compares them,
+and each guard field has its own single-field arm and mutant. `--apply` must
+archive, never delete: reaped dirs move whole under `.archive/<date>/`, a
+second reap of one name lands beside the first, and ingest and reap both
+skip the archive. Every fixture repo
 sets `origin/HEAD` the way a clone does. The newline case
 runs from a decoy working dir holding `bar/`, beside a file named
 `x<newline>bar`. The guardrails suite holds the matching ingest fixture,

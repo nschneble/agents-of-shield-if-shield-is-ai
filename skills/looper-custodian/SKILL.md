@@ -65,9 +65,9 @@ Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.
 - The index's record schema, the incremental-ingest mechanics, the guardrail replay (G1/G2/G3), and the derived-cache argument all live in one place: `references/phase-detail.md` `## Phase C`. Cite it rather than restating it.
 - Read-only. The digest is signal for a human (or a future scoped run), not an action — it surfaces the systemic pattern a per-run learn can't see. No checkboxes unless a finding is concrete enough to route to `the-turncoat`, in which case it becomes a `D-turncoat-<n>` proposal. If git is unavailable for a repo, its records carry `files: []` and the phase logs the gap per the availability discipline — never an invented touched-file list.
 
-### Phase A — artifact GC (auto, destructive only to scratch)
+### Phase A — artifact GC (auto, archives, never deletes)
 
-- Per repo, `REPO_ROOT=<repo> bash scripts/custodian-reap.sh` prints one `verdict branch reason` line per `local/loops/<branch>/` dir plus a `summary`, deleting nothing; `--apply` performs that plan. Exit 0 · 1 a deletion failed · 2 unusable input. Reasons:
+- Per repo, `REPO_ROOT=<repo> bash scripts/custodian-reap.sh` prints one `verdict branch reason` line per `local/loops/<branch>/` dir plus a `summary`, touching nothing; `--apply` moves each reaped dir to `local/loops/.archive/<date>/`, never deletes it. Exit 0 · 1 a move failed · 2 unusable input. Reasons:
   - `merged (ancestry)` / `merged (PR #N)` — reaped: `git branch --merged <default>` lists it AND every commit its records name as shipped is in it; or `gh pr list --state merged --head <branch>` returns the tip's row merged into the default (squash merges). A lingering local branch blocks it only once its tip moves past that PR: `kept (merged PR #N, local tip ahead)`.
   - `kept (open PR #N)` / `kept (unmerged)` — work genuinely in flight.
   - `kept (unindexed — ingest gap)` — the **ingest-guard (hard rule)**: a `gates.jsonl` line missing from `history-index.jsonl` (by `cite` and content) blocks the reap until a later ingest catches up (a reused cite never does). With C running first this is a no-op in a healthy run — the guard exists so a partial or failed ingest can never turn the GC destructive again (2026-07-13 incident: 11 unindexed `gates.jsonl` reaped, recovered only via off-site backup).

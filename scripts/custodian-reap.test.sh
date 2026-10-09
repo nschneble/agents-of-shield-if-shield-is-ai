@@ -319,12 +319,46 @@ run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
 check "E2E: a rewrite differing only in blockers, ran and verified_by is kept" $?
 
-# --- apply: deletes exactly the reap set ---
+# --- each guard field on its own: a rewrite changing only it is kept ---
+base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
+for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
+  '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)'; do
+  : > "$home/history-index.jsonl"
+  printf '%s\n' "$base_line" > "$loops/fix-ci/gates.jsonl"; ingest || die_temp "field ingest failed"
+  printf '%s\n' "$base_line" | jq -c "$change" > "$loops/fix-ci/gates.jsonl"
+  run "$runner"
+  has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+  check "FIELD: a rewrite changing only $change is kept" $?
+done
+mv "$home/held.jsonl" "$home/history-index.jsonl" 2>/dev/null || true
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"; : > "$home/history-index.jsonl"; ingest || die_temp "field reset ingest failed"
+
+# --- an archived dir is out of every later scan, ingest included ---
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e archive ingest failed"
+run "$runner" --apply
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: restored to its indexed content, the dir reaps" $?
+before_idx=$(grep -c . "$home/history-index.jsonl")
+ingest && [ "$(grep -c . "$home/history-index.jsonl")" -eq "$before_idx" ]
+check "E2E: ingest does not re-index an archived gates.jsonl" $?
+run "$runner"
+! printf '%s\n' "$out" | grep -qE $'^(skip|keep|reap)\t.*archive'
+check "E2E: reap does not enumerate its own archive" $?
+
+# --- apply: archives exactly the reap set, deletes nothing ---
 case=apply; build "$case"
 run "$runner" --apply
 [ "$rc" -eq 0 ]; check "APPLY: exits 0 (got $rc)" $?
 has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=apply'; check "APPLY: summary names apply mode" $?
-[ ! -e "$loops/anc" ] && [ ! -e "$loops/sq" ] && [ ! -e "$loops/gonepr" ]; check "APPLY: merged dirs are gone" $?
+[ ! -e "$loops/anc" ] && [ ! -e "$loops/sq" ] && [ ! -e "$loops/gonepr" ]; check "APPLY: merged dirs leave local/loops" $?
+arch="$loops/.archive/$(date +%Y-%m-%d)"
+[ -f "$arch/anc/run-state.json" ] && [ -f "$arch/anc/gates.jsonl" ] && [ -f "$arch/sq/run-state.json" ] \
+  && [ -f "$arch/gonepr/run-state.json" ] && [ -f "$arch/fix/slash/run-state.json" ]
+check "APPLY: every reaped dir is archived whole, slash branch included" $?
+has "$(printf 'archived\tanc\tlocal/loops/.archive/%s/anc' "$(date +%Y-%m-%d)")"
+check "APPLY: each archive move is printed with its destination" $?
 [ ! -e "$loops/fix" ]; check "APPLY: an emptied slash parent is pruned" $?
 [ -d "$loops/anc-open" ] && [ -d "$loops/ungated" ] && [ -d "$loops/broken" ] \
   && [ -d "$loops/main" ] && [ -d "$loops/gone" ] && [ -d "$loops/nest/inner" ] \
@@ -335,6 +369,10 @@ check "APPLY: every kept dir survives" $?
 check "APPLY: tmp cleared, the kept snapshot beside it untouched" $?
 run "$runner" --apply
 has $'summary\trepo\treap=0 keep=13 clear=0 failed=0 mode=apply'; check "APPLY: a second apply reaps nothing" $?
+cp -R "$arch/anc" "$loops/anc"
+run "$runner" --apply
+[ -f "$arch/anc/run-state.json" ] && [ -f "$arch/anc.2/run-state.json" ]
+check "APPLY: a second reap of one name archives beside the first, not over it" $?
 
 # --- a newline in a file name never yields a dir outside local/loops ---
 case=newline; build "$case"

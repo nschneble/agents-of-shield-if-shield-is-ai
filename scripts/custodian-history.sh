@@ -5,7 +5,7 @@
 #
 # Subcommands:
 #   ingest            append only gates.jsonl lines not already indexed
-#   rebuild           wipe + re-derive the whole index from source (safe anytime)
+#   rebuild           wipe + re-derive from source; loses reaped dirs' records
 #   query <q> [flags]  read-only ranked cited lookup
 #
 # query flags (all substring, case-insensitive):
@@ -85,7 +85,7 @@ ingest() {
         # copied only if source has the key: feeds the legacy exemption
         + (if has("verified_by") then {verified_by} else {} end)
         + (if has("outcome")     then {outcome}     else {} end)' >> "$cand"
-    done < <(find "$rr/local/loops" -name gates.jsonl 2>/dev/null)
+    done < <(find "$rr/local/loops" -path "$rr/local/loops/.archive" -prune -o -name gates.jsonl -print 2>/dev/null)
   done
   # anti-join by cite: keep only candidates not already in the index
   jq -c -n --slurpfile idx "$INDEX" --slurpfile cand "$cand" '

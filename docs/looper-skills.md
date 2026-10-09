@@ -264,7 +264,8 @@ LOGGED — never that the runtime was serialized (decision 24,
 `docs/decisions/looper-custodian.md`):
 
 - **C** mines wave history across repos into a cited index
-- **A** GCs merged-branch artifacts under `local/loops/`, via
+- **A** archives merged-branch artifacts under `local/loops/` into
+  `local/loops/.archive/`, never deleting them, via
   `scripts/custodian-reap.sh`
 - **B** audits memory for duplicates / contradictions / staleness
 - **E** researches external advances

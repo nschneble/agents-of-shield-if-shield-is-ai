@@ -67,7 +67,7 @@ if [ "$WANT_CENSUS" -eq 1 ]; then
   [ -d "$CENSUS_ROOT" ] || { echo "--census needs a directory: $CENSUS_ROOT" >&2; exit 2; }
   # only a WHOLLY empty corpus is fatal below, so a partial walk
   # must speak up
-  find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
+  find "$CENSUS_ROOT" -type d \( -name node_modules -o -path '*/local/loops/.archive' \) -prune -o \
        -path '*/local/loops/*' -name gates.jsonl -print \
        > "$work/gates.found" 2> "$work/find.err" || true
   census_unreadable=$(grep -c . "$work/find.err" || true)

@@ -148,10 +148,11 @@ while IFS= read -r -d '' dir; do
     printf 'skip\t%q\tnot a branch name\n' "$branch"; continue
   fi
   branch_dirs+=("$dir")
-done < <(find "$loops" -mindepth 2 -type f ! -name .DS_Store -print0 2>/dev/null \
+done < <(find "$loops" -mindepth 2 -path "$loops/.archive/*" -prune -o -type f ! -name .DS_Store -print0 2>/dev/null \
   | while IFS= read -r -d '' f; do printf '%s\0' "${f%/*}"; done | sort -zu)
 
 reaped=0; kept=0; cleared=0; failed=0
+archive="$loops/.archive/$(date +%Y-%m-%d)"
 for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
   branch=${dir#"$loops/"}
 
@@ -219,10 +220,13 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
   if [ "$verdict" = keep ]; then kept=$((kept + 1)); continue; fi
   reaped=$((reaped + 1))
   [ "$APPLY" -eq 1 ] || continue
-  rm -rf -- "$dir"
-  if [ -e "$dir" ]; then
-    echo "could not delete $dir" >&2; failed=$((failed + 1)); continue
+  # archived, never deleted: a wrong verdict costs clutter, not data
+  dest="$archive/$branch"; n=1
+  while [ -e "$dest" ] || [ -L "$dest" ]; do n=$((n + 1)); dest="$archive/$branch.$n"; done
+  if ! mkdir -p -- "$(dirname "$dest")" || ! mv -- "$dir" "$dest" || [ -e "$dir" ] || [ ! -d "$dest" ]; then
+    echo "could not archive $dir" >&2; failed=$((failed + 1)); continue
   fi
+  printf 'archived\t%s\t%s\n' "$branch" "${dest#"$REPO_ROOT/"}"
   parent=$(dirname "$dir")
   while [ "$parent" != "$loops" ] && rmdir "$parent" 2>/dev/null; do
     parent=$(dirname "$parent")
