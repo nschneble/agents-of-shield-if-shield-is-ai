@@ -143,10 +143,12 @@
 # behind-tip keep, and undo never following a link.
 # A third review adds +21: --default must match git's own spelling of
 # the ref, since a case-blind macOS filesystem resolves `Main` to main.
+# +26 more: a remote ref must sit under a configured remote, so `up/stream`
+# strips whole, and a dangling origin/HEAD is ignored rather than trusted.
 orchestrator-run	25713	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20185	7283
+custodian-run	20211	7283
 defend-run	8086	0
 declutter-run	6661	0

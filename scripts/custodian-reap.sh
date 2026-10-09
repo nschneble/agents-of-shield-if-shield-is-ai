@@ -28,8 +28,11 @@ done
 git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 \
   || { echo "not a git repo: $REPO_ROOT" >&2; exit 2; }
 if [ -z "$DEFAULT" ]; then
-  DEFAULT=$(git -C "$REPO_ROOT" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
-  DEFAULT=${DEFAULT#origin/}
+  origin_head=$(git -C "$REPO_ROOT" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)
+  # a dangling origin/HEAD, left by a rename and prune, names nothing
+  if [ -n "$origin_head" ] && git -C "$REPO_ROOT" show-ref --verify --quiet "$origin_head"; then
+    DEFAULT=${origin_head#refs/remotes/origin/}
+  fi
 fi
 if [ -z "$DEFAULT" ] && git -C "$REPO_ROOT" show-ref --verify --quiet refs/heads/main; then
   DEFAULT=main
@@ -44,7 +47,11 @@ git -C "$REPO_ROOT" rev-parse --verify --quiet "$DEFAULT^{commit}" >/dev/null \
 DEFAULT_REF=$(git -C "$REPO_ROOT" rev-parse --symbolic-full-name "$DEFAULT" 2>/dev/null)
 case "$DEFAULT_REF" in
   refs/heads/?*)          DEFAULT=${DEFAULT_REF#refs/heads/};;
-  refs/remotes/?*/?*)     DEFAULT=${DEFAULT_REF#refs/remotes/}; DEFAULT=${DEFAULT#*/};;
+  refs/remotes/?*/?*)
+    remote=$(git -C "$REPO_ROOT" remote | awk -v r="${DEFAULT_REF#refs/remotes/}" \
+      'index(r, $0 "/") == 1 && length($0) > length(best) { best = $0 } END { print best }')
+    [ -n "$remote" ] || { echo "--default $DEFAULT names no configured remote" >&2; exit 2; }
+    DEFAULT=${DEFAULT_REF#refs/remotes/"$remote"/};;
   *) echo "--default $DEFAULT does not name a branch" >&2; exit 2;;
 esac
 # case-blind filesystems resolve a misspelled ref; only git's own spelling counts

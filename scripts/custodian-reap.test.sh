@@ -136,6 +136,7 @@ has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=plan'; check "PLAN: su
 [ "$(tree)" = "$before" ]; check "PLAN: deletes nothing without --apply" $?
 
 # --- --default spelled as a ref still guards the default branch's dir ---
+gitq remote add origin "$temp_dir/no-such-origin.git"
 gitq update-ref refs/remotes/origin/main main
 for spelling in origin/main refs/heads/main refs/remotes/origin/main; do
   run "$runner" --default "$spelling"
@@ -159,6 +160,28 @@ for spelling in HEAD head Head @ "$(sha main)" main~0 Main MAIN origin/head Orig
   check "DEFAULT: --default $spelling names no default branch, refused (got $rc)" $?
 done
 gitq checkout -q main
+
+# --- a remote with a slash in its name strips to the branch it names ---
+gitq remote add up/stream "$temp_dir/no-such-upstream.git"
+gitq update-ref refs/remotes/up/stream/main main
+for spelling in up/stream/main refs/remotes/up/stream/main; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)'
+  check "DEFAULT: --default $spelling, a slashed remote, keeps the main dir (got $rc)" $?
+done
+gitq update-ref refs/remotes/nowhere/main main
+run "$runner" --default nowhere/main
+[ "$rc" -eq 2 ]; check "DEFAULT: a remote ref under no configured remote is refused (got $rc)" $?
+gitq update-ref -d refs/remotes/nowhere/main
+
+# --- a dangling origin/HEAD falls back instead of naming a stale branch ---
+gitq branch master main
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tmain\t'
+check "DEFAULT: a dangling origin/HEAD falls back to main, keeping its dir (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+gitq branch -D -q master
 
 # --- a merged PR behind the local tip is named, not called unmerged ---
 gitq checkout -q -b ahead main && echo ahead > "$repo/ahead.txt" \
