@@ -31,7 +31,7 @@ seed() { echo "a v1" > "$mem/a.md"; echo "b v1" > "$mem/sub/b.md"; echo "index v
 
 # --- snapshot: one dir, every file, manifest written ---
 seed
-run snapshot --issue 94 --date 2026-10-01 --tag B-merge-1 "$mem/a.md" "$mem/MEMORY.md" \
+CUSTODIAN_BACKUP_DATE=2026-10-01 run snapshot --issue 94 --tag B-merge-1 "$mem/a.md" "$mem/MEMORY.md" \
   --tag B-retire-2 "$mem/sub/b.md" "$mem/MEMORY.md"
 b1="$home/2026-10-01/backup-94-1"
 [ "$rc" -eq 0 ]; check "SNAPSHOT: exits 0 (got $rc)" $?
@@ -46,7 +46,7 @@ jq -e --arg p "$mem/sub/b.md" '.issue == 94 and .seq == 1 and .date == "2026-10-
   "$b1/manifest.json" >/dev/null
 check "SNAPSHOT: manifest records issue, seq, original, backup and tag" $?
 
-(cd "$mem" && CUSTODIAN_HOME="$home" "$runner" snapshot --issue 94 --date 2026-10-01 --tag T a.md >/dev/null 2>&1)
+(cd "$mem" && CUSTODIAN_BACKUP_DATE=2026-10-01 CUSTODIAN_HOME="$home" "$runner" snapshot --issue 94 --tag T a.md >/dev/null 2>&1)
 jq -e --arg p "$mem/a.md" '.entries[0].original == $p' "$home/2026-10-01/backup-94-2/manifest.json" >/dev/null
 check "SNAPSHOT: a second snapshot takes the next seq; relative paths go absolute" $?
 
@@ -59,13 +59,18 @@ run snapshot --issue 94 --tag T "$mem/missing.md"
 [ "$rc" -eq 2 ]; check "REFUSE: a missing file exits 2 (got $rc)" $?
 run snapshot --issue 94 --tag T "$mem/sub"
 [ "$rc" -eq 2 ]; check "REFUSE: a directory exits 2 (got $rc)" $?
+CUSTODIAN_BACKUP_DATE=2026-1-01 run snapshot --issue 94 --tag T "$mem/a.md"
+[ "$rc" -eq 2 ] && [ ! -e "$home/2026-1-01" ]
+check "REFUSE: a malformed CUSTODIAN_BACKUP_DATE exits 2 and creates no dir (got $rc)" $?
+run snapshot --issue 94 --date 2026-10-01 --tag T "$mem/a.md"
+[ "$rc" -eq 2 ]; check "REFUSE: --date is no longer a flag (got $rc)" $?
 [ "$(find "$home" -name 'backup-*' | grep -c .)" -eq 2 ]
 check "REFUSE: no refused call created a backup dir" $?
 
 # --- a partial copy writes no manifest and exits 1 ---
 if [ "$(id -u)" -ne 0 ]; then
   echo locked > "$mem/locked.md"; chmod 000 "$mem/locked.md"
-  run snapshot --issue 95 --date 2026-10-02 --tag T "$mem/a.md" "$mem/locked.md"
+  CUSTODIAN_BACKUP_DATE=2026-10-02 run snapshot --issue 95 --tag T "$mem/a.md" "$mem/locked.md"
   [ "$rc" -eq 1 ]; check "PARTIAL: an unreadable file exits 1 (got $rc)" $?
   printf '%s\n' "$out" | grep -q '^PARTIAL'; check "PARTIAL: says so" $?
   [ ! -e "$home/2026-10-02/backup-95-1/manifest.json" ]
@@ -79,9 +84,9 @@ fi
 
 # --- undo restores the latest snapshot, idempotently ---
 echo "a OLDER" > "$mem/a.md"; echo "b EDITED" > "$mem/sub/b.md"; rm "$mem/MEMORY.md"
-run snapshot --issue 96 --date 2026-09-30 --tag older "$mem/a.md"
+CUSTODIAN_BACKUP_DATE=2026-09-30 run snapshot --issue 96 --tag older "$mem/a.md"
 seed; echo "a EDITED" > "$mem/a.md"
-CUSTODIAN_HOME="$home" "$runner" snapshot --issue 97 --date 2026-10-01 --tag T "$mem/a.md" "$mem/sub/b.md" "$mem/MEMORY.md" >/dev/null 2>&1
+CUSTODIAN_BACKUP_DATE=2026-10-01 CUSTODIAN_HOME="$home" "$runner" snapshot --issue 97 --tag T "$mem/a.md" "$mem/sub/b.md" "$mem/MEMORY.md" >/dev/null 2>&1
 b3="$home/2026-10-01/backup-97-3"
 echo "a NEWER" > "$mem/a.md"; rm "$mem/MEMORY.md"
 before=$(cd "$home" && find . -type f -exec cksum {} + | sort)
@@ -122,9 +127,9 @@ run bogus
 # --- undo is per issue; a create-only apply is a clean no-op ---
 home="$temp_dir/issue-home"; f="$temp_dir/issue-files"; mkdir -p "$f"
 echo a1 > "$f/a"; echo b1 > "$f/b"
-run snapshot --issue 10 --date 2026-10-05 --tag X "$f/a"; echo a2 > "$f/a"
-run snapshot --issue 11 --date 2026-10-05 --tag Y "$f/b"; echo b2 > "$f/b"
-run snapshot --issue 12 --date 2026-10-05
+CUSTODIAN_BACKUP_DATE=2026-10-05 run snapshot --issue 10 --tag X "$f/a"; echo a2 > "$f/a"
+CUSTODIAN_BACKUP_DATE=2026-10-05 run snapshot --issue 11 --tag Y "$f/b"; echo b2 > "$f/b"
+CUSTODIAN_BACKUP_DATE=2026-10-05 run snapshot --issue 12
 [ "$rc" -eq 0 ] && jq -e '.issue == 12 and .entries == []' "$home/2026-10-05/backup-12-3/manifest.json" >/dev/null
 check "ISSUE: a zero-file snapshot writes an empty manifest (got $rc)" $?
 echo "edited by hand" > "$f/a"
@@ -144,8 +149,8 @@ real_jq=$(command -v jq)
 printf '#!/usr/bin/env bash\nfor a; do [ "$a" = seq ] && exit 5; done\nexec %q "$@"\n' "$real_jq" > "$shim/jq"
 chmod +x "$shim/jq"
 echo c1 > "$f/c"
-run snapshot --issue 20 --date 2026-10-06 --tag T "$f/c"
-out=$(PATH="$shim:$PATH" CUSTODIAN_HOME="$home" "$runner" snapshot --issue 21 --date 2026-10-06 --tag T "$f/c" 2>&1); rc=$?
+CUSTODIAN_BACKUP_DATE=2026-10-06 run snapshot --issue 20 --tag T "$f/c"
+out=$(PATH="$shim:$PATH" CUSTODIAN_BACKUP_DATE=2026-10-06 CUSTODIAN_HOME="$home" "$runner" snapshot --issue 21 --tag T "$f/c" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && [ "$(find "$home" -name 'backup-*' | grep -c .)" -eq 1 ]
 check "NO MANIFEST: a snapshot that cannot build its manifest creates no dir (got $rc)" $?
 echo c2 > "$f/c"; run undo --issue 20
@@ -154,7 +159,7 @@ echo c2 > "$f/c"; run undo --issue 20
 # --- a symlinked original is snapshotted and restored as the link ---
 home="$temp_dir/link-home"; target="$temp_dir/agent-target.md"
 echo "agent v1" > "$target"; ln -s "$target" "$f/agent.md"
-run snapshot --issue 30 --date 2026-10-07 --tag L "$f/agent.md"
+CUSTODIAN_BACKUP_DATE=2026-10-07 run snapshot --issue 30 --tag L "$f/agent.md"
 bl="$home/2026-10-07/backup-30-1/files$f/agent.md"
 [ "$rc" -eq 0 ] && [ -L "$bl" ] && [ "$(readlink "$bl")" = "$target" ]
 check "LINK: the snapshot holds the link itself (got $rc)" $?
@@ -174,7 +179,7 @@ check "LINK: an edit through the link is not undone; the link already matches" $
 # --- a restore never follows a link standing in the original's place ---
 home="$temp_dir/dirlink-home"; d1="$temp_dir/d1"; d2="$temp_dir/d2"
 mkdir -p "$d1" "$d2"; ln -s "$d1" "$f/dirlink"
-run snapshot --issue 31 --date 2026-10-08 --tag DL "$f/dirlink"
+CUSTODIAN_BACKUP_DATE=2026-10-08 run snapshot --issue 31 --tag DL "$f/dirlink"
 [ "$rc" -eq 0 ]; check "DIR LINK: a link to a directory is snapshotted as the link (got $rc)" $?
 rm "$f/dirlink"; ln -s "$d2" "$f/dirlink"
 run undo --issue 31
@@ -183,7 +188,7 @@ check "DIR LINK: undo re-points the link, not a copy inside its target (got $rc)
 [ -z "$(ls -A "$d2")" ] && [ -z "$(ls -A "$d1")" ]
 check "DIR LINK: nothing is left inside either directory" $?
 echo "plain v1" > "$f/plain"
-run snapshot --issue 32 --date 2026-10-08 --tag P "$f/plain"
+CUSTODIAN_BACKUP_DATE=2026-10-08 run snapshot --issue 32 --tag P "$f/plain"
 rm "$f/plain"; ln -s "$d2" "$f/plain"
 run undo --issue 32
 [ "$rc" -eq 0 ] && [ ! -L "$f/plain" ] && [ "$(cat "$f/plain")" = "plain v1" ] && [ -z "$(ls -A "$d2")" ]
@@ -196,7 +201,7 @@ check "DIR LINK: a real directory in the original's place fails, untouched (got 
 
 # --- a parent swapped for a link fails rather than restoring elsewhere ---
 mkdir -p "$f/pd" "$temp_dir/elsewhere"; echo "pf v1" > "$f/pd/pf"
-run snapshot --issue 33 --date 2026-10-08 --tag PD "$f/pd/pf"
+CUSTODIAN_BACKUP_DATE=2026-10-08 run snapshot --issue 33 --tag PD "$f/pd/pf"
 echo "pf v2" > "$f/pd/pf"; mv "$f/pd" "$f/pd.moved"; ln -s "$temp_dir/elsewhere" "$f/pd"
 run undo --issue 33
 [ "$rc" -eq 1 ] && [ -z "$(ls -A "$temp_dir/elsewhere")" ] && [ "$(cat "$f/pd.moved/pf")" = "pf v2" ] \

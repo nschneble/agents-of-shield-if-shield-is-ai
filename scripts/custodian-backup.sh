@@ -6,9 +6,10 @@ REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 
 usage() {
-  echo "usage: $0 snapshot --issue N [--date YYYY-MM-DD] [--tag TAG FILE...]..." >&2
+  echo "usage: $0 snapshot --issue N [--tag TAG FILE...]..." >&2
   echo "       $0 undo --issue N" >&2
   echo "  snapshot copies every file before an apply edits it; undo restores the latest" >&2
+  echo "  CUSTODIAN_BACKUP_DATE=YYYY-MM-DD overrides today's date dir (tests only)" >&2
 }
 die() { echo "$1" >&2; exit 2; }
 needs_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
@@ -22,11 +23,10 @@ same() { # copy, original -> 0 when they match; a symlink matches by target
 }
 
 snapshot() {
-  local issue="" day="" tag="" f pairs=""
+  local issue="" day="${CUSTODIAN_BACKUP_DATE:-}" tag="" f pairs=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --issue) needs_value --issue "$#"; issue="$2"; shift 2;;
-      --date)  needs_value --date "$#";  day="$2";   shift 2;;
       --tag)   needs_value --tag "$#";   tag="$2";   shift 2;;
       --*) die "unknown flag: $1";;
       *)
@@ -40,7 +40,7 @@ snapshot() {
   done
   [[ "$issue" =~ ^[0-9]+$ ]] || die "--issue needs a number"
   [ -n "$day" ] || day=$(date +%Y-%m-%d)
-  [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "--date needs YYYY-MM-DD"
+  [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "CUSTODIAN_BACKUP_DATE needs YYYY-MM-DD"
 
   local dir="$CUSTODIAN_HOME/$day" seq bdir manifest
   mkdir -p "$dir" || die "cannot create $dir"
