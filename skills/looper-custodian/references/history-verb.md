@@ -18,4 +18,4 @@ Read-only lookup over `history-index.jsonl`. Returns **ranked, cited matches** �
 - `--agent the-diamantaire --blocked` → "everything this crew agent flagged with blockers."
 - `--kind wave-retry --repo linklater` → "which waves needed retries here."
 
-`scripts/custodian-history.sh rebuild` wipes and re-derives the whole index from every `gates.jsonl` — safe anytime, since the index is a derived cache. Query writes nothing; disposes nothing; never part of the scheduled run. Human- or agent-triggered, like `apply`/`undo`.
+`scripts/custodian-history.sh rebuild` wipes and re-derives the whole index from every `gates.jsonl` that still exists. It is safe only before Phase A has reaped anything: a reaped dir's records live nowhere but the index, so a rebuild after any reap loses them for good. It is not the way to clear a `kept (unindexed — ingest gap)`; that dir needs its new lines indexed by hand, or its gap left standing. Query writes nothing; disposes nothing; never part of the scheduled run. Human- or agent-triggered, like `apply`/`undo`.

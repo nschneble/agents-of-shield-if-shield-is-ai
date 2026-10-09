@@ -235,7 +235,8 @@ reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" 
 reap-unmerged-reaped|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(unmerged\)"/verdict=reap; reason="kept (unmerged)"/
 reap-gh-absent-guessed|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(merge unverifiable/verdict=reap; reason="kept (merge unverifiable/
 reap-ingest-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/!\(\$0 in seen\)/0/
-reap-guard-cite-only|custodian-reap.sh|custodian-reap.test.sh|s/\.cite \+ "\\t" \+ \(\[\.wave, \.kind, \.agent, \.verdict, \(\.summary \/\/ ""\)\] \| tojson\)/.cite/; s/\(input_line_number \| tostring\) \+ "\\t"\n\s*\+ \(\[\.wave, \.kind, \.agent, \.verdict, \(\.summary \/\/ ""\)\] \| tojson\)/(input_line_number | tostring)/
+reap-guard-cite-only|custodian-reap.sh|custodian-reap.test.sh|s/\] \| tojson\)/] | tojson | "")/g
+reap-guard-summary-fields-only|custodian-reap.sh|custodian-reap.test.sh|s/ \(\.blockers \/\/ 0\), \(\.ran \/\/ null\), \(\.task_tool_available \/\/ null\),//g; s/, \(if has\("verified_by"\) then \[\.verified_by\] else null end\), \(if has\("outcome"\) then \[\.outcome\] else null end\)//g
 reap-unreadable-gates-reaps|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| missing=unreadable\E/|| missing=0/
 reap-tmp-clear-dead|custodian-reap.sh|custodian-reap.test.sh|s/if \[ -e "\$dir\/run-state.json.tmp" \]; then/if false; then/
 reap-plan-mode-deletes|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$APPLY" -eq 1 \] \|\| continue/true || continue/

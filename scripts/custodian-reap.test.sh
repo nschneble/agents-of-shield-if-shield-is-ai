@@ -57,7 +57,10 @@ index_upto() { # branch, n — index lines 1..n as ingest would: fields plus cit
   local i
   for i in $(seq 1 "$2"); do
     sed -n "${i}p" "$loops/$1/gates.jsonl" | jq -c --arg c "repo/local/loops/$1/gates.jsonl:$i" \
-      '{wave, kind, agent, verdict, summary: (.summary // ""), cite: $c}'
+      '{wave, kind, agent, verdict, blockers: (.blockers // 0), ran: (.ran // null),
+        task_tool_available: (.task_tool_available // null), summary: (.summary // ""), cite: $c}
+        + (if has("verified_by") then {verified_by} else {} end)
+        + (if has("outcome") then {outcome} else {} end)'
   done >> "$home/history-index.jsonl"
 }
 index_all() { index_upto "$1" "$(grep -c . "$loops/$1/gates.jsonl")"; }
@@ -304,6 +307,17 @@ ingest || die_temp "e2e re-ingest failed"
 run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
 check "E2E: a rewritten gates.jsonl under reused cites is kept, not reaped" $?
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+mv "$home/history-index.jsonl" "$home/held.jsonl"; ingest || die_temp "e2e fresh ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: a line ingest wrote with every field reaps" $?
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":2,"ran":false,"summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+check "E2E: a rewrite differing only in blockers, ran and verified_by is kept" $?
 
 # --- apply: deletes exactly the reap set ---
 case=apply; build "$case"

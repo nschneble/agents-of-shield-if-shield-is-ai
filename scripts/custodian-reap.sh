@@ -79,9 +79,9 @@ merged_branches=$(git -C "$REPO_ROOT" branch --merged "$DEFAULT_REF" --format='%
 # unreadable index reads as empty, so the guard keeps rather than reaps
 indexed=""
 if [ -s "$INDEX" ]; then
-  # cite plus content: a reused name or rewritten file reuses old cites
+  # cite plus every field ingest stores, in ingest's own normal form
   indexed=$(jq -r 'select(.cite != null)
-    | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.summary // "")] | tojson)' "$INDEX" 2>/dev/null) \
+    | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] | tojson)' "$INDEX" 2>/dev/null) \
     || indexed=""
 fi
 
@@ -115,7 +115,7 @@ uncited_count() { # gates path, branch -> lines whose cite is not indexed
   local cites
   cites=$(terminated "$1" | jq -r --arg cbase "$repo_name/local/loops/$2/gates.jsonl" \
     '$cbase + ":" + (input_line_number | tostring) + "\t"
-      + ([.wave, .kind, .agent, .verdict, (.summary // "")] | tojson)' 2>/dev/null) || return 1
+      + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] | tojson)' 2>/dev/null) || return 1
   [ -n "$cites" ] || { echo 0; return 0; }
   awk 'NR == FNR { seen[$0] = 1; next } !($0 in seen)' \
     <(printf '%s\n' "$indexed") <(printf '%s\n' "$cites") | grep -c . || true
