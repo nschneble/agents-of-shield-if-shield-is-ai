@@ -151,10 +151,12 @@
 # +14 more: a ref two nested remote names could split is refused.
 # +54 more: a merged PR counts only when its base is the default, so a
 # stacked PR merged into a feature branch no longer reaps.
+# +121 more: the ingest guard matches a gates line by cite AND content,
+# since a reused branch name or rewritten file repeats old cites.
 orchestrator-run	25713	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20346	7283
+custodian-run	20467	7283
 defend-run	8086	0
 declutter-run	6661	0

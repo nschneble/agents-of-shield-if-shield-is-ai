@@ -53,10 +53,11 @@ gates() { # branch, line count — a gates.jsonl with n lines
     printf '{"wave":%d,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n' "$i"
   done > "$loops/$1/gates.jsonl"
 }
-index_upto() { # branch, n — index lines 1..n of its gates.jsonl under their cites
+index_upto() { # branch, n — index lines 1..n as ingest would: fields plus cite
   local i
   for i in $(seq 1 "$2"); do
-    printf '{"cite":"repo/local/loops/%s/gates.jsonl:%d"}\n' "$1" "$i"
+    sed -n "${i}p" "$loops/$1/gates.jsonl" | jq -c --arg c "repo/local/loops/$1/gates.jsonl:$i" \
+      '{wave, kind, agent, verdict, summary: (.summary // ""), cite: $c}'
   done >> "$home/history-index.jsonl"
 }
 index_all() { index_upto "$1" "$(grep -c . "$loops/$1/gates.jsonl")"; }
@@ -123,7 +124,12 @@ has $'reap\tfix/slash\tmerged (ancestry)'; check "PLAN: slash branch is one dir,
 has $'keep\tungated\tkept (unindexed — ingest gap)'; check "PLAN: one unindexed gates line blocks the reap" $?
 has $'keep\tbroken\tkept (unindexed — ingest gap)'; check "PLAN: unreadable gates.jsonl blocks the reap" $?
 has $'keep\tmain\tkept (default branch)'; check "PLAN: the default branch's dir is kept" $?
-has $'keep\tnest\tkept (nests branch dir nest/inner)'; check "PLAN: a dir nesting another branch dir is kept" $?
+has $'keep\tnest\tkept (nests dir nest/inner)'; check "PLAN: a dir nesting another branch dir is kept" $?
+mkdir -p "$loops/anc/.cache" && echo x > "$loops/anc/.cache/x"
+run "$runner"
+has $'keep\tanc\tkept (nests dir anc/.cache)'; check "PLAN: a dir holding a skipped non-branch dir is kept" $?
+rm -f "$loops/anc/.cache/x" && rmdir "$loops/anc/.cache"
+run "$runner"
 has $'clear\twip\trun-state.json.tmp'; check "PLAN: orphaned tmp on a kept dir is cleared" $?
 has $'clear\tanc\trun-state.json.tmp'; check "PLAN: orphaned tmp on a reaped dir is cleared" $?
 has $'keep\tfresh\tkept (merged tip, no recorded commit)'
@@ -252,6 +258,14 @@ printf 'merged\tgonestack\t51\t%s\tfeature-base\n' "$(sha stacked)" >> "$temp_di
 run "$runner"
 ! has $'reap\tstacked\tmerged (PR #50)' && ! has $'reap\tgonestack\tmerged (PR #51)'
 check "STACKED: a PR merged into another feature branch does not reap" $?
+gitq checkout -q -b nonum main && echo nonum > "$repo/nonum.txt" \
+  && gitq add nonum.txt && gitq commit -q -m nonum && gitq checkout -q main \
+  || die_temp "branch nonum failed"
+record nonum "$(sha nonum)"
+printf 'merged\tnonum\tnull\t%s\n' "$(sha nonum)" >> "$temp_dir/$case/gh.tsv"
+run "$runner"
+! printf '%s\n' "$out" | grep -q $'^reap\tnonum\t'
+check "NUMBERLESS: a merged PR with no number is not taken as a merge" $?
 
 # --- gh absent or failing: never a guessed merge ---
 run env GH_BIN="$temp_dir/no-such-gh" "$runner"
@@ -268,6 +282,28 @@ mv "$home/history-index.jsonl" "$home/held.jsonl"
 run "$runner"
 has $'keep\tanc\tkept (unindexed — ingest gap)'; check "NO INDEX: a gated merged dir is kept" $?
 mv "$home/held.jsonl" "$home/history-index.jsonl"
+
+# --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
+case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
+repo="$temp_dir/$case/rss-reader"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
+mkdir -p "$repo" "$home" && git init -q -b main "$repo" || die_temp "e2e init failed"
+gitq commit -q --allow-empty -m seed && gitq checkout -q -b fix-ci \
+  && gitq commit -q --allow-empty -m fix && gitq checkout -q main && gitq merge -q --ff-only fix-ci \
+  && gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+  && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "e2e repo failed"
+record fix-ci "$(sha fix-ci)"
+for i in 1 2 3; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":0,"summary":"run1 line %d"}\n' "$i" "$i"; done \
+  > "$loops/fix-ci/gates.jsonl"
+ingest() { REPOS_ROOT="$temp_dir/$case" CUSTODIAN_HOME="$home" "$here/custodian-history.sh" ingest >/dev/null 2>&1; }
+ingest || die_temp "e2e ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: lines the real ingest indexed let the merged dir reap" $?
+for i in 1 2; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":1,"summary":"run2 line %d"}\n' "$i" "$i"; done \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+check "E2E: a rewritten gates.jsonl under reused cites is kept, not reaped" $?
 
 # --- apply: deletes exactly the reap set ---
 case=apply; build "$case"

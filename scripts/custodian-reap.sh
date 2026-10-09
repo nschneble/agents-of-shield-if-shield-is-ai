@@ -79,7 +79,10 @@ merged_branches=$(git -C "$REPO_ROOT" branch --merged "$DEFAULT_REF" --format='%
 # unreadable index reads as empty, so the guard keeps rather than reaps
 indexed=""
 if [ -s "$INDEX" ]; then
-  indexed=$(jq -r '.cite // empty' "$INDEX" 2>/dev/null) || indexed=""
+  # cite plus content: a reused name or rewritten file reuses old cites
+  indexed=$(jq -r 'select(.cite != null)
+    | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.summary // "")] | tojson)' "$INDEX" 2>/dev/null) \
+    || indexed=""
 fi
 
 gh_prs() { # branch, state, tip ('' = any) -> PR numbers; fails if gh can't
@@ -89,7 +92,7 @@ gh_prs() { # branch, state, tip ('' = any) -> PR numbers; fails if gh can't
     || return 1
   # a merge only counts into the default; a stacked PR's base is not it
   printf '%s' "$raw" | jq -er --arg tip "$3" --arg state "$2" --arg base "$DEFAULT" 'if type == "array"
-    then map(select($tip == "" or .headRefOid == $tip)
+    then map(select(.number != null) | select($tip == "" or .headRefOid == $tip)
       | select($state != "merged" or .baseRefName == $base) | .number | tostring) | join(",")
     else error end' 2>/dev/null
 }
@@ -111,7 +114,8 @@ terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
 uncited_count() { # gates path, branch -> lines whose cite is not indexed
   local cites
   cites=$(terminated "$1" | jq -r --arg cbase "$repo_name/local/loops/$2/gates.jsonl" \
-    '$cbase + ":" + (input_line_number | tostring)' 2>/dev/null) || return 1
+    '$cbase + ":" + (input_line_number | tostring) + "\t"
+      + ([.wave, .kind, .agent, .verdict, (.summary // "")] | tojson)' 2>/dev/null) || return 1
   [ -n "$cites" ] || { echo 0; return 0; }
   awk 'NR == FNR { seen[$0] = 1; next } !($0 in seen)' \
     <(printf '%s\n' "$indexed") <(printf '%s\n' "$cites") | grep -c . || true
@@ -135,9 +139,10 @@ on_default() { # commits, one per line -> 0 when every one is in the default
   done <<< "$1"
 }
 
-branch_dirs=()
+branch_dirs=(); file_dirs=()
 while IFS= read -r -d '' dir; do
   case "$dir" in "$loops"/?*) ;; *) continue ;; esac
+  file_dirs+=("$dir")
   branch=${dir#"$loops/"}
   if ! git check-ref-format "refs/heads/$branch"; then
     printf 'skip\t%q\tnot a branch name\n' "$branch"; continue
@@ -160,14 +165,15 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
   fi
 
   nested=""
-  for other in "${branch_dirs[@]}"; do
+  # a skipped dir inside this one would go with it, so it nests too
+  for other in "${file_dirs[@]}"; do
     case "$other" in "$dir"/*) nested=$other; break ;; esac
   done
   verdict=keep
   if [ "$branch" = "$DEFAULT" ]; then
     reason="kept (default branch)"
   elif [ -n "$nested" ]; then
-    reason="kept (nests branch dir ${nested#"$loops/"})"
+    reason="kept (nests dir ${nested#"$loops/"})"
   else
     tip=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "refs/heads/$branch") || tip=""
     gh_ok=1; open=""; merged_pr=""

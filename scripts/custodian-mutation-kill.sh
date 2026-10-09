@@ -227,12 +227,15 @@ reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 
 reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
 reap-pr-tip-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(true)/
 reap-pr-base-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$state != "merged" or \.baseRefName == \$base\)/select(true)/
+reap-pr-numberless-counted|custodian-reap.sh|custodian-reap.test.sh|s/map\(select\(\.number != null\) \| /map(/
+reap-skipped-subdir-unnested|custodian-reap.sh|custodian-reap.test.sh|s/for other in "\$\{file_dirs\[\@\]\}"; do/for other in "\$\{branch_dirs[\@]}"; do/
 reap-deleted-branch-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(.headRefOid == \$tip)/
 reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
 reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/
 reap-unmerged-reaped|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(unmerged\)"/verdict=reap; reason="kept (unmerged)"/
 reap-gh-absent-guessed|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(merge unverifiable/verdict=reap; reason="kept (merge unverifiable/
 reap-ingest-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/!\(\$0 in seen\)/0/
+reap-guard-cite-only|custodian-reap.sh|custodian-reap.test.sh|s/\.cite \+ "\\t" \+ \(\[\.wave, \.kind, \.agent, \.verdict, \(\.summary \/\/ ""\)\] \| tojson\)/.cite/; s/\(input_line_number \| tostring\) \+ "\\t"\n\s*\+ \(\[\.wave, \.kind, \.agent, \.verdict, \(\.summary \/\/ ""\)\] \| tojson\)/(input_line_number | tostring)/
 reap-unreadable-gates-reaps|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| missing=unreadable\E/|| missing=0/
 reap-tmp-clear-dead|custodian-reap.sh|custodian-reap.test.sh|s/if \[ -e "\$dir\/run-state.json.tmp" \]; then/if false; then/
 reap-plan-mode-deletes|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$APPLY" -eq 1 \] \|\| continue/true || continue/
