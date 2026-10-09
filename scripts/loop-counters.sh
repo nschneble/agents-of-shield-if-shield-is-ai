@@ -39,8 +39,9 @@ case "$NEXT" in
 esac
 
 [ -s "$STATE" ] || refuse "empty or missing run-state: $STATE"
-jq -e 'type == "object" and ((.counters // {}) | type == "object")' "$STATE" >/dev/null 2>&1 \
-  || refuse "unparseable run-state, or counters is not an object: $STATE"
+jq -e 'type == "object" and ((.counters // {}) | type == "object")
+       and ((.cleanup_batch // []) | type == "array")' "$STATE" >/dev/null 2>&1 \
+  || refuse "unparseable run-state, or counters is not an object or cleanup_batch not an array: $STATE"
 
 if [ -z "$NEXT" ]; then
   if [ "$OUTCOME" = "-" ]; then
@@ -238,7 +239,7 @@ while IFS=$'\t' read -r rail count limit wave_retried; do
       continue;;
     max_correctives_per_wave) retry_or_stop "STOP + escalate: rethink again after the wave's one 2b-retry";;
     consecutive_no_progress)  retry_or_stop "STOP + escalate: retry spent, still thrashing";;
-    max_total_waves)         action="STOP + escalate: queue + corrective waves reached the ceiling"; verdict="STOP";;
+    max_total_waves)         action="STOP + escalate: dispatched waves reached the ceiling"; verdict="STOP";;
     max_corrective_waves)    action="STOP + escalate: too many floor-gated fixes; drift is structural"; verdict="STOP";;
     max_wave_retries)        action="STOP + escalate: the goal is systematically too hard for the executor"; verdict="STOP";;
     scaffolding_only_correctives) action="STOP + escalate: consecutive correctives touched only test scaffolding"; verdict="STOP";;

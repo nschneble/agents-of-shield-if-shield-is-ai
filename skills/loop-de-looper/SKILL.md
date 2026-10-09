@@ -152,7 +152,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `waves_since_crew`             | every wave; reset on crew pass. Reported; triggers only under `crew-cadence`                                    |
 | `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported; triggers only under `crew-cadence`      |
 | `last_review_verdict`          | from the-looper's review step                                                                                   |
-| `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
+| `total_waves`                  | every wave dispatched: queue, corrective, retry, cleanup (never reset)                                          |
 | `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
 | `correctives_this_wave`        | +1 per corrective on the current wave; reset when the wave advances                                             |
 | `consecutive_no_progress`      | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
@@ -236,7 +236,7 @@ A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --o
 | Rail                           | Default | Hit →                                                                                                    |
 | ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
 | `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`)                 |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves reached the ceiling                                            |
+| `max_total_waves`              | 25      | STOP + escalate: dispatched waves reached the ceiling                                                    |
 | `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                          |
 | `consecutive_no_progress`      | 3       | `rethink`: one 2b-retry on the next ranked alternate, then STOP + escalate: retry spent, still thrashing |
 | `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                                    |

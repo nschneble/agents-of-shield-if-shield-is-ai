@@ -141,10 +141,12 @@
 # replaces a rule the first cut stated and a review refuted. A re-review
 # adds +75 always / +43 conditional: --default resolution, the merged-PR-
 # behind-tip keep, and undo never following a link.
+# A third review adds +21: --default must match git's own spelling of
+# the ref, since a case-blind macOS filesystem resolves `Main` to main.
 orchestrator-run	25713	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20164	7283
+custodian-run	20185	7283
 defend-run	8086	0
 declutter-run	6661	0

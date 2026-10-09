@@ -194,13 +194,14 @@ lc-retry-spent-ignored|loop-counters.sh|loop-counters.test.sh|s/if \[ "\$wave_re
 lc-wave-retry-not-counted|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = n\("retries_this_wave"\) \+ 1//
 lc-wave-retry-reset-off|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = 0//
 lc-counter-check-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$not_counts" \] \|\| refuse/true || refuse/
+lc-cleanup-batch-shape-unchecked|loop-counters.sh|loop-counters.test.sh|s/\n       and \(\(\.cleanup_batch \/\/ \[\]\) \| type == "array"\)//
 lc-counter-check-drops-retries|loop-counters.sh|loop-counters.test.sh|s/"wave_retries","retries_this_wave"/"retries_this_wave"/
 lc-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the governor rails/ || true "could not evaluate the governor rails/
 lc-fence-skip-off|loop-counters.sh|loop-counters.test.sh|s/ && run\(t, c\) >= 3\) \{/ \&\& run(t, c) >= 99) {/
 lc-fence-closes-on-any-run|loop-counters.sh|loop-counters.test.sh|s/if \(c == fence_c && run\(t, c\) >= fence_n && /if (c == fence_c \&\& /
 lc-second-budget-ignored|loop-counters.sh|loop-counters.test.sh|s/\| grep -c \.\)" -gt 1 \]/| grep -c .)" -gt 99 ]/
 lc-zero-budget-accepted|loop-counters.sh|loop-counters.test.sh|s/\[ "\$val" -gt 0 \] \|\| refuse/true || refuse/
-lc-spec-ceiling-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/queue \+ corrective waves reached the ceiling/queue + corrective waves exceeded the ceiling/
+lc-spec-ceiling-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/dispatched waves reached the ceiling/queue + corrective waves reached the ceiling/
 reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch"; then/false; then/
 reap-ancestry-without-record|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -z "\$recorded" \]; then\n\s*tip_note="kept \(merged tip, no recorded commit\)"/elif [ -z "\$recorded" ]; then ancestry=1/
 reap-record-off-default-counts|custodian-reap.sh|custodian-reap.test.sh|s/elif on_default "\$recorded"; then/elif true; then/
@@ -208,7 +209,8 @@ reap-unreadable-run-state-ignored|custodian-reap.sh|custodian-reap.test.sh|s/("\
 reap-unterminated-line-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
 history-unterminated-line-uncounted|custodian-history.sh|custodian-guardrails.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
 reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT_REF#refs\/heads\/\}/DEFAULT=\$DEFAULT_REF/
-reap-default-head-accepted|custodian-reap.sh|custodian-reap.test.sh|s/  HEAD\|@\) echo/  NOMATCHZZZ) echo/
+reap-default-head-accepted|custodian-reap.sh|custodian-reap.test.sh|s/  head\|@\) echo/  NOMATCHZZZ) echo/; s/grep -qxF -e "\$given"/true || grep -qxF -e "$given"/
+reap-default-case-blind|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -e "\$given"/grep -qixF -e "$given"/
 reap-default-commit-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\*\) echo "--default \$DEFAULT does not name a branch" >&2; exit 2;;/*) DEFAULT_REF=\$DEFAULT;;/
 reap-merged-behind-dead|custodian-reap.sh|custodian-reap.test.sh|s/behind=\$\(merged_behind "\$branch" "\$tip"\) && \[ -n "\$behind" \]/false/
 reap-merged-behind-any-tip|custodian-reap.sh|custodian-reap.test.sh|s/git -C "\$REPO_ROOT" merge-base --is-ancestor "\$oid" "\$2" 2>\/dev\/null && found/found/
@@ -246,6 +248,7 @@ undo-shape-check-off|custodian-backup.sh|custodian-backup.test.sh|s/\Qjq -e '(.e
 undo-preflight-off|custodian-backup.sh|custodian-backup.test.sh|s/\[ -f "\$bdir\/\$backup" \] \|\| die/true || die/
 undo-follows-dir-link|custodian-backup.sh|custodian-backup.test.sh|s/\[ ! -L "\$original" \] \|\| rm -f -- "\$original"/true/
 undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L "\$original" \] \|\| \[ ! -d "\$original" \]; \}/true/
+undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! parent_unmoved "\$original"; then/if false; then/
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 TABLE
 }

@@ -109,6 +109,10 @@ undo() {
   done < <(jq -r '.entries[] | [.original, .backup] | @tsv' "$manifest")
 
   while IFS='	' read -r original backup tags; do
+    if ! parent_unmoved "$original"; then
+      printf 'failed\t%s\t%s\n' "$original" "$tags"
+      failed=$((failed + 1)); continue
+    fi
     if same "$bdir/$backup" "$original"; then
       printf 'unchanged\t%s\t%s\n' "$original" "$tags"
       unchanged=$((unchanged + 1)); continue
@@ -132,6 +136,14 @@ undo() {
   fi
   printf 'undo\t%s\trestored=%d unchanged=%d failed=%d\n' "$bdir" "$restored" "$unchanged" "$failed"
   [ "$failed" -eq 0 ] || exit 1
+}
+
+# a parent swapped for a symlink would land the restore somewhere else
+parent_unmoved() {
+  local p
+  p=$(dirname "$1")
+  while [ ! -e "$p" ] && [ ! -L "$p" ]; do p=$(dirname "$p"); done
+  [ "$(cd "$p" 2>/dev/null && pwd -P)" = "$p" ]
 }
 
 cmd="${1:-}"; shift || true

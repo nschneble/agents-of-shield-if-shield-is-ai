@@ -35,9 +35,10 @@ if [ -z "$DEFAULT" ] && git -C "$REPO_ROOT" show-ref --verify --quiet refs/heads
   DEFAULT=main
 fi
 [ -n "$DEFAULT" ] || { echo "cannot resolve the default branch; pass --default" >&2; exit 2; }
-case "$DEFAULT" in
-  HEAD|@) echo "--default $DEFAULT names the checkout, not the default branch" >&2; exit 2;;
+case "$(printf '%s' "$DEFAULT" | tr '[:upper:]' '[:lower:]')" in
+  head|@) echo "--default $DEFAULT names the checkout, not the default branch" >&2; exit 2;;
 esac
+given=$DEFAULT
 git -C "$REPO_ROOT" rev-parse --verify --quiet "$DEFAULT^{commit}" >/dev/null \
   || { echo "default branch does not resolve: $DEFAULT" >&2; exit 2; }
 DEFAULT_REF=$(git -C "$REPO_ROOT" rev-parse --symbolic-full-name "$DEFAULT" 2>/dev/null)
@@ -46,6 +47,11 @@ case "$DEFAULT_REF" in
   refs/remotes/?*/?*)     DEFAULT=${DEFAULT_REF#refs/remotes/}; DEFAULT=${DEFAULT#*/};;
   *) echo "--default $DEFAULT does not name a branch" >&2; exit 2;;
 esac
+# case-blind filesystems resolve a misspelled ref; only git's own spelling counts
+refnames=$(git -C "$REPO_ROOT" for-each-ref --format='%(refname)')
+printf '%s\n' "$refnames" | grep -qxF -e "$DEFAULT_REF" \
+  && printf '%s\n' "$refnames" | grep -qxF -e "$given" -e "refs/heads/$given" -e "refs/remotes/$given" \
+  || { echo "--default $given does not match a ref's exact spelling" >&2; exit 2; }
 
 mode=plan
 [ "$APPLY" -eq 1 ] && mode=apply

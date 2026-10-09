@@ -194,6 +194,15 @@ run undo --issue 32
   && has "$(printf 'failed\t%s\tP' "$f/plain")"
 check "DIR LINK: a real directory in the original's place fails, untouched (got $rc)" $?
 
+# --- a parent swapped for a link fails rather than restoring elsewhere ---
+mkdir -p "$f/pd" "$temp_dir/elsewhere"; echo "pf v1" > "$f/pd/pf"
+run snapshot --issue 33 --date 2026-10-08 --tag PD "$f/pd/pf"
+echo "pf v2" > "$f/pd/pf"; mv "$f/pd" "$f/pd.moved"; ln -s "$temp_dir/elsewhere" "$f/pd"
+run undo --issue 33
+[ "$rc" -eq 1 ] && [ -z "$(ls -A "$temp_dir/elsewhere")" ] && [ "$(cat "$f/pd.moved/pf")" = "pf v2" ] \
+  && has "$(printf 'failed\t%s\tPD' "$(cd "$f" && pwd -P)/pd/pf")"
+check "PARENT LINK: undo refuses a parent swapped for a link, writing nothing (got $rc)" $?
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all $checks custodian-backup test(s) passed"; exit 0
 else echo "$fails of $checks custodian-backup test(s) FAILED"; exit 1; fi

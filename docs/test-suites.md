@@ -195,7 +195,10 @@ stub must produce the same verdict as a missing one.
 
 Two of the exit-2 arms are layered: removing the non-repo or
 default-branch check alone leaves a later check that still exits 2. Each was
-watched failing with every layer removed.
+watched failing with every layer removed. The `HEAD` refusal is layered the
+same way over the exact-spelling check, so its mutant removes both. The
+miscased spellings (`Main`, `head`, `Origin/HEAD`) resolve on a case-blind
+macOS filesystem and fail to resolve on Linux; both must exit 2.
 
 ## custodian-skill-lint
 
@@ -340,7 +343,7 @@ Eight properties the governor's honesty depends on:
 - THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
   appear in its `SKILL.md` governor row, so the two cannot drift apart.
 
-Every assertion was watched fail: 66 declared mutants in
+Every assertion was watched fail: 67 declared mutants in
 `scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
 comparison, rail condition, `--next` kind, override path and refusal
 guard, all killed. The first sweep

@@ -153,7 +153,7 @@ done
 run "$runner"
 has $'keep\tmain\tkept (default branch)'; check "DEFAULT: origin/HEAD, auto-detected, resolves to main" $?
 gitq checkout -q wip
-for spelling in HEAD @ "$(sha main)" main~0; do
+for spelling in HEAD head Head @ "$(sha main)" main~0 Main MAIN origin/head Origin/HEAD; do
   run "$runner" --default "$spelling"
   [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
   check "DEFAULT: --default $spelling names no default branch, refused (got $rc)" $?

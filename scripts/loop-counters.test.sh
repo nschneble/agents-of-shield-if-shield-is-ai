@@ -431,6 +431,16 @@ bad_counter "retries_this_wave 0.5" '{"retries_this_wave":0.5}' "$shipped_q"
 bad_counter "batched_findings -1" '{"batched_findings":-1}' "$shipped_q"
 bad_counter "cleanup_waves true" '{"cleanup_waves":true}' "$shipped_q"
 
+# cleanup_batch must be an array, or its length is a key or char count
+for batch in '{"a":1}' '"abc"' '7'; do
+  case_n=$((case_n + 1)); d="$temp_dir/case-$case_n"; mkdir -p "$d"
+  jq -n --argjson z "$zeros" --argjson b "$batch" '{counters: $z, cleanup_batch: $b}' > "$d/run-state.json"
+  pristine=$(cat "$d/run-state.json")
+  out=$("$runner" --state "$d/run-state.json" --next cleanup --claude-md "$no_md" 2>&1); rc=$?
+  [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = "$pristine" ]
+  check "REFUSE cleanup_batch $batch: --next cleanup exits 2 (got $rc)" $?
+done
+
 printf '{"counters":{"total_waves":1},' > "$d/run-state.json"
 out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && [ "$(cat "$d/run-state.json")" = '{"counters":{"total_waves":1},' ]
