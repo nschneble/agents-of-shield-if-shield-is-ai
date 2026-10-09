@@ -157,10 +157,12 @@
 # stop calling rebuild safe after a reap or a fix for an ingest gap.
 # +224 more: reap archives instead of deleting (Phase A, phase-detail,
 # decision 32), so a wrong verdict is reversible.
+# +25 more: the docs name the one file --apply still removes, an orphaned
+# run-state.json.tmp, instead of claiming nothing is deleted.
 orchestrator-run	25713	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20755	7346
+custodian-run	20780	7346
 defend-run	8086	0
 declutter-run	6661	0

@@ -951,7 +951,7 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     a symlinked original was copied as its target. `phase-detail.md` and
     `phase-d-apply.md` state each rule.
 
-32. **Reaping archives; it never deletes.** Decision 31 moved Phase A's
+32. **Reaping archives a dir; it never deletes one.** Decision 31 moved Phase A's
     reap into a script, and nine correctness reviews followed. Each found
     a new way the script would `rm -rf` a dir it should have kept: a
     default branch spelled `origin/main`, `Main` on a case-blind
@@ -966,7 +966,8 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
 
     So the cost of a wrong verdict changes instead of its rate.
     `--apply` moves a reaped dir to `local/loops/.archive/<date>/`; it
-    never deletes. Every verdict is reversible by moving the dir back,
+    never deletes it; the only file it removes is an orphaned
+    `run-state.json.tmp`. Every verdict is reversible by moving the dir back,
     and the remaining edge cases cost clutter, which a gitignored
     `local/` absorbs. The archive is pruned from reap, ingest and both
     census audits, so archived gate lines are never re-indexed or

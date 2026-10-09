@@ -85,7 +85,7 @@ ingest() {
         # copied only if source has the key: feeds the legacy exemption
         + (if has("verified_by") then {verified_by} else {} end)
         + (if has("outcome")     then {outcome}     else {} end)' >> "$cand"
-    done < <(find "$rr/local/loops" -path "$rr/local/loops/.archive" -prune -o -name gates.jsonl -print 2>/dev/null)
+    done < <(find "$rr/local/loops" -type d -name .archive -prune -o -name gates.jsonl -print 2>/dev/null)
   done
   # anti-join by cite: keep only candidates not already in the index
   jq -c -n --slurpfile idx "$INDEX" --slurpfile cand "$cand" '

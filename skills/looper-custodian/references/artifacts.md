@@ -17,7 +17,7 @@ Under `local/custodian/<date>/` (gitignored, same as `local/loops/`):
   "repo": "tuffgal",
   "task_tool_available": true,        // false = could NOT invoke a sub-skill/agent
   "ran": true,                        // false when a needed tool was unavailable
-  "action": "reaped local/loops/fix-auth (merged+deleted)",
+  "action": "reaped local/loops/fix-auth (merged, archived)",
   "detail": "1 dir, 2 files"
 }
 ```

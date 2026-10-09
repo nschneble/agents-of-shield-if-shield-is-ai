@@ -65,7 +65,7 @@ Run in order — **C strictly before A.** Phase C's ingest indexes every `gates.
 - The index's record schema, the incremental-ingest mechanics, the guardrail replay (G1/G2/G3), and the derived-cache argument all live in one place: `references/phase-detail.md` `## Phase C`. Cite it rather than restating it.
 - Read-only. The digest is signal for a human (or a future scoped run), not an action — it surfaces the systemic pattern a per-run learn can't see. No checkboxes unless a finding is concrete enough to route to `the-turncoat`, in which case it becomes a `D-turncoat-<n>` proposal. If git is unavailable for a repo, its records carry `files: []` and the phase logs the gap per the availability discipline — never an invented touched-file list.
 
-### Phase A — artifact GC (auto, archives, never deletes)
+### Phase A — artifact GC (auto, archives reaped dirs)
 
 - Per repo, `REPO_ROOT=<repo> bash scripts/custodian-reap.sh` prints one `verdict branch reason` line per `local/loops/<branch>/` dir plus a `summary`, touching nothing; `--apply` moves each reaped dir to `local/loops/.archive/<date>/`, never deletes it. Exit 0 · 1 a move failed · 2 unusable input. Reasons:
   - `merged (ancestry)` / `merged (PR #N)` — reaped: `git branch --merged <default>` lists it AND every commit its records name as shipped is in it; or `gh pr list --state merged --head <branch>` returns the tip's row merged into the default (squash merges). A lingering local branch blocks it only once its tip moves past that PR: `kept (merged PR #N, local tip ahead)`.

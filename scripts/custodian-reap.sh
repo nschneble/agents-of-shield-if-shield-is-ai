@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# custodian-reap — Phase A verdict per local/loops dir; --apply deletes
+# custodian-reap — Phase A verdict per local/loops dir; --apply archives
 set -uo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -13,7 +13,7 @@ APPLY=0
 
 usage() {
   echo "usage: REPO_ROOT=<repo> $0 [--default BRANCH] [--apply]" >&2
-  echo "  prints reap/keep/clear per local/loops dir; --apply deletes" >&2
+  echo "  prints reap/keep/clear per local/loops dir; --apply archives reaped dirs" >&2
 }
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
@@ -148,7 +148,7 @@ while IFS= read -r -d '' dir; do
     printf 'skip\t%q\tnot a branch name\n' "$branch"; continue
   fi
   branch_dirs+=("$dir")
-done < <(find "$loops" -mindepth 2 -path "$loops/.archive/*" -prune -o -type f ! -name .DS_Store -print0 2>/dev/null \
+done < <(find "$loops" -type d -name .archive -prune -o -type f ! -name .DS_Store -print0 2>/dev/null \
   | while IFS= read -r -d '' f; do printf '%s\0' "${f%/*}"; done | sort -zu)
 
 reaped=0; kept=0; cleared=0; failed=0

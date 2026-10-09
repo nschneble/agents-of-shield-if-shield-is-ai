@@ -252,8 +252,8 @@ reap-tmp-clear-dead|custodian-reap.sh|custodian-reap.test.sh|s/if \[ -e "\$dir\/
 reap-plan-mode-deletes|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$APPLY" -eq 1 \] \|\| continue/true || continue/
 reap-apply-deletes|custodian-reap.sh|custodian-reap.test.sh|s/! mv -- "\$dir" "\$dest"/! rm -rf -- "$dir"/
 reap-archive-overwrites|custodian-reap.sh|custodian-reap.test.sh|s/while \[ -e "\$dest" \] \|\| \[ -L "\$dest" \]; do/while false; do/
-reap-archive-enumerated|custodian-reap.sh|custodian-reap.test.sh|s/-mindepth 2 -path "\$loops\/\.archive\/\*" -prune -o /-mindepth 2 /
-history-ingests-archive|custodian-history.sh|custodian-reap.test.sh|s/-path "\$rr\/local\/loops\/\.archive" -prune -o //
+reap-archive-enumerated|custodian-reap.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
+history-ingests-archive|custodian-history.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
 reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
 reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
 reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/

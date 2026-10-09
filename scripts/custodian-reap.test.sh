@@ -374,6 +374,13 @@ run "$runner" --apply
 [ -f "$arch/anc/run-state.json" ] && [ -f "$arch/anc.2/run-state.json" ]
 check "APPLY: a second reap of one name archives beside the first, not over it" $?
 
+# --- a glob character in the repo path does not unhide the archive ---
+case='glob[1]'; build "$case"
+run "$runner" --apply
+run "$runner"
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'archive'
+check "GLOB PATH: a repo path with [ ] still keeps the archive out of the scan (got $rc)" $?
+
 # --- a newline in a file name never yields a dir outside local/loops ---
 case=newline; build "$case"
 branch_commit bar && gitq merge -q --ff-only bar || die_temp "branch bar failed"
