@@ -159,10 +159,14 @@
 # decision 32), so a wrong verdict is reversible.
 # +25 more: the docs name the one file --apply still removes, an orphaned
 # run-state.json.tmp, instead of claiming nothing is deleted.
-orchestrator-run	25713	1898
+# +179 more: phase-detail.md says a deleted branch's merged PR counts
+# because archiving makes it safe, and names rebuild --include-archive.
+# +39 orchestrator-run: the loop-counters contract says exit 1 has
+# already written the outcome, so it is never re-piped.
+orchestrator-run	25752	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20780	7346
+custodian-run	20959	7346
 defend-run	8086	0
 declutter-run	6661	0
