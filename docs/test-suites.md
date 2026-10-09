@@ -71,13 +71,14 @@ Also covers two properties the legacy exemption depends on:
   `history --rebuild` (the writer preserves source key-absence, not a `// null`).
 - G2 ⇔ state-schemas SYNC: G2 must select the SAME lines as the canonical
   provenance lint in state-schemas.md, so the "reused, not forked" claim holds.
-- ARCHIVE: plain `rebuild` indexes live dirs only; `rebuild
-  --include-archive` adds each archived line under its archived cite, after
-  the live dirs. `foo.2` beside `foo` is branch `foo`; a lone `x.2` stays
-  `x.2`. An unknown `rebuild` argument exits 2 and leaves the index alone,
-  `ingest` and `query` refuse the flag, and `query` returns archived
-  records. The replay flags a live G2 line and skips the identical archived
-  one. Mutants pin the archive walk, the suffix rule and the replay filter.
+- ARCHIVE: plain `rebuild` indexes live dirs only;
+  `rebuild --include-archive` adds each archived line under its archived
+  cite, after the live dirs. `foo.2` beside `foo` is branch `foo`; a lone
+  `x.2` stays `x.2`. An unknown `rebuild` argument exits 2 and leaves the
+  index alone, `ingest` and `query` refuse the flag, and `query` returns
+  archived records. The replay flags a live G2 line and skips the identical
+  archived one. Mutants pin the archive walk, the suffix rule and the replay
+  filter.
 
 Pure bash + jq, self-contained fixtures.
 
