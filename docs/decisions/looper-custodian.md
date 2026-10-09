@@ -919,7 +919,8 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     fragile operations keep exact scripts, and code is the exact form.
 
     `scripts/custodian-reap.sh` decides every dir, prints the plan, and
-    deletes only under `--apply`. `scripts/custodian-backup.sh` writes the
+    deletes only under `--apply` (superseded by decision 32: reap now
+    archives and never deletes). `scripts/custodian-backup.sh` writes the
     manifest only after every copy verifies, and its `undo` refuses rather
     than guess. Both have a both-directions suite and declared mutants.
     The spec now names the command and what each verdict means. The WHY
