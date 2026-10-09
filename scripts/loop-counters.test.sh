@@ -45,15 +45,16 @@ run() { # counter-overrides-json, outcome-json, extra args...
   rc=$?
 }
 # the pre-dispatch query: writes $d, $out, $rc and leaves the snapshot alone
-query() { # counter-overrides-json, next-kind, extra args...
+query() { # counter-overrides-json, next-kind, [cleanup-batch-json], extra args...
   case_n=$((case_n + 1))
   d="$temp_dir/case-$case_n"
   mkdir -p "$d"
-  jq -n --argjson z "$zeros" --argjson over "$1" \
-    '{counters: ($z + $over), cleanup_batch: []}' > "$d/run-state.json"
-  local next=$2 pristine
-  pristine=$(cat "$d/run-state.json")
+  local over=$1 next=$2 batch='[]' pristine
   shift 2
+  case "${1:-}" in '['*) batch=$1; shift;; esac
+  jq -n --argjson z "$zeros" --argjson over "$over" --argjson b "$batch" \
+    '{counters: ($z + $over), cleanup_batch: $b}' > "$d/run-state.json"
+  pristine=$(cat "$d/run-state.json")
   out=$("$runner" --state "$d/run-state.json" --next "$next" \
         --claude-md "$no_md" "$@" 2>&1)
   rc=$?
@@ -180,7 +181,7 @@ rail "consecutive_no_progress" consecutive_no_progress '{"consecutive_no_progres
   '{"kind":"queue","shipped":false}'
 next_rail "max_wave_retries" max_wave_retries '{"wave_retries":4}' '{"wave_retries":3}' retry
 rail "scaffolding_only_correctives" scaffolding_only_correctives '{"scaffolding_only_correctives":1}' '{"scaffolding_only_correctives":0}' \
-  '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":false}'
+  '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":false,"gating":true}'
 
 # --- a rail never halts the run on a unit that succeeded ---
 run '{"corrective_waves":5}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":true}'
@@ -192,12 +193,34 @@ check "SUCCEEDED: the 4th retry shipping net-new work is clear" $?
 run '{"total_waves":24}' "$shipped_q"
 printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
 check "SUCCEEDED: the 25th wave, shipped, is clear" $?
+run '{"scaffolding_only_correctives":1}' '{"kind":"corrective","shipped":true,"files_changed":1,"touched_product":false,"net_new":false,"gating":false}'
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "SUCCEEDED: a 2nd scaffolding-only corrective, nothing gating after it, is clear" $?
+is "SUCCEEDED: the scaffolding-only corrective is still counted" scaffolding_only_correctives 2
 
 # --- the dispatch rails gate the next dispatch of their kind only ---
-query '{"total_waves":25}' cleanup
+query '{"total_waves":25}' cleanup '[{"wave":1}]'
 printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
 check "NEXT: the cleanup batch wave is not gated by max_total_waves" $?
 agree "NEXT cleanup at the ceiling:"
+query '{}' cleanup
+printf '%s\n' "$out" | grep -q '^GOVERNOR: skip' && printf '%s\n' "$out" | grep -q 'SKIP  cleanup_batch is empty'
+check "CLEANUP: an empty cleanup_batch has no cleanup wave to dispatch" $?
+agree "CLEANUP empty batch:"
+query '{"cleanup_waves":1}' cleanup '[{"wave":1}]'
+printf '%s\n' "$out" | grep -q '^GOVERNOR: skip' && printf '%s\n' "$out" | grep -q "SKIP  the run's one cleanup wave already ran"
+check "CLEANUP: a second cleanup wave is never dispatched" $?
+agree "CLEANUP second wave:"
+query '{"cleanup_waves":1}' queue
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "CLEANUP: the cleanup marker gates only a cleanup dispatch" $?
+run '{"total_waves":25,"correctives_this_wave":1,"retries_this_wave":1}' '{"kind":"cleanup","shipped":true,"files_changed":4,"touched_product":true}'
+is "CLEANUP: the cleanup wave marks the run's one cleanup" cleanup_waves 1
+is "CLEANUP: the cleanup wave counts in total_waves" total_waves 26
+is "CLEANUP: the cleanup wave counts as shipped" waves_shipped 1
+is "CLEANUP: the cleanup wave resets the wave's correctives" correctives_this_wave 0
+printf '%s\n' "$out" | grep -q '^GOVERNOR: clear'
+check "CLEANUP: the cleanup wave itself reads clear" $?
 query '{"total_waves":25}' corrective
 printf '%s\n' "$out" | grep -q 'TRIPPED  max_total_waves 25/25'
 check "NEXT: a corrective dispatch at the ceiling trips max_total_waves" $?
@@ -296,6 +319,20 @@ step "$unshipped_q"; step "$unshipped_q"; step "$unshipped_q"; step "$clean_retr
 h=$(headline); [ "$h" = clear ]
 check "NO PROGRESS: a retry shipping net-new work clears it (got $h)" $?
 
+# --- the run dispatches one cleanup wave, however often it asks ---
+fresh
+jq '.cleanup_batch = [{wave: 1}, {wave: 2}]' "$d/run-state.json" > "$d/batch.json" \
+  && mv "$d/batch.json" "$d/run-state.json"
+rounds=""
+for i in 1 2 3; do
+  out=$("$runner" --state "$d/run-state.json" --next cleanup --claude-md "$no_md" 2>&1); rc=$?
+  rounds="$rounds$(headline) "
+  [ "$rc" -ne 0 ] || step '{"kind":"cleanup","shipped":true,"files_changed":1,"touched_product":true}'
+done
+total=$(ctr total_waves)
+[ "$rounds" = "clear skip skip " ] && [ "$total" = 1 ]
+check "CLEANUP: three cleanup rounds dispatch one wave (got $rounds, total $total)" $?
+
 # --- overrides, from the project CLAUDE.md ---
 md="$temp_dir/override.md"
 cat > "$md" <<'MD'
@@ -353,7 +390,7 @@ refused "truncated JSON" '{"kind":"queue","shipped":tr'
 refused "two objects" '{"kind":"queue","shipped":false}{"kind":"queue","shipped":false}'
 refused "an array" '[{"kind":"queue","shipped":false}]'
 refused "unknown key" '{"kind":"queue","shipped":false,"shiped":true}'
-refused "unknown kind" '{"kind":"cleanup","shipped":false}'
+refused "unknown kind" '{"kind":"polish","shipped":false}'
 refused "missing shipped" '{"kind":"queue"}'
 refused "non-boolean shipped" '{"kind":"queue","shipped":"yes"}'
 refused "shipped without files" '{"kind":"queue","shipped":true,"touched_product":true}'
@@ -392,6 +429,7 @@ bad_counter "wave_retries \"9\"" '{"wave_retries":"9"}' "$shipped_q"
 bad_counter "corrective_waves [1]" '{"corrective_waves":[1]}' "$shipped_q"
 bad_counter "retries_this_wave 0.5" '{"retries_this_wave":0.5}' "$shipped_q"
 bad_counter "batched_findings -1" '{"batched_findings":-1}' "$shipped_q"
+bad_counter "cleanup_waves true" '{"cleanup_waves":true}' "$shipped_q"
 
 printf '{"counters":{"total_waves":1},' > "$d/run-state.json"
 out=$("$runner" --state "$d/run-state.json" --outcome "$d/outcome.json" --claude-md "$no_md" 2>&1); rc=$?
@@ -445,6 +483,10 @@ budget_run '# project
 '
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q "limits from .*: per-wave 1 · total 30 "
 check "FENCE: a longer fence closes only on its own run; the real line lands (exit $rc)" $?
+
+budget_run "$(printf '# project\r\n\r\n```md\r\n## Loop de Looper\r\n- budget: max-waves=N\r\n```\r\n\r\n## Loop de Looper\r\n- budget: max-waves=2\r\n')"
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q "limits from .*: per-wave 1 · total 2 "
+check "CRLF: a CRLF fence closes, so the real budget line lands (exit $rc)" $?
 
 budget_run '# project
 

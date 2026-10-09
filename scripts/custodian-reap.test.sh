@@ -142,6 +142,36 @@ for spelling in origin/main refs/heads/main refs/remotes/origin/main; do
   has $'keep\tmain\tkept (default branch)'; check "DEFAULT: --default $spelling keeps the main dir" $?
 done
 
+# --- a symbolic --default resolves to the branch it names, or refuses ---
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+for spelling in origin/HEAD refs/remotes/origin/HEAD; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' \
+    && has $'reap\tanc\tmerged (ancestry)'
+  check "DEFAULT: --default $spelling resolves to main (got $rc)" $?
+done
+run "$runner"
+has $'keep\tmain\tkept (default branch)'; check "DEFAULT: origin/HEAD, auto-detected, resolves to main" $?
+gitq checkout -q wip
+for spelling in HEAD @ "$(sha main)" main~0; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+  check "DEFAULT: --default $spelling names no default branch, refused (got $rc)" $?
+done
+gitq checkout -q main
+
+# --- a merged PR behind the local tip is named, not called unmerged ---
+gitq checkout -q -b ahead main && echo ahead > "$repo/ahead.txt" \
+  && gitq add ahead.txt && gitq commit -q -m ahead || die_temp "branch ahead failed"
+printf 'merged\tahead\t40\t%s\n' "$(sha ahead)" >> "$temp_dir/$case/gh.tsv"
+echo more >> "$repo/ahead.txt" && gitq commit -q -am more && gitq checkout -q main \
+  || die_temp "ahead tip failed"
+record ahead "$(sha ahead)"
+run "$runner"
+has $'keep\tahead\tkept (merged PR #40, local tip ahead)'
+check "AHEAD: a merged PR behind the local tip keeps, and says so" $?
+has $'keep\treused\tkept (unmerged)'; check "AHEAD: another tip's merged PR is still not named" $?
+
 # --- gh absent or failing: never a guessed merge ---
 run env GH_BIN="$temp_dir/no-such-gh" "$runner"
 has $'keep\tsq\tkept (merge unverifiable — gh absent)'; check "GH ABSENT: squash merge is kept, not guessed" $?

@@ -59,8 +59,8 @@ if [ -z "$NEXT" ]; then
     [
       ($o | keys - ["kind","shipped","files_changed","touched_product","net_new",
                     "reopened","review_verdict","gating","wave"] | .[] | "unknown key: \(.)"),
-      (if ($o.kind | IN("queue","corrective","direct-fix","retry","crew-pass")) then empty
-       else "kind must be queue|corrective|direct-fix|retry|crew-pass" end),
+      (if ($o.kind | IN("queue","cleanup","corrective","direct-fix","retry","crew-pass")) then empty
+       else "kind must be queue|cleanup|corrective|direct-fix|retry|crew-pass" end),
       (("shipped","touched_product","net_new","reopened","gating") | select(bool(.) | not) | "\(.) must be a boolean"),
       (if ($o | has("review_verdict")) and ($o.review_verdict | type | IN("string","null") | not)
        then "review_verdict must be a string or null" else empty end),
@@ -82,7 +82,7 @@ not_counts=$(jq -r '
   (.counters // {}) as $c
   | ("waves_shipped","waves_since_crew","cumulative_files_changed","total_waves",
      "corrective_waves","correctives_this_wave","consecutive_no_progress",
-     "wave_retries","retries_this_wave","scaffolding_only_correctives","batched_findings")
+     "wave_retries","retries_this_wave","scaffolding_only_correctives","batched_findings","cleanup_waves")
   | . as $k
   | select($c | has($k))
   | select($c[$k] | (type == "number" and . >= 0 and floor == .) | not)
@@ -110,6 +110,7 @@ fi
 if [ -n "$CLAUDE_MD" ]; then
   budget=$(awk '
     function run(s, c,   n) { n = 0; while (substr(s, n + 1, 1) == c) n++; return n }
+    { sub(/\r$/, "") }
     {
       t = $0; sub(/^ ? ? ?/, "", t); c = substr(t, 1, 1)
       if (fence_n) {
@@ -157,7 +158,9 @@ if [ -n "$NEXT" ]; then
     (.counters // {}) as $c
     | def at($k): ($c[$k] // 0);
     (if ($next | IN("queue","corrective","retry")) and at("total_waves") >= $total then "max_total_waves\t\(at("total_waves"))\t\($total)" else empty end),
-    (if $next == "retry" and at("wave_retries") >= $ret then "max_wave_retries\t\(at("wave_retries"))\t\($ret)" else empty end)
+    (if $next == "retry" and at("wave_retries") >= $ret then "max_wave_retries\t\(at("wave_retries"))\t\($ret)" else empty end),
+    (if $next == "cleanup" and ((.cleanup_batch // []) | length) == 0 then "cleanup_batch_empty" else empty end),
+    (if $next == "cleanup" and at("cleanup_waves") >= 1 then "cleanup_wave_ran" else empty end)
   ' "$STATE") || refuse "could not evaluate the dispatch rails"
   echo "loop-counters — before a $NEXT dispatch — $STATE"
   echo "  $limits"
@@ -171,7 +174,7 @@ else
   jq --argjson o "$outcome" '
     def n($k): (.counters[$k] // 0);
     ($o.shipped == true) as $shipped
-    | ($o.kind | IN("queue","corrective","retry")) as $wave
+    | ($o.kind | IN("queue","cleanup","corrective","retry")) as $wave
     | ($o.kind | IN("corrective","direct-fix")) as $fix
     | .counters = (.counters // {})
     | if $wave and $shipped then .counters.waves_shipped = n("waves_shipped") + 1 else . end
@@ -181,11 +184,12 @@ else
     | if ($o | has("review_verdict")) then .counters.last_review_verdict = $o.review_verdict else . end
     | if $wave then .counters.total_waves = n("total_waves") + 1 else . end
     | if $fix then .counters.corrective_waves = n("corrective_waves") + 1 else . end
-    | if $o.kind == "queue" then .counters.correctives_this_wave = 0 | .counters.retries_this_wave = 0 else . end
+    | if ($o.kind | IN("queue","cleanup")) then .counters.correctives_this_wave = 0 | .counters.retries_this_wave = 0 else . end
     | if $fix then .counters.correctives_this_wave = n("correctives_this_wave") + 1 else . end
     | if $o.net_new == true then .counters.consecutive_no_progress = 0
       elif $wave and (($shipped | not) or $o.reopened == true) then .counters.consecutive_no_progress = n("consecutive_no_progress") + 1
       else . end
+    | if $o.kind == "cleanup" then .counters.cleanup_waves = n("cleanup_waves") + 1 else . end
     | if $o.kind == "retry" then .counters.wave_retries = n("wave_retries") + 1 | .counters.retries_this_wave = n("retries_this_wave") + 1 else . end
     | if $shipped and $o.touched_product == true then .counters.scaffolding_only_correctives = 0
       elif $fix and $shipped then .counters.scaffolding_only_correctives = n("scaffolding_only_correctives") + 1
@@ -203,7 +207,7 @@ else
     | def at($k): ($c[$k] // 0);
     (if $o.gating == true and at("corrective_waves") >= $corr then "max_corrective_waves\t\(at("corrective_waves"))\t\($corr)" else empty end),
     (if at("consecutive_no_progress") >= $nop then "consecutive_no_progress\t\(at("consecutive_no_progress"))\t\($nop)\t\(at("retries_this_wave"))" else empty end),
-    (if at("scaffolding_only_correctives") >= $scaf then "scaffolding_only_correctives\t\(at("scaffolding_only_correctives"))\t\($scaf)" else empty end),
+    (if $o.gating == true and at("scaffolding_only_correctives") >= $scaf then "scaffolding_only_correctives\t\(at("scaffolding_only_correctives"))\t\($scaf)" else empty end),
     (if $o.gating == true and at("correctives_this_wave") >= $per then "max_correctives_per_wave\t\(at("correctives_this_wave"))\t\($per)\t\(at("retries_this_wave"))" else empty end)
   ' "$tmp") || refuse "could not evaluate the governor rails; $STATE left as it was"
   mv -f "$tmp" "$STATE" || refuse "could not rename $tmp over $STATE"
@@ -227,6 +231,11 @@ retry_or_stop() { # stop-action
 while IFS=$'\t' read -r rail count limit wave_retried; do
   [ -n "$rail" ] || continue
   case "$rail" in
+    cleanup_batch_empty|cleanup_wave_ran)
+      [ "$rail" = cleanup_batch_empty ] && echo "  SKIP  cleanup_batch is empty — no cleanup wave; run the final crew"
+      [ "$rail" = cleanup_wave_ran ] && echo "  SKIP  the run's one cleanup wave already ran — run the final crew"
+      verdict="skip"
+      continue;;
     max_correctives_per_wave) retry_or_stop "STOP + escalate: rethink again after the wave's one 2b-retry";;
     consecutive_no_progress)  retry_or_stop "STOP + escalate: retry spent, still thrashing";;
     max_total_waves)         action="STOP + escalate: queue + corrective waves reached the ceiling"; verdict="STOP";;

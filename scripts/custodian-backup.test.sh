@@ -171,6 +171,29 @@ run undo --issue 30
 [ "$rc" -eq 0 ] && [ "$(cat "$target")" = "agent v2" ] && has "$(printf 'unchanged\t%s\tL' "$f/agent.md")"
 check "LINK: an edit through the link is not undone; the link already matches" $?
 
+# --- a restore never follows a link standing in the original's place ---
+home="$temp_dir/dirlink-home"; d1="$temp_dir/d1"; d2="$temp_dir/d2"
+mkdir -p "$d1" "$d2"; ln -s "$d1" "$f/dirlink"
+run snapshot --issue 31 --date 2026-10-08 --tag DL "$f/dirlink"
+[ "$rc" -eq 0 ]; check "DIR LINK: a link to a directory is snapshotted as the link (got $rc)" $?
+rm "$f/dirlink"; ln -s "$d2" "$f/dirlink"
+run undo --issue 31
+[ "$rc" -eq 0 ] && [ -L "$f/dirlink" ] && [ "$(readlink "$f/dirlink")" = "$d1" ]
+check "DIR LINK: undo re-points the link, not a copy inside its target (got $rc)" $?
+[ -z "$(ls -A "$d2")" ] && [ -z "$(ls -A "$d1")" ]
+check "DIR LINK: nothing is left inside either directory" $?
+echo "plain v1" > "$f/plain"
+run snapshot --issue 32 --date 2026-10-08 --tag P "$f/plain"
+rm "$f/plain"; ln -s "$d2" "$f/plain"
+run undo --issue 32
+[ "$rc" -eq 0 ] && [ ! -L "$f/plain" ] && [ "$(cat "$f/plain")" = "plain v1" ] && [ -z "$(ls -A "$d2")" ]
+check "DIR LINK: a file replaced by a link to a directory is restored in place (got $rc)" $?
+rm "$f/plain"; mkdir "$f/plain"
+run undo --issue 32
+[ "$rc" -eq 1 ] && [ -d "$f/plain" ] && [ -z "$(ls -A "$f/plain")" ] \
+  && has "$(printf 'failed\t%s\tP' "$f/plain")"
+check "DIR LINK: a real directory in the original's place fails, untouched (got $rc)" $?
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all $checks custodian-backup test(s) passed"; exit 0
 else echo "$fails of $checks custodian-backup test(s) FAILED"; exit 1; fi

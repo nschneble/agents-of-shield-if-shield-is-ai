@@ -35,16 +35,16 @@ if [ -z "$DEFAULT" ] && git -C "$REPO_ROOT" show-ref --verify --quiet refs/heads
   DEFAULT=main
 fi
 [ -n "$DEFAULT" ] || { echo "cannot resolve the default branch; pass --default" >&2; exit 2; }
+case "$DEFAULT" in
+  HEAD|@) echo "--default $DEFAULT names the checkout, not the default branch" >&2; exit 2;;
+esac
 git -C "$REPO_ROOT" rev-parse --verify --quiet "$DEFAULT^{commit}" >/dev/null \
   || { echo "default branch does not resolve: $DEFAULT" >&2; exit 2; }
-DEFAULT_REF=$DEFAULT
-DEFAULT=${DEFAULT#refs/heads/}
-case "$DEFAULT" in
-  refs/remotes/*) DEFAULT=${DEFAULT#refs/remotes/}; DEFAULT=${DEFAULT#*/};;
-  *) if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$DEFAULT" \
-       && git -C "$REPO_ROOT" show-ref --verify --quiet "refs/remotes/$DEFAULT"; then
-       DEFAULT=${DEFAULT#*/}
-     fi;;
+DEFAULT_REF=$(git -C "$REPO_ROOT" rev-parse --symbolic-full-name "$DEFAULT" 2>/dev/null)
+case "$DEFAULT_REF" in
+  refs/heads/?*)          DEFAULT=${DEFAULT_REF#refs/heads/};;
+  refs/remotes/?*/?*)     DEFAULT=${DEFAULT_REF#refs/remotes/}; DEFAULT=${DEFAULT#*/};;
+  *) echo "--default $DEFAULT does not name a branch" >&2; exit 2;;
 esac
 
 mode=plan
@@ -73,6 +73,18 @@ gh_prs() { # branch, state, tip ('' = any) -> PR numbers; fails if gh can't
   printf '%s' "$raw" | jq -er --arg tip "$3" 'if type == "array"
     then map(select($tip == "" or .headRefOid == $tip) | .number | tostring) | join(",")
     else error end' 2>/dev/null
+}
+
+merged_behind() { # branch, tip -> merged PRs whose head the tip has moved past
+  local raw n oid found=""
+  [ -n "$2" ] || return 0
+  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state merged --head "$1" --json number,headRefOid 2>/dev/null) \
+    || return 1
+  while IFS=$'\t' read -r n oid; do
+    [ -n "$n" ] || continue
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$oid" "$2" 2>/dev/null && found="$found${found:+,}$n"
+  done < <(printf '%s' "$raw" | jq -r '.[]? | [.number, .headRefOid] | @tsv' 2>/dev/null)
+  printf '%s' "$found"
 }
 
 terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
@@ -160,6 +172,8 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
       verdict=reap; reason="merged (ancestry)"
     elif [ "$gh_ok" -eq 1 ] && [ -n "$merged_pr" ]; then
       verdict=reap; reason="merged (PR #$merged_pr)"
+    elif [ "$gh_ok" -eq 1 ] && behind=$(merged_behind "$branch" "$tip") && [ -n "$behind" ]; then
+      reason="kept (merged PR #$behind, local tip ahead)"
     elif [ -n "$tip_note" ]; then
       reason=$tip_note
     elif [ "$gh_ok" -eq 0 ]; then

@@ -231,7 +231,7 @@ Resume mode (`/loop-de-looper resume`):
 
 The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuck-wave retries are not**. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
 
-A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; both corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave (`references/state-schemas.md` `## loop-counters outcome`):
+A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; the three corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave, which `--next cleanup` allows once, over a non-empty batch (`references/state-schemas.md` `## loop-counters outcome`):
 
 | Rail                           | Default | Hit →                                                                                                    |
 | ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |

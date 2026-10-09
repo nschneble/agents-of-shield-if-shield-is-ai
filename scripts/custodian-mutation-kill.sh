@@ -142,11 +142,19 @@ lc-crew-reset-off|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.wave
 lc-last-crew-wave-dropped|loop-counters.sh|loop-counters.test.sh|s/ \| \.last_crew_wave = \$o\.wave//
 lc-verdict-dropped|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.last_review_verdict = \$o\.review_verdict else/then . else/
 lc-total-not-counted|loop-counters.sh|loop-counters.test.sh|s/total_waves"\) \+ 1/total_waves") + 0/
-lc-total-counts-direct-fix|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) as/IN("queue","corrective","retry","direct-fix")) as/
+lc-total-counts-direct-fix|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","cleanup","corrective","retry"\)\) as/IN("queue","cleanup","corrective","retry","direct-fix")) as/
 lc-corrective-not-counted|loop-counters.sh|loop-counters.test.sh|s/corrective_waves"\) \+ 1/corrective_waves") + 0/
 lc-direct-fix-not-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("corrective","direct-fix"\)\) as/IN("corrective")) as/
-lc-advance-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$o\.kind == "queue" then/if false then/
-lc-retry-resets-this-wave|loop-counters.sh|loop-counters.test.sh|s/if \$o\.kind == "queue" then/if (\$o.kind | IN("queue","retry")) then/
+lc-advance-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if false then/
+lc-retry-resets-this-wave|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if (\$o.kind | IN("queue","cleanup","retry")) then/
+lc-cleanup-keeps-wave-correctives|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if \$o.kind == "queue" then/
+lc-cleanup-not-a-wave|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","cleanup","corrective","retry"\)\) as/IN("queue","corrective","retry")) as/
+lc-cleanup-not-marked|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.cleanup_waves = n\("cleanup_waves"\) \+ 1 else/then . else/
+lc-cleanup-empty-batch-dispatched|loop-counters.sh|loop-counters.test.sh|s/\$next == "cleanup" and \(\(\.cleanup_batch/false and ((.cleanup_batch/
+lc-cleanup-rerun-dispatched|loop-counters.sh|loop-counters.test.sh|s/\$next == "cleanup" and at\("cleanup_waves"\) >= 1/false/
+lc-counter-check-drops-cleanup|loop-counters.sh|loop-counters.test.sh|s/,"cleanup_waves"\)/)/
+lc-scaffolding-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("scaffolding_only_correctives"\)/true and at("scaffolding_only_correctives")/
+lc-crlf-not-stripped|loop-counters.sh|loop-counters.test.sh|s/\{ sub\(\/\\r\$\/, ""\) \}/{ }/
 lc-this-wave-not-counted|loop-counters.sh|loop-counters.test.sh|s/correctives_this_wave"\) \+ 1/correctives_this_wave") + 0/
 lc-no-progress-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$o\.net_new == true then/if false then/
 lc-no-progress-not-counted|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress"\) \+ 1/consecutive_no_progress") + 0/
@@ -199,7 +207,11 @@ reap-record-off-default-counts|custodian-reap.sh|custodian-reap.test.sh|s/elif o
 reap-unreadable-run-state-ignored|custodian-reap.sh|custodian-reap.test.sh|s/("\$1\/run-state.json" 2>\/dev\/null) \|\| return 1/$1 || true/
 reap-unterminated-line-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
 history-unterminated-line-uncounted|custodian-history.sh|custodian-guardrails.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
-reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT#refs\/heads\/\}/:/
+reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT_REF#refs\/heads\/\}/DEFAULT=\$DEFAULT_REF/
+reap-default-head-accepted|custodian-reap.sh|custodian-reap.test.sh|s/  HEAD\|@\) echo/  NOMATCHZZZ) echo/
+reap-default-commit-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\*\) echo "--default \$DEFAULT does not name a branch" >&2; exit 2;;/*) DEFAULT_REF=\$DEFAULT;;/
+reap-merged-behind-dead|custodian-reap.sh|custodian-reap.test.sh|s/behind=\$\(merged_behind "\$branch" "\$tip"\) && \[ -n "\$behind" \]/false/
+reap-merged-behind-any-tip|custodian-reap.sh|custodian-reap.test.sh|s/git -C "\$REPO_ROOT" merge-base --is-ancestor "\$oid" "\$2" 2>\/dev\/null && found/found/
 reap-default-remote-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT#\*\/\}/:/g
 reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 2>\/dev\/null/-print 2>\/dev\/null | tr "\\n" "\\0"/; s/case "\$dir" in "\$loops"\/\?\*\) ;; \*\) continue ;; esac/:/
 reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
@@ -232,6 +244,8 @@ undo-restore-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -
 undo-incomplete-not-refused|custodian-backup.sh|custodian-backup.test.sh|s/\[ -s "\$manifest" \] \|\| die "newest snapshot is incomplete[^"]*"/true/
 undo-shape-check-off|custodian-backup.sh|custodian-backup.test.sh|s/\Qjq -e '(.entries | type == "array")\E/jq -e 'true or (.entries | type == "array")/
 undo-preflight-off|custodian-backup.sh|custodian-backup.test.sh|s/\[ -f "\$bdir\/\$backup" \] \|\| die/true || die/
+undo-follows-dir-link|custodian-backup.sh|custodian-backup.test.sh|s/\[ ! -L "\$original" \] \|\| rm -f -- "\$original"/true/
+undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L "\$original" \] \|\| \[ ! -d "\$original" \]; \}/true/
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 TABLE
 }

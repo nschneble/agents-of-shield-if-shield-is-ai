@@ -114,7 +114,9 @@ undo() {
       unchanged=$((unchanged + 1)); continue
     fi
     tmp="$original.undo-$$"
-    if mkdir -p "$(dirname "$original")" && cp -P -p "$bdir/$backup" "$tmp" 2>/dev/null \
+    if { [ -L "$original" ] || [ ! -d "$original" ]; } \
+        && mkdir -p "$(dirname "$original")" && cp -P -p "$bdir/$backup" "$tmp" 2>/dev/null \
+        && { [ ! -L "$original" ] || rm -f -- "$original"; } \
         && mv -f "$tmp" "$original" && same "$bdir/$backup" "$original"; then
       printf 'restored\t%s\t%s\n' "$original" "$tags"
       restored=$((restored + 1))

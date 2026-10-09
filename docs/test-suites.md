@@ -42,7 +42,10 @@ apply must be a no-op that leaves the hand edit, and `undo` for the earlier
 issue must refuse. A `jq` shim that fails only the manifest build proves a
 refused snapshot leaves no empty backup dir to block the next `undo`. The
 symlink fixture replaces the link with a file holding the same bytes, so a
-content compare would wrongly call it unchanged.
+content compare would wrongly call it unchanged. The directory-link fixture
+re-points a link to a directory, and swaps a file for one, before `undo`:
+a restore that follows the link drops its temp copy inside the directory.
+A real directory in the original's place must fail and stay empty.
 
 The non-numeric `--issue` arm is layered: without the regex check, the
 manifest's `--argjson` still refuses. It was watched failing with both
@@ -176,7 +179,10 @@ created from main with no commit, `stray` records a commit off main, and
 `garbled` has a `run-state.json` that will not parse; all three have merged
 tips and must keep. `reused` has a merged PR for another tip, `gonepr` a
 merged PR and no local branch, and `tail` an unterminated last `gates.jsonl`
-line missing from the index. A dot-dir must print `skip`. The newline case
+line missing from the index. A dot-dir must print `skip`. `ahead` has a
+merged PR its local tip has moved past, and must name it. `--default`
+spelled `origin/HEAD` must keep `main`, and `HEAD`, `@`, a sha or `main~0`
+must exit 2 with a feature branch checked out. The newline case
 runs from a decoy working dir holding `bar/`, beside a file named
 `x<newline>bar`. The guardrails suite holds the matching ingest fixture,
 since it is the one that drives `custodian-history.sh`.
@@ -302,17 +308,22 @@ Eight properties the governor's honesty depends on:
 - EVERY RAIL IS PINNED AT ITS BOUNDARY, both directions: trips on reaching
   its limit, quiet one short of it. A `>=` turned `>` passes every arm that
   sits far from the limit.
-- BOTH CORRECTIVE RAILS NEED A GATING FINDING. The wave's one corrective is
-  the budget, not a breach; only a second gating finding after it is a
-  `rethink`. Likewise the run's sixth corrective shipping clean is clear;
-  `max_corrective_waves` trips only when a seventh would be needed. And a
-  STOP rail tripped beside a rethink wins.
+- ALL THREE CORRECTIVE RAILS NEED A GATING FINDING. The wave's one
+  corrective is the budget, not a breach; only a second gating finding after
+  it is a `rethink`. Likewise the run's sixth corrective shipping clean is clear;
+  `max_corrective_waves` trips only when a seventh would be needed, and a
+  second scaffolding-only corrective with nothing gating is clear but still
+  counted. And a STOP rail tripped beside a rethink wins.
 - A RAIL NEVER HALTS ON A UNIT THAT SUCCEEDED. The 25th wave and the 4th
   retry, each shipped, read clear. `max_total_waves` and `max_wave_retries`
   are checked by `--next`, before the dispatch they would refuse: a queue,
   corrective or retry dispatch at the ceiling trips the first, a retry
   dispatch at the limit the second, a queue dispatch never the second, and
   `--next cleanup` neither. Every query leaves the snapshot byte-identical.
+- THE CLEANUP WAVE RUNS ONCE. `--next cleanup` reads `skip` over an empty
+  `cleanup_batch` or once a `cleanup` outcome has set `cleanup_waves`; the
+  reviewer's case, three cleanup rounds on one snapshot, must read clear,
+  skip, skip with `total_waves` at 1.
 - A RETHINK EARNS ONE RETRY PER WAVE. Outcomes are chained on one snapshot:
   queue, gating crew, gating corrective (rethink), then a gating retry must
   read STOP, as must a gating re-crew after a clean retry. A new queue wave
@@ -324,11 +335,12 @@ Eight properties the governor's honesty depends on:
   line under another heading is ignored; with no flag, the snapshot's own
   repo `CLAUDE.md` is read. A template quoted in a code fence is skipped,
   a fence closes only on a run at least as long as its opener, and a
-  second `budget:` line or a zero limit refuses.
+  second `budget:` line or a zero limit refuses. A CRLF file's fence closes
+  too, so its budget line still lands.
 - THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
   appear in its `SKILL.md` governor row, so the two cannot drift apart.
 
-Every assertion was watched fail: 58 declared mutants in
+Every assertion was watched fail: 66 declared mutants in
 `scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
 comparison, rail condition, `--next` kind, override path and refusal
 guard, all killed. The first sweep
