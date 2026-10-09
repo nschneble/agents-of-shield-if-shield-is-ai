@@ -205,6 +205,17 @@ check "DEFAULT: a ref two remote names could split is refused (got $rc)" $?
 gitq update-ref -d refs/remotes/origin/release/main
 gitq config --remove-section remote.origin/release
 
+# --- origin/HEAD under another remote splits that remote, not origin ---
+gitq remote add upstream "$temp_dir/no-such-upstream2.git"
+gitq update-ref refs/remotes/upstream/main main
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/upstream/main
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tmain\tmerged (ancestry)'
+check "DEFAULT: origin/HEAD under another remote keeps the main dir (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+gitq update-ref -d refs/remotes/upstream/main
+gitq remote remove upstream
+
 # --- an unset or dangling origin/HEAD is refused, never guessed ---
 gitq branch master main
 gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master

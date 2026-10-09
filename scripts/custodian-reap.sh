@@ -32,7 +32,8 @@ if [ -z "$DEFAULT" ]; then
   origin_head=$(git -C "$REPO_ROOT" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)
   # a dangling origin/HEAD, left by a rename and prune, names nothing
   if [ -n "$origin_head" ] && git -C "$REPO_ROOT" show-ref --verify --quiet "$origin_head"; then
-    DEFAULT=$origin_head; remote=origin
+    DEFAULT=$origin_head
+    case "$origin_head" in refs/remotes/origin/?*) remote=origin;; esac
   fi
 fi
 [ -n "$DEFAULT" ] || { echo "origin/HEAD is unset or dangling; pass --default or run git remote set-head origin --auto" >&2; exit 2; }
@@ -55,6 +56,8 @@ case "$DEFAULT_REF" in
     DEFAULT=${DEFAULT_REF#refs/remotes/"$remote"/};;
   *) echo "--default $DEFAULT does not name a branch" >&2; exit 2;;
 esac
+[ "$DEFAULT_REF" = "refs/heads/$DEFAULT" ] || [ "$DEFAULT_REF" = "refs/remotes/$remote/$DEFAULT" ] \
+  || { echo "default $DEFAULT does not name the branch $DEFAULT_REF names" >&2; exit 2; }
 # case-blind filesystems resolve a misspelled ref; only git's own spelling counts
 refnames=$(git -C "$REPO_ROOT" for-each-ref --format='%(refname)')
 printf '%s\n' "$refnames" | grep -qxF -e "$DEFAULT_REF" \

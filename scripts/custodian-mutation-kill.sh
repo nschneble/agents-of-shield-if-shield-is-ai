@@ -214,7 +214,8 @@ reap-default-case-blind|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -e 
 reap-default-dangling-origin-head|custodian-reap.sh|custodian-reap.test.sh|s/ && git -C "\$REPO_ROOT" show-ref --verify --quiet "\$origin_head"//
 reap-default-guesses-main|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$DEFAULT" \] \|\| \{ echo "origin\/HEAD is unset/[ -n "$DEFAULT" ] || DEFAULT=main; true || { echo "origin\/HEAD is unset/
 reap-default-auto-uses-local|custodian-reap.sh|custodian-reap.test.sh|s/    DEFAULT=\$origin_head/    DEFAULT=\$\{origin_head#refs\/remotes\/origin\/\}/
-reap-default-auto-resplits-origin|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$origin_head; remote=origin/DEFAULT=\$origin_head/
+reap-default-auto-resplits-origin|custodian-reap.sh|custodian-reap.test.sh|s/case "\$origin_head" in refs\/remotes\/origin\/\?\*\) remote=origin;; esac/:/
+reap-default-origin-assumed|custodian-reap.sh|custodian-reap.test.sh|s/case "\$origin_head" in refs\/remotes\/origin\/\?\*\) remote=origin;; esac/remote=origin/; s/\[ "\$DEFAULT_REF" = "refs\/heads\/\$DEFAULT" \] \|\|/true ||/
 reap-default-ambiguous-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$\(printf '%s\\n' "\$remote" \| wc -l\)" -eq 1 \]/true/
 reap-default-slashed-remote-first-slash|custodian-reap.sh|custodian-reap.test.sh|s/remotes\/"\$remote"\/\};;/remotes\/}; DEFAULT=\$\{DEFAULT#*\/};;/
 reap-default-unknown-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$remote" \] \|\| \{ echo "--default \$DEFAULT names no configured remote" >&2; exit 2; \}/remote=\$\{DEFAULT_REF#refs\/remotes\/\}; remote=\$\{remote%%\/*\}/
