@@ -85,22 +85,24 @@ fi
 gh_prs() { # branch, state, tip ('' = any) -> PR numbers; fails if gh can't
   local raw
   command -v "$GH_BIN" >/dev/null 2>&1 || return 1
-  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state "$2" --head "$1" --json number,headRefOid 2>/dev/null) \
+  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state "$2" --head "$1" --json number,headRefOid,baseRefName 2>/dev/null) \
     || return 1
-  printf '%s' "$raw" | jq -er --arg tip "$3" 'if type == "array"
-    then map(select($tip == "" or .headRefOid == $tip) | .number | tostring) | join(",")
+  # a merge only counts into the default; a stacked PR's base is not it
+  printf '%s' "$raw" | jq -er --arg tip "$3" --arg state "$2" --arg base "$DEFAULT" 'if type == "array"
+    then map(select($tip == "" or .headRefOid == $tip)
+      | select($state != "merged" or .baseRefName == $base) | .number | tostring) | join(",")
     else error end' 2>/dev/null
 }
 
 merged_behind() { # branch, tip -> merged PRs whose head the tip has moved past
   local raw n oid found=""
   [ -n "$2" ] || return 0
-  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state merged --head "$1" --json number,headRefOid 2>/dev/null) \
+  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state merged --head "$1" --json number,headRefOid,baseRefName 2>/dev/null) \
     || return 1
   while IFS=$'\t' read -r n oid; do
     [ -n "$n" ] || continue
     git -C "$REPO_ROOT" merge-base --is-ancestor "$oid" "$2" 2>/dev/null && found="$found${found:+,}$n"
-  done < <(printf '%s' "$raw" | jq -r '.[]? | [.number, .headRefOid] | @tsv' 2>/dev/null)
+  done < <(printf '%s' "$raw" | jq -r --arg base "$DEFAULT" '.[]? | select(.baseRefName == $base) | [.number, .headRefOid] | @tsv' 2>/dev/null)
   printf '%s' "$found"
 }
 

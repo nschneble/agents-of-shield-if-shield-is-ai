@@ -35,9 +35,9 @@ while [ $# -gt 0 ]; do
     *) shift;;
   esac
 done
-row=$(awk -F'\t' -v s="$state" -v h="$head" '$1 == s && $2 == h { print $3 "\t" $4; exit }' "$GH_STUB_DB")
-n=${row%%$'\t'*}; oid=${row#*$'\t'}
-if [ -n "$n" ]; then printf '[{"number":%s,"headRefOid":"%s"}]\n' "$n" "$oid"; else echo '[]'; fi
+row=$(awk -F'\t' -v s="$state" -v h="$head" '$1 == s && $2 == h { print $3 "\t" $4 "\t" ($5 == "" ? "main" : $5); exit }' "$GH_STUB_DB")
+n=${row%%$'\t'*}; rest=${row#*$'\t'}; oid=${rest%%$'\t'*}; base=${rest#*$'\t'}
+if [ -n "$n" ]; then printf '[{"number":%s,"headRefOid":"%s","baseRefName":"%s"}]\n' "$n" "$oid" "$base"; else echo '[]'; fi
 STUB
 chmod +x "$stub_bin/gh"
 
@@ -240,6 +240,18 @@ run "$runner"
 has $'keep\tahead\tkept (merged PR #40, local tip ahead)'
 check "AHEAD: a merged PR behind the local tip keeps, and says so" $?
 has $'keep\treused\tkept (unmerged)'; check "AHEAD: another tip's merged PR is still not named" $?
+
+# --- a PR merged into a branch other than the default is not merged ---
+gitq checkout -q -b stacked main && echo stacked > "$repo/stacked.txt" \
+  && gitq add stacked.txt && gitq commit -q -m stacked && gitq checkout -q main \
+  || die_temp "branch stacked failed"
+record stacked "$(sha stacked)"
+printf 'merged\tstacked\t50\t%s\tfeature-base\n' "$(sha stacked)" >> "$temp_dir/$case/gh.tsv"
+mkdir -p "$loops/gonestack" && record gonestack "$(sha stacked)"
+printf 'merged\tgonestack\t51\t%s\tfeature-base\n' "$(sha stacked)" >> "$temp_dir/$case/gh.tsv"
+run "$runner"
+! has $'reap\tstacked\tmerged (PR #50)' && ! has $'reap\tgonestack\tmerged (PR #51)'
+check "STACKED: a PR merged into another feature branch does not reap" $?
 
 # --- gh absent or failing: never a guessed merge ---
 run env GH_BIN="$temp_dir/no-such-gh" "$runner"

@@ -189,7 +189,9 @@ no configured remote or under two nested ones; `up/stream/main` must keep
 `origin/release`. An unpushed merge into local `main` must not reap, nor
 may `main` when origin/HEAD points under another remote. The check that
 DEFAULT_REF is exactly `refs/heads/<DEFAULT>` or `refs/remotes/<remote>/<DEFAULT>`
-is a backstop behind the resolution above it, so its mutant removes both. Every fixture repo
+is a backstop behind the resolution above it, so its mutant removes both.
+A PR merged into a feature branch, for a live or a deleted branch, must not
+reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one. Every fixture repo
 sets `origin/HEAD` the way a clone does. The newline case
 runs from a decoy working dir holding `bar/`, beside a file named
 `x<newline>bar`. The guardrails suite holds the matching ingest fixture,

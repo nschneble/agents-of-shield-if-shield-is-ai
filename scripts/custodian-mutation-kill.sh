@@ -226,6 +226,7 @@ reap-default-remote-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAU
 reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 2>\/dev\/null/-print 2>\/dev\/null | tr "\\n" "\\0"/; s/case "\$dir" in "\$loops"\/\?\*\) ;; \*\) continue ;; esac/:/
 reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
 reap-pr-tip-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(true)/
+reap-pr-base-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$state != "merged" or \.baseRefName == \$base\)/select(true)/
 reap-deleted-branch-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(.headRefOid == \$tip)/
 reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
 reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/
