@@ -67,6 +67,20 @@ run snapshot --issue 94 --date 2026-10-01 --tag T "$mem/a.md"
 [ "$(find "$home" -name 'backup-*' | grep -c .)" -eq 2 ]
 check "REFUSE: no refused call created a backup dir" $?
 
+# --- a tab or newline in a path is refused before CUSTODIAN_HOME is touched ---
+odd="$temp_dir/odd"; oddhome="$temp_dir/oddhome"
+mkdir -p "$odd" || die_temp "cannot create $odd"
+printf x > "$odd/tab"$'\t'"name"; printf x > "$odd/new"$'\n'"line"; printf x > "$odd/sp ace"
+for name in "tab"$'\t'"name" "new"$'\n'"line"; do
+  out=$(CUSTODIAN_HOME="$oddhome" "$runner" snapshot --issue 40 --tag T "$odd/$name" 2>&1); rc=$?
+  [ "$rc" -eq 2 ] && [ ! -e "$oddhome" ] && printf '%s\n' "$out" | grep -q 'tab or newline'
+  result=$?
+  check "REFUSE: $(printf %q "$name") exits 2 before creating anything (got $rc)" "$result"
+done
+out=$(CUSTODIAN_HOME="$oddhome" "$runner" snapshot --issue 40 --tag T "$odd/sp ace" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && cmp -s "$odd/sp ace" "$(find "$oddhome" -path '*/files*' -name 'sp ace')"
+check "SNAPSHOT: a space in a path still copies (got $rc)" $?
+
 # --- a partial copy writes no manifest and exits 1 ---
 if [ "$(id -u)" -ne 0 ]; then
   echo locked > "$mem/locked.md"; chmod 000 "$mem/locked.md"

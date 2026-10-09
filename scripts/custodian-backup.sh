@@ -33,6 +33,9 @@ snapshot() {
         [ -n "$tag" ] || die "$1 has no --tag before it"
         [ -L "$1" ] || [ -f "$1" ] || die "not a regular file or symlink: $1"
         f="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
+        # pairs and the manifest walk are tab- and newline-delimited
+        case "$1$f" in *$'\t'*|*$'\n'*)
+          die "cannot snapshot a path holding a tab or newline: $(printf %q "$1")";; esac
         pairs="$pairs$f	$tag
 "
         shift;;

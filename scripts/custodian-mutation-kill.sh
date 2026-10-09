@@ -268,6 +268,7 @@ undo-other-issue-restored|custodian-backup.sh|custodian-backup.test.sh|s/\[ "\$n
 snapshot-zero-files-refused|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[\[ "\$day" =~ [^\n]*\n)/$1  [ -n "\$pairs" ] || die "nothing to snapshot"\n/
 undo-empty-manifest-refused|custodian-backup.sh|custodian-backup.test.sh|s/\Q(.entries | type == "array")\E\n/(.entries | type == "array") and (.entries | length > 0)\n/
 snapshot-dir-before-manifest|custodian-backup.sh|custodian-backup.test.sh|s/(  manifest=\$\(printf .*?\|\| die "cannot build manifest"\n)(  mkdir "\$bdir" \|\| die "cannot create \$bdir"\n)/$2$1/s
+snapshot-odd-path-accepted|custodian-backup.sh|custodian-backup.test.sh|s/case "\$1\$f" in/case "" in/
 snapshot-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$original"/cp -p "\$original"/
 undo-link-compared-by-content|custodian-backup.sh|custodian-backup.test.sh|s/if \[ -L "\$1" \] \|\| \[ -L "\$2" \]; then/if false; then/
 undo-restore-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$bdir\/\$backup" "\$tmp"/cp -p "\$bdir\/\$backup" "\$tmp"/
