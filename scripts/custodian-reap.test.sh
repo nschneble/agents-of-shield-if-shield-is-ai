@@ -80,6 +80,7 @@ build() { # builds $repo with the full branch roster
   for b in anc anc-open fix/slash ungated broken nest stray garbled tail; do
     gitq merge -q --ff-only "$b" 2>/dev/null \
     || gitq merge -q --no-edit "$b" || die_temp "merge $b failed"; done
+  gitq update-ref refs/remotes/origin/main main || die_temp "push origin/main failed"
   gitq branch -q fresh main || die_temp "branch fresh failed"
   for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest tail reused; do
     record "$b" "$(sha "$b")"
@@ -175,6 +176,18 @@ run "$runner" --default nowhere/main
 [ "$rc" -eq 2 ]; check "DEFAULT: a remote ref under no configured remote is refused (got $rc)" $?
 gitq update-ref -d refs/remotes/nowhere/main
 
+# --- auto-detect measures merges against origin's ref, not local main ---
+gitq branch -q unpushed main && gitq checkout -q unpushed && echo unpushed > "$repo/unpushed.txt" \
+  && gitq add unpushed.txt && gitq commit -q -m unpushed && gitq checkout -q main \
+  || die_temp "branch unpushed failed"
+record unpushed "$(sha unpushed)"
+pre_main=$(sha main)
+gitq checkout -q wip && gitq update-ref refs/heads/main "$(sha unpushed)"
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tunpushed\tmerged (ancestry)'
+check "DEFAULT: an unpushed merge into local main does not reap (got $rc)" $?
+gitq update-ref refs/heads/main "$pre_main" && gitq checkout -q main
+
 # --- an unset or dangling origin/HEAD is refused, never guessed ---
 gitq branch master main
 gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
@@ -265,6 +278,7 @@ out=$(GIT_CEILING_DIRECTORIES="$temp_dir" REPO_ROOT="$temp_dir/notrepo" CUSTODIA
 [ "$rc" -eq 2 ]; check "USAGE: a non-repo exits 2 (got $rc)" $?
 repo="$temp_dir/bare"; mkdir -p "$repo"; git init -q -b main "$repo"
 gitq commit -q --allow-empty -m seed
+gitq remote add origin "$temp_dir/no-such-origin.git"
 gitq update-ref refs/remotes/origin/main main && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 run "$runner"
 [ "$rc" -eq 0 ] && has $'summary\tbare\treap=0 keep=0 clear=0 failed=0 mode=plan (no local/loops)'

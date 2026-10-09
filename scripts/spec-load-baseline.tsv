@@ -146,10 +146,12 @@
 # +26 more: a remote ref must sit under a configured remote, so `up/stream`
 # strips whole. +42 more: with no --default, an unset or dangling
 # origin/HEAD exits 2 instead of guessing main, which reaped master's dir.
+# +25 more: auto-detection measures merges against origin's ref, not a
+# local main that may hold an unpushed merge.
 orchestrator-run	25713	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20253	7283
+custodian-run	20278	7283
 defend-run	8086	0
 declutter-run	6661	0

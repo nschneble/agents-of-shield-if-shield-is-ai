@@ -31,7 +31,7 @@ if [ -z "$DEFAULT" ]; then
   origin_head=$(git -C "$REPO_ROOT" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)
   # a dangling origin/HEAD, left by a rename and prune, names nothing
   if [ -n "$origin_head" ] && git -C "$REPO_ROOT" show-ref --verify --quiet "$origin_head"; then
-    DEFAULT=${origin_head#refs/remotes/origin/}
+    DEFAULT=$origin_head
   fi
 fi
 [ -n "$DEFAULT" ] || { echo "origin/HEAD is unset or dangling; pass --default or run git remote set-head origin --auto" >&2; exit 2; }
