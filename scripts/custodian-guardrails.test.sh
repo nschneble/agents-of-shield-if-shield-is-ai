@@ -137,7 +137,8 @@ histscript="$here/custodian-history.sh"
 simroot="$temp_dir/simroot"; simhome="$temp_dir/simhome"
 mkdir -p "$simroot/linklater/local/loops/legacy-src" \
          "$simroot/linklater/local/loops/modern-null" \
-         "$simroot/linklater/local/loops/unterminated" "$simhome"
+         "$simroot/linklater/local/loops/unterminated" \
+         "$simroot/linklater/local/loops/not-ran" "$simhome"
 printf '{"wave":1}\n{"wave":2}\n{"wave":3}' > "$simroot/linklater/local/loops/unterminated/gates.jsonl"
 # legacy-era SOURCE line: ran==true crew line with NO verified_by / outcome key
 # (would trip the raw G2 lint) — the pre-schema shape.
@@ -147,6 +148,10 @@ echo '{"wave":1,"kind":"crew","agent":"the-auditor","task_tool_available":true,"
 echo '{"wave":1,"kind":"pre-build-specialist","agent":"accessibility-lead","task_tool_available":true,"ran":true,"verdict":"CLEAR","outcome":null,"verified_by":null,"blockers":0,"summary":"reviewed"}' \
   > "$simroot/linklater/local/loops/modern-null/gates.jsonl"
 
+# a verdict on a gate that could not run: G1's violation, once indexed
+echo '{"wave":1,"kind":"pre-build-specialist","agent":"accessibility-lead","task_tool_available":false,"ran":false,"verdict":"CLEAR","outcome":null,"verified_by":null,"blockers":0,"summary":"gate could not run"}' \
+  > "$simroot/linklater/local/loops/not-ran/gates.jsonl"
+
 REPOS_ROOT="$simroot" CUSTODIAN_HOME="$simhome" "$histscript" rebuild >/dev/null 2>&1
 simindex="$simhome/history-index.jsonl"
 
@@ -155,6 +160,8 @@ jq -e 'select(.branch=="legacy-src") | (has("verified_by") | not)' "$simindex" >
 check "REBUILD: legacy source line stays key-absent (classifies legacy) after rebuild" $?
 jq -e 'select(.branch=="modern-null") | has("verified_by")' "$simindex" >/dev/null 2>&1
 check "REBUILD: modern verified_by:null line keeps the key (classifies modern) after rebuild" $?
+jq -e 'select(.branch=="not-ran") | .ran == false and .task_tool_available == false' "$simindex" >/dev/null 2>&1
+check "REBUILD: ran and task_tool_available false survive ingest as false" $?
 [ "$(jq -r 'select(.branch=="unterminated") | .cite | sub(".*:"; "")' "$simindex" | tr '\n' ' ')" = "1 2 3 " ]
 check "REBUILD: an unterminated last gates line gets its own line number" $?
 
@@ -174,6 +181,8 @@ simout=$("$runner" --index "$simindex")
 check "REBUILD e2e: rebuilt legacy line is NOT a violation (exemption survived rebuild)" $?
 printf '%s\n' "$simout" | grep -q 'modern-null'
 check "REBUILD e2e: rebuilt modern verified_by:null line IS checked (G2 fires, null != absent)" $?
+printf '%s\n' "$simout" | grep -q 'VIOLATION  linklater/local/loops/not-ran/gates.jsonl:1  verdict=CLEAR ran=false'
+check "REBUILD e2e: a rebuilt ran:false line with a verdict trips G1" $?
 
 # --- REBUILD --include-archive: archived dirs come back under their real
 #     cites, and plain rebuild still leaves them out. ---

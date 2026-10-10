@@ -79,7 +79,7 @@ merged_branches=$(git -C "$REPO_ROOT" branch --merged "$DEFAULT_REF" --format='%
 # unreadable index reads as empty, so the guard keeps rather than reaps
 indexed=""
 if [ -s "$INDEX" ]; then
-  # cite plus every field ingest stores, in ingest's own normal form
+  # cite plus every field ingest stores; // null keeps old false-as-null rows
   indexed=$(jq -r 'select(.cite != null)
     | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] | tojson)' "$INDEX" 2>/dev/null) \
     || indexed=""

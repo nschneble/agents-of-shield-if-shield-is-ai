@@ -69,6 +69,8 @@ Also covers two properties the legacy exemption depends on:
   writer (`custodian-history.sh rebuild`) must still classify legacy/exempt, and
   a modern verified_by:null line must classify modern — so the exemption survives
   `history --rebuild` (the writer preserves source key-absence, not a `// null`).
+  A `ran: false` line with a verdict must come through as false and trip G1;
+  `// null` once turned it into null, so G1 never fired on indexed data.
 - G2 ⇔ state-schemas SYNC: G2 must select the SAME lines as the canonical
   provenance lint in state-schemas.md, so the "reused, not forked" claim holds.
 - ARCHIVE: plain `rebuild` indexes live dirs only;
@@ -208,7 +210,9 @@ The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
 `gates.jsonl` rewritten under reused cites must be kept, including one that
 differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every
 field ingest writes, in ingest's normal form, since the guard compares them,
-and each guard field has its own single-field arm and mutant. `--apply` must
+and each guard field has its own single-field arm and mutant. Ingest must
+index `ran` and `task_tool_available` false as false, and the guard must
+still match an older index that stored them as null. `--apply` must
 archive, never delete: reaped dirs move whole under `.archive/<date>/`, a
 second reap of one name lands beside the first, and ingest and reap both
 skip the archive. Every fixture repo

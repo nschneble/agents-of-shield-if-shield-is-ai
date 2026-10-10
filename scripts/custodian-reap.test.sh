@@ -57,8 +57,8 @@ index_upto() { # branch, n — index lines 1..n as ingest would: fields plus cit
   local i
   for i in $(seq 1 "$2"); do
     sed -n "${i}p" "$loops/$1/gates.jsonl" | jq -c --arg c "repo/local/loops/$1/gates.jsonl:$i" \
-      '{wave, kind, agent, verdict, blockers: (.blockers // 0), ran: (.ran // null),
-        task_tool_available: (.task_tool_available // null), summary: (.summary // ""), cite: $c}
+      '{wave, kind, agent, verdict, blockers: (.blockers // 0), ran: .ran,
+        task_tool_available: .task_tool_available, summary: (.summary // ""), cite: $c}
         + (if has("verified_by") then {verified_by} else {} end)
         + (if has("outcome") then {outcome} else {} end)'
   done >> "$home/history-index.jsonl"
@@ -333,6 +333,18 @@ for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blo
   has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
   check "FIELD: a rewrite changing only $change is kept" $?
 done
+
+# --- ingest keeps false; an index written before it did still matches ---
+: > "$home/history-index.jsonl"
+printf '%s\n' "$base_line" | jq -c '.ran = false | .task_tool_available = false' > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "false ingest failed"
+jq -e '.ran == false and .task_tool_available == false' "$home/history-index.jsonl" >/dev/null
+check "INGEST: ran and task_tool_available false are indexed as false" $?
+jq -c '.ran = null | .task_tool_available = null' "$home/history-index.jsonl" > "$home/old.jsonl" \
+  && mv "$home/old.jsonl" "$home/history-index.jsonl" || die_temp "old index rewrite failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "FIELD: an older index holding null for a false ran still matches" $?
 mv "$home/held.jsonl" "$home/history-index.jsonl" 2>/dev/null || true
 printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
   > "$loops/fix-ci/gates.jsonl"; : > "$home/history-index.jsonl"; ingest || die_temp "field reset ingest failed"
