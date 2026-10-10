@@ -163,10 +163,13 @@
 # because archiving makes it safe, and names rebuild --include-archive.
 # +39 orchestrator-run: the loop-counters contract says exit 1 has
 # already written the outcome, so it is never re-piped.
+# +42 custodian-run: the ingest guard reads ran and task_tool_available
+# false and null as equal, so an index from before ingest kept false
+# still matches.
 orchestrator-run	25752	1898
 pre-flight	2452	2617
 orchestrated-wave	17650	10317
 crew-agent	13738	0
-custodian-run	20959	7346
+custodian-run	21001	7346
 defend-run	8086	0
 declutter-run	6661	0
