@@ -319,7 +319,8 @@ if [ ! -d "$pristine/.git" ] && command -v git >/dev/null; then
 fi
 
 run_suite() { # suite name, tree root — returns the suite's status
-  ( cd "$2" && bash "scripts/$1" >/dev/null 2>&1 )
+  # stdin is the table; a mutant reading it would end the sweep early
+  ( cd "$2" && bash "scripts/$1" >/dev/null 2>&1 </dev/null )
 }
 
 echo "custodian-mutation-kill — declared mutants over the check suites"
@@ -374,6 +375,12 @@ $(mutants)
 EOF
 
 echo
+declared=$(mutants | awk -F'|' -v only="$ONLY" '$1 != "" && (only == "" || $1 == only)' | grep -c . || true)
+scored=$((killed + survived + noop))
+if [ "$scored" -ne "$declared" ]; then
+  echo "SHORT SWEEP      scored $scored of $declared declared mutant(s); the rest never ran."
+  exit 2
+fi
 # exercising nothing isn't a pass: a bad --target once faked a clean sweep
 if [ $((killed + survived + noop)) -eq 0 ]; then
   echo "NOTHING MUTATED  no declared mutant ran, so no suite was scored."

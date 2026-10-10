@@ -111,6 +111,12 @@ scripts, never the real checks: a suite that CAN catch its mutant (killed), a
 suite that cannot (SURVIVED), and a pattern that matches nothing (DID NOT
 APPLY — the false-kill shape, which must be a failure and never a pass).
 
+A fourth arm pins a suite that reads stdin. The harness feeds its table to
+the scoring loop on stdin, and a mutant that sent `grep` to stdin once ate
+the last 72 rows, so sweeps scored 158 of 230 and still exited 0. Suites
+now run with stdin from `/dev/null`, and a sweep that scores fewer mutants
+than it declares exits 2 `SHORT SWEEP`.
+
 ## custodian-phase-order
 
 Both-directions test for the phase-order log check.
