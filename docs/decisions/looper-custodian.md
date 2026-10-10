@@ -973,10 +973,10 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     `run-state.json.tmp`. Every verdict is reversible by moving the dir back,
     and the remaining edge cases cost clutter, which a gitignored
     `local/` absorbs. The archive is pruned from reap, ingest and both
-    census audits, so archived gate lines are never re-indexed or
-    re-audited. Emptying it is a separate human step; nothing in the
-    custodian deletes from it. The decision rules stay as the filter,
-    unchanged.
+    census audits, so plain ingest and rebuild never re-index archived
+    gate lines, and they are never re-audited. Emptying it is a separate
+    human step; nothing in the custodian deletes from it. The decision
+    rules stay as the filter, unchanged.
 
     A plain `rebuild` still drops archived dirs' records, since ingest
     prunes the archive. `custodian-history.sh rebuild --include-archive`
