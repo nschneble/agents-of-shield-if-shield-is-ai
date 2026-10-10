@@ -114,7 +114,7 @@ elif [ ${#unevaluable[@]} -eq 0 ]; then
     "${#shipped_waves[@]}" "journals"
   cmp_field "total_waves" \
     "$(jq -r '.counters.total_waves // "absent"' "$STATE")" \
-    "${#declared_waves[@]}" "journals"
+    "$(( ${#declared_waves[@]} + retry_dispatches ))" "journals"
   cmp_field "wave_retries" \
     "$(jq -r '.counters.wave_retries // "absent"' "$STATE")" \
     "$retry_dispatches" "journals"

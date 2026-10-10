@@ -28,6 +28,10 @@ jobs:
         run: ./scripts/custodian-log-recall.test.sh
       - name: Custodian fingerprint pre-filter (both directions)
         run: ./scripts/custodian-fingerprint-cache.test.sh
+      - name: Custodian Phase A reap (both directions)
+        run: ./scripts/custodian-reap.test.sh
+      - name: Custodian Phase D snapshot + undo (both directions)
+        run: ./scripts/custodian-backup.test.sh
       - name: Mutation-kill harness (both directions)
         run: ./scripts/custodian-mutation-kill.test.sh
       - name: Every declared mutant is killed by its suite
@@ -46,6 +50,8 @@ jobs:
         run: ./scripts/loop-state-audit.test.sh
       - name: Loop finding admissibility audit (both directions)
         run: ./scripts/loop-finding-audit.test.sh
+      - name: Loop counters + budget governor (both directions)
+        run: ./scripts/loop-counters.test.sh
       - name: Wave-queue DAG invariant audit (both directions)
         run: ./scripts/wave-queue-dag-audit.test.sh
       - name: Unanimous-verdict backing audit (both directions)

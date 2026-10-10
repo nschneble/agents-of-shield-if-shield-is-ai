@@ -163,6 +163,31 @@ out=$(PRETTIER="$stub" "$nopin/gate.sh" --dir "$p" --changed "$p/changed.txt" a.
 [ "$rc" -eq 2 ] && r=0 || r=1; check "PIN RED: missing pin file is an ENV error (exit 2)" "$r"
 printf '%s\n' "$out" | grep -q 'missing prettier pin'; check "PIN RED: message names the missing pin" $?
 
+# --- REPLAY: archived gate lines are never re-audited (decision 32). ---
+replay="$here/replay.sh"
+rp="$temp_dir/replay"; mkdir -p "$rp" || die_temp "cannot create $rp"
+row() { # cite
+  jq -nc --arg cite "$1" '{repo: "linklater", branch: "live", wave: 2,
+    summary: "a.css still failed prettier --check after the wave", cite: $cite}'
+}
+live_cite="linklater/local/loops/live/gates.jsonl:1"
+arch_cite="linklater/local/loops/.archive/2026-10-01/live/gates.jsonl:1"
+row "$live_cite" > "$rp/live.jsonl"
+row "$arch_cite" > "$rp/archived.jsonl"
+cat "$rp/live.jsonl" "$rp/archived.jsonl" > "$rp/both.jsonl"
+
+out=$("$replay" --index "$rp/live.jsonl" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'would-have-caught 1 '
+check "REPLAY CONTROL: the live row alone is a would-have-caught violation" $?
+
+out=$("$replay" --index "$rp/both.jsonl" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q "^  $live_cite "
+check "REPLAY RED: a live violating row is reported" $?
+printf '%s\n' "$out" | grep -q '1 records · format-scope class 1 · would-have-caught 1 '
+check "REPLAY: the archived twin adds nothing to the counts" $?
+! printf '%s\n' "$out" | grep -q '\.archive/'
+check "REPLAY GREEN: the identical archived row is never reported" $?
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all format-scope gate tests passed"; exit 0
 else echo "$fails format-scope gate test(s) FAILED"; exit 1; fi

@@ -134,6 +134,155 @@ wq-closes-null-counted-bad|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|
 wq-asks-container-noun-collapsed|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qif type == "array" then "yes" else "no" end\E%"yes"%
 wq-has-closes-null-uncounted|wave-queue-dag-audit.sh|wave-queue-dag-audit.test.sh|s%\Qselect(.closes != null)] | length\E%select(has("closes"))] | length%
 unanimity-census-warns-always|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/census_unreadable=\$\(grep[^)]*\)/census_unreadable=1/
+lsa-total-ignores-retries|loop-state-audit.sh|loop-state-audit.test.sh|s/ \+ retry_dispatches \)\)"/ ))"/
+lc-shipped-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_shipped"\) \+ 1/waves_shipped") + 0/
+lc-since-crew-not-counted|loop-counters.sh|loop-counters.test.sh|s/waves_since_crew"\) \+ 1/waves_since_crew") + 0/
+lc-files-not-summed|loop-counters.sh|loop-counters.test.sh|s/n\("cumulative_files_changed"\) \+ \$o\.files_changed/n("cumulative_files_changed")/
+lc-crew-reset-off|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.waves_since_crew = 0 \| \.counters\.cumulative_files_changed = 0 \| /then /
+lc-last-crew-wave-dropped|loop-counters.sh|loop-counters.test.sh|s/ \| \.last_crew_wave = \$o\.wave//
+lc-verdict-dropped|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.last_review_verdict = \$o\.review_verdict else/then . else/
+lc-total-not-counted|loop-counters.sh|loop-counters.test.sh|s/total_waves"\) \+ 1/total_waves") + 0/
+lc-total-counts-direct-fix|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","cleanup","corrective","retry"\)\) as/IN("queue","cleanup","corrective","retry","direct-fix")) as/
+lc-corrective-not-counted|loop-counters.sh|loop-counters.test.sh|s/corrective_waves"\) \+ 1/corrective_waves") + 0/
+lc-direct-fix-not-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("corrective","direct-fix"\)\) as/IN("corrective")) as/
+lc-advance-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if false then/
+lc-retry-resets-this-wave|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if (\$o.kind | IN("queue","cleanup","retry")) then/
+lc-cleanup-keeps-wave-correctives|loop-counters.sh|loop-counters.test.sh|s/if \(\$o\.kind \| IN\("queue","cleanup"\)\) then/if \$o.kind == "queue" then/
+lc-cleanup-not-a-wave|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","cleanup","corrective","retry"\)\) as/IN("queue","corrective","retry")) as/
+lc-cleanup-not-marked|loop-counters.sh|loop-counters.test.sh|s/then \.counters\.cleanup_waves = n\("cleanup_waves"\) \+ 1 else/then . else/
+lc-cleanup-empty-batch-dispatched|loop-counters.sh|loop-counters.test.sh|s/\$next == "cleanup" and \(\(\.cleanup_batch/false and ((.cleanup_batch/
+lc-cleanup-rerun-dispatched|loop-counters.sh|loop-counters.test.sh|s/\$next == "cleanup" and at\("cleanup_waves"\) >= 1/false/
+lc-counter-check-drops-cleanup|loop-counters.sh|loop-counters.test.sh|s/,"cleanup_waves"\)/)/
+lc-scaffolding-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("scaffolding_only_correctives"\)/true and at("scaffolding_only_correctives")/
+lc-crlf-not-stripped|loop-counters.sh|loop-counters.test.sh|s/\{ sub\(\/\\r\$\/, ""\) \}/{ }/
+lc-this-wave-not-counted|loop-counters.sh|loop-counters.test.sh|s/correctives_this_wave"\) \+ 1/correctives_this_wave") + 0/
+lc-no-progress-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$o\.net_new == true then/if false then/
+lc-no-progress-not-counted|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress"\) \+ 1/consecutive_no_progress") + 0/
+lc-reopened-ignored|loop-counters.sh|loop-counters.test.sh|s/or \$o\.reopened == true\)/or false)/
+lc-retries-not-counted|loop-counters.sh|loop-counters.test.sh|s/wave_retries"\) \+ 1/wave_retries") + 0/
+lc-scaffolding-reset-off|loop-counters.sh|loop-counters.test.sh|s/if \$shipped and \$o\.touched_product == true then/if false then/
+lc-scaffolding-not-counted|loop-counters.sh|loop-counters.test.sh|s/scaffolding_only_correctives"\) \+ 1/scaffolding_only_correctives") + 0/
+lc-batched-not-derived|loop-counters.sh|loop-counters.test.sh|s/\| \.counters\.batched_findings = \(\(\.cleanup_batch \/\/ \[\]\) \| length\)/| ./
+lc-per-wave-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("correctives_this_wave"\) >= /at("correctives_this_wave") > /
+lc-per-wave-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("correctives_this_wave"\)/true and at("correctives_this_wave")/
+lc-corrective-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("corrective_waves"\)/true and at("corrective_waves")/
+lc-total-gates-cleanup|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective","retry","cleanup")) and at/
+lc-total-skips-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","retry")) and at/
+lc-total-skips-retry|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective")) and at/
+lc-retries-gate-any-dispatch|loop-counters.sh|loop-counters.test.sh|s/\$next == "retry" and at\("wave_retries"\)/true and at("wave_retries")/
+lc-no-progress-never-retries|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="STOP + escalate: retry spent, still thrashing"; verdict="STOP";;/
+lc-no-progress-retry-unbounded|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="rethink: one 2b-retry on the next ranked alternate, then STOP"; verdict="rethink";;/
+lc-next-kind-unchecked|loop-counters.sh|loop-counters.test.sh|s/''\|queue\|corrective\|retry\|cleanup\) ;;/*) ;;/
+lc-next-outcome-not-exclusive|loop-counters.sh|loop-counters.test.sh|s/if \[ -n "\$OUTCOME" \] && \[ -n "\$NEXT" \]; then/if false; then/
+lc-next-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the dispatch rails"/ || true/
+lc-spec-thrash-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/then STOP \+ escalate: retry spent, still thrashing/then STOP + escalate: retry spent, still looping/
+lc-total-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("total_waves"\) >= /at("total_waves") > /
+lc-corrective-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("corrective_waves"\) >= /at("corrective_waves") > /
+lc-no-progress-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("consecutive_no_progress"\) >= /at("consecutive_no_progress") > /
+lc-retries-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("wave_retries"\) >= /at("wave_retries") > /
+lc-scaffolding-off-by-one|loop-counters.sh|loop-counters.test.sh|s/at\("scaffolding_only_correctives"\) >= /at("scaffolding_only_correctives") > /
+lc-rethink-outranks-stop|loop-counters.sh|loop-counters.test.sh|s/\[ "\$verdict" = "STOP" \] \|\| verdict="rethink"/verdict="rethink"/
+lc-tripped-exits-zero|loop-counters.sh|loop-counters.test.sh|s/\[ "\$verdict" = "clear" \]/true/
+lc-budget-line-ignored|loop-counters.sh|loop-counters.test.sh|s%in_loop && /\^- budget:/%in_loop && /^- zzz:/%
+lc-budget-any-section|loop-counters.sh|loop-counters.test.sh|s%in_loop = \(\$0 ~ /\^## Loop de Looper\[\[:space:\]\]\*\$/\)%in_loop = 1%
+lc-budget-key-crossed|loop-counters.sh|loop-counters.test.sh|s/max-waves\)( +)L_TOTAL=/max-waves)$1L_CORRECTIVE=/
+lc-repo-claude-md-unread|loop-counters.sh|loop-counters.test.sh|s/\[ -n "\$top" \] && \[ -e "\$top\/CLAUDE\.md" \] && CLAUDE_MD="\$top\/CLAUDE\.md"/:/
+lc-outcome-validation-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$problems" \] \|\| refuse/true || refuse/
+lc-write-in-place|loop-counters.sh|loop-counters.test.sh|s/"\$STATE" > "\$tmp" 2>/"\$STATE" > "\$STATE" 2>/
+lc-tmp-trap-off|loop-counters.sh|loop-counters.test.sh|s/trap 'rm -f "\$tmp"' EXIT/:/
+lc-retry-spent-ignored|loop-counters.sh|loop-counters.test.sh|s/if \[ "\$wave_retried" -ge 1 \]; then/if false; then/
+lc-wave-retry-not-counted|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = n\("retries_this_wave"\) \+ 1//
+lc-wave-retry-reset-off|loop-counters.sh|loop-counters.test.sh|s/ \| \.counters\.retries_this_wave = 0//
+lc-counter-check-off|loop-counters.sh|loop-counters.test.sh|s/\[ -z "\$not_counts" \] \|\| refuse/true || refuse/
+lc-cleanup-batch-shape-unchecked|loop-counters.sh|loop-counters.test.sh|s/\n       and \(\(\.cleanup_batch \/\/ \[\]\) \| type == "array"\)//
+lc-counter-check-drops-retries|loop-counters.sh|loop-counters.test.sh|s/"wave_retries","retries_this_wave"/"retries_this_wave"/
+lc-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the governor rails/ || true "could not evaluate the governor rails/
+lc-fence-skip-off|loop-counters.sh|loop-counters.test.sh|s/ && run\(t, c\) >= 3\) \{/ \&\& run(t, c) >= 99) {/
+lc-fence-closes-on-any-run|loop-counters.sh|loop-counters.test.sh|s/if \(c == fence_c && run\(t, c\) >= fence_n && /if (c == fence_c \&\& /
+lc-second-budget-ignored|loop-counters.sh|loop-counters.test.sh|s/\| grep -c \.\)" -gt 1 \]/| grep -c .)" -gt 99 ]/
+lc-zero-budget-accepted|loop-counters.sh|loop-counters.test.sh|s/\[ "\$val" -gt 0 \] \|\| refuse/true || refuse/
+lc-spec-ceiling-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/dispatched waves reached the ceiling/queue + corrective waves reached the ceiling/
+reap-ancestry-dead|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -- "\$branch"; then/false; then/
+reap-ancestry-without-record|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -z "\$recorded" \]; then\n\s*tip_note="kept \(merged tip, no recorded commit\)"/elif [ -z "\$recorded" ]; then ancestry=1/
+reap-record-off-default-counts|custodian-reap.sh|custodian-reap.test.sh|s/elif on_default "\$recorded"; then/elif true; then/
+reap-unreadable-run-state-ignored|custodian-reap.sh|custodian-reap.test.sh|s/("\$1\/run-state.json" 2>\/dev\/null) \|\| return 1/$1 || true/
+reap-unterminated-line-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
+history-unterminated-line-uncounted|custodian-history.sh|custodian-guardrails.test.sh|s/\Q|| echo; }; }\E/|| true; }; }/
+reap-default-heads-prefix-kept|custodian-reap.sh|custodian-reap.test.sh|s/DEFAULT=\$\{DEFAULT_REF#refs\/heads\/\}/DEFAULT=\$DEFAULT_REF/
+reap-default-head-accepted|custodian-reap.sh|custodian-reap.test.sh|s/  head\|@\) echo/  NOMATCHZZZ) echo/; s/grep -qxF -e "\$given"/true || grep -qxF -e "$given"/
+reap-default-case-blind|custodian-reap.sh|custodian-reap.test.sh|s/grep -qxF -e "\$given"/grep -qixF -e "$given"/
+reap-default-guesses-main|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$DEFAULT" \] \|\| \{ echo "origin\/HEAD is unset/[ -n "$DEFAULT" ] || DEFAULT=main; true || { echo "origin\/HEAD is unset/
+reap-default-auto-uses-local|custodian-reap.sh|custodian-reap.test.sh|s/    DEFAULT=\$origin_head/    DEFAULT=\$\{origin_head#refs\/remotes\/origin\/\}/
+reap-default-auto-resplits-origin|custodian-reap.sh|custodian-reap.test.sh|s/case "\$origin_head" in refs\/remotes\/origin\/\?\*\) remote=origin;; esac/:/
+reap-default-origin-assumed|custodian-reap.sh|custodian-reap.test.sh|s/case "\$origin_head" in refs\/remotes\/origin\/\?\*\) remote=origin;; esac/remote=origin/; s/\[ "\$DEFAULT_REF" = "refs\/heads\/\$DEFAULT" \] \|\|/true ||/
+reap-default-ambiguous-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$\(printf '%s\\n' "\$remote" \| wc -l\)" -eq 1 \]/true/; s/\[ "\$DEFAULT_REF" = "refs\/heads\/\$DEFAULT" \] \|\|/true ||/
+reap-default-slashed-remote-first-slash|custodian-reap.sh|custodian-reap.test.sh|s/remotes\/"\$remote"\/\};;/remotes\/}; DEFAULT=\$\{DEFAULT#*\/};;/
+reap-default-unknown-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$remote" \] \|\| \{ echo "--default \$DEFAULT names no configured remote" >&2; exit 2; \}/remote=\$\{DEFAULT_REF#refs\/remotes\/\}; remote=\$\{remote%%\/*\}/
+reap-merged-behind-dead|custodian-reap.sh|custodian-reap.test.sh|s/behind=\$\(merged_behind "\$branch" "\$tip"\) && \[ -n "\$behind" \]/false/
+reap-merged-behind-any-tip|custodian-reap.sh|custodian-reap.test.sh|s/git -C "\$REPO_ROOT" merge-base --is-ancestor "\$oid" "\$2" 2>\/dev\/null && found/found/
+reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 2>\/dev\/null/-print 2>\/dev\/null | tr "\\n" "\\0"/; s/case "\$dir" in "\$loops"\/\?\*\) ;; \*\) continue ;; esac/:/
+reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
+reap-pr-tip-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(true)/
+reap-pr-base-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$state != "merged" or \.baseRefName == \$base\)/select(true)/
+reap-pr-numberless-counted|custodian-reap.sh|custodian-reap.test.sh|s/map\(select\(\.number != null\) \| /map(/
+reap-skipped-subdir-unnested|custodian-reap.sh|custodian-reap.test.sh|s/for other in "\$\{file_dirs\[\@\]\}"; do/for other in "\$\{branch_dirs[\@]}"; do/
+reap-deleted-branch-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/select\(\$tip == "" or \.headRefOid == \$tip\)/select(.headRefOid == \$tip)/
+reap-merged-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ "\$gh_ok" -eq 1 \] && \[ -n "\$merged_pr" \]; then/elif false; then/
+reap-open-pr-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$gh_ok" -eq 1 \] && \[ -n "\$open" \]; then/if false; then/
+reap-unmerged-reaped|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(unmerged\)"/verdict=reap; reason="kept (unmerged)"/
+reap-gh-absent-guessed|custodian-reap.sh|custodian-reap.test.sh|s/reason="kept \(merge unverifiable/verdict=reap; reason="kept (merge unverifiable/
+reap-ingest-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/!\(\$0 in seen\)/0/
+reap-guard-cite-only|custodian-reap.sh|custodian-reap.test.sh|s/\] \| tojson\)/] | tojson | "")/g
+reap-guard-summary-fields-only|custodian-reap.sh|custodian-reap.test.sh|s/ \(\.blockers \/\/ 0\), \(\.ran \/\/ null\), \(\.task_tool_available \/\/ null\),//g; s/, \(if has\("verified_by"\) then \[\.verified_by\] else null end\), \(if has\("outcome"\) then \[\.outcome\] else null end\)//g
+reap-guard-drops-wave|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-kind|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-agent|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-verdict|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-blockers|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-ran|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.blockers // 0), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-tta|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-summary|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-verified-by|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("outcome") then [.outcome] else null end)]}g
+reap-guard-drops-outcome|custodian-reap.sh|custodian-reap.test.sh|s{\Q[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)]\E}{[.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end)]}g
+reap-unreadable-gates-reaps|custodian-reap.sh|custodian-reap.test.sh|s/\Q|| missing=unreadable\E/|| missing=0/
+reap-tmp-clear-dead|custodian-reap.sh|custodian-reap.test.sh|s/if \[ -e "\$dir\/run-state.json.tmp" \]; then/if false; then/
+reap-plan-mode-deletes|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$APPLY" -eq 1 \] \|\| continue/true || continue/
+reap-apply-deletes|custodian-reap.sh|custodian-reap.test.sh|s/! mv -- "\$dir" "\$dest"/! rm -rf -- "$dir"/
+reap-archive-overwrites|custodian-reap.sh|custodian-reap.test.sh|s/while \[ -e "\$dest" \] \|\| \[ -L "\$dest" \]; do/while false; do/
+reap-archive-enumerated|custodian-reap.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
+history-ingests-archive|custodian-history.sh|custodian-reap.test.sh|s/-type d -name \.archive -prune -o //
+history-false-ran-nulled|custodian-history.sh|custodian-guardrails.test.sh|s/ran: \.ran,/ran: (.ran \/\/ null),/
+history-false-tta-nulled|custodian-history.sh|custodian-reap.test.sh|s/task_tool_available: \.task_tool_available,/task_tool_available: (.task_tool_available \/\/ null),/
+reap-guard-splits-false-null|custodian-reap.sh|custodian-reap.test.sh|s{\Q(.ran // null), (.task_tool_available // null)\E}{.ran, .task_tool_available}g
+history-archive-unwalked|custodian-history.sh|custodian-guardrails.test.sh|s/\[ "\$include_archive" -eq 1 \] \|\| continue/continue/
+history-strips-any-suffix|custodian-history.sh|custodian-guardrails.test.sh|s/\[ -d "\$\{1%\.\*\}" \]/true/
+guardrails-audits-archive|custodian-guardrails.sh|custodian-guardrails.test.sh|s{\Q | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
+unanimity-audits-archive|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
+format-scope-replay-audits-archive|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
+reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
+reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
+reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/
+backup-copy-failure-ignored|custodian-backup.sh|custodian-backup.test.sh|s/\|\| \{ echo "copy failed: \$original" >&2; failed=\$\(\(failed \+ 1\)\); \}/|| true/
+backup-manifest-despite-partial|custodian-backup.sh|custodian-backup.test.sh|s/if \[ "\$failed" -gt 0 \]; then/if false; then/
+backup-seq-fixed|custodian-backup.sh|custodian-backup.test.sh|s/seq=\$\(\( \$\{seq:-0\} \+ 1 \)\)/seq=1/
+backup-tags-first-only|custodian-backup.sh|custodian-backup.test.sh|s/\Qtags: (map(.tag) | unique)\E/tags: [.[0].tag]/
+undo-picks-oldest|custodian-backup.sh|custodian-backup.test.sh|s/\Q-k2,2n | tail -1)\E/-k2,2n | head -1)/
+undo-always-restores|custodian-backup.sh|custodian-backup.test.sh|s/if same "\$bdir\/\$backup" "\$original"; then/if false; then/
+undo-other-issue-restored|custodian-backup.sh|custodian-backup.test.sh|s/\[ "\$newest" = "\$issue" \] \|\| die/true || die/
+snapshot-zero-files-refused|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[\[ "\$day" =~ [^\n]*\n)/$1  [ -n "\$pairs" ] || die "nothing to snapshot"\n/
+undo-empty-manifest-refused|custodian-backup.sh|custodian-backup.test.sh|s/\Q(.entries | type == "array")\E\n/(.entries | type == "array") and (.entries | length > 0)\n/
+snapshot-dir-before-manifest|custodian-backup.sh|custodian-backup.test.sh|s/(  manifest=\$\(printf .*?\|\| die "cannot build manifest"\n)(  mkdir "\$bdir" \|\| die "cannot create \$bdir"\n)/$2$1/s
+snapshot-odd-path-accepted|custodian-backup.sh|custodian-backup.test.sh|s/case "\$1\$f" in/case "" in/
+snapshot-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$original"/cp -p "\$original"/
+undo-link-compared-by-content|custodian-backup.sh|custodian-backup.test.sh|s/if \[ -L "\$1" \] \|\| \[ -L "\$2" \]; then/if false; then/
+undo-restore-follows-link|custodian-backup.sh|custodian-backup.test.sh|s/cp -P -p "\$bdir\/\$backup" "\$tmp"/cp -p "\$bdir\/\$backup" "\$tmp"/
+undo-incomplete-not-refused|custodian-backup.sh|custodian-backup.test.sh|s/\[ -s "\$manifest" \] \|\| die "newest snapshot is incomplete[^"]*"/true/
+undo-shape-check-off|custodian-backup.sh|custodian-backup.test.sh|s/\Qjq -e '(.entries | type == "array")\E/jq -e 'true or (.entries | type == "array")/
+undo-preflight-off|custodian-backup.sh|custodian-backup.test.sh|s/\[ -f "\$bdir\/\$backup" \] \|\| die/true || die/
+undo-follows-dir-link|custodian-backup.sh|custodian-backup.test.sh|s/\[ ! -L "\$original" \] \|\| rm -f -- "\$original"/true/
+undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L "\$original" \] \|\| \[ ! -d "\$original" \]; \}/true/
+undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! parent_unmoved "\$original"; then/if false; then/
+undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 TABLE
 }
 
@@ -171,7 +320,8 @@ if [ ! -d "$pristine/.git" ] && command -v git >/dev/null; then
 fi
 
 run_suite() { # suite name, tree root — returns the suite's status
-  ( cd "$2" && bash "scripts/$1" >/dev/null 2>&1 )
+  # stdin is the table; a mutant reading it would end the sweep early
+  ( cd "$2" && bash "scripts/$1" >/dev/null 2>&1 </dev/null )
 }
 
 echo "custodian-mutation-kill — declared mutants over the check suites"
@@ -226,6 +376,12 @@ $(mutants)
 EOF
 
 echo
+declared=$(mutants | awk -F'|' -v only="$ONLY" '$1 != "" && (only == "" || $1 == only)' | grep -c . || true)
+scored=$((killed + survived + noop))
+if [ "$scored" -ne "$declared" ]; then
+  echo "SHORT SWEEP      scored $scored of $declared declared mutant(s); the rest never ran."
+  exit 2
+fi
 # exercising nothing isn't a pass: a bad --target once faked a clean sweep
 if [ $((killed + survived + noop)) -eq 0 ]; then
   echo "NOTHING MUTATED  no declared mutant ran, so no suite was scored."

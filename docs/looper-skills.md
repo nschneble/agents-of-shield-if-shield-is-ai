@@ -19,12 +19,12 @@ convention so the grammar is predictable across the family:
 
 Structured invocations today:
 
-| Skill              | Invocation                                                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `loop-de-looper`   | `/loop-de-looper resume`                                                                                                                                                                               |
-| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo`, `/looper-custodian resume [<date>]`, `/looper-custodian history <query> [--flags]`, `/looper-custodian shadow [<namespace>]` |
-| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>`                                                                                                                      |
-| `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>`                                                                                                                   |
+| Skill              | Invocation                                                                                                                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loop-de-looper`   | `/loop-de-looper resume`                                                                                                                                                                                        |
+| `looper-custodian` | `/looper-custodian apply #<issue> [--dry-run]`, `/looper-custodian undo #<issue>`, `/looper-custodian resume [<date>]`, `/looper-custodian history <query> [--flags]`, `/looper-custodian shadow [<namespace>]` |
+| `looper-defend`    | `/looper-defend apply #<finding-id> [--dry-run]`, `/looper-defend apply <run-id>`                                                                                                                               |
+| `looper-declutter` | `/looper-declutter apply #<snip-id> [--dry-run]`, `/looper-declutter apply <run-id>`                                                                                                                            |
 
 Two rules keep it extensible (clig.dev future-proofing): **add verbs
 explicitly** — a new operation is a new named verb, never folded into a
@@ -218,7 +218,9 @@ changed. Everything else is recorded to a cleanup batch and worked in one
 terminal wave. One corrective per wave, one scoped re-crew, and the crew
 may not add queue items. `scripts/loop-finding-audit.sh` fails a run whose
 correctives cannot be accounted for that way, so the rule is checked
-rather than merely written down.
+rather than merely written down. The run counters and the budget
+governor's rails are applied by `scripts/loop-counters.sh` from the
+classified hand-back, never by hand-editing the snapshot.
 
 Added in framework v1.1. Severity floor + goal contract added in v1.4.
 
@@ -262,7 +264,9 @@ LOGGED — never that the runtime was serialized (decision 24,
 `docs/decisions/looper-custodian.md`):
 
 - **C** mines wave history across repos into a cited index
-- **A** GCs merged-branch artifacts under `local/loops/`
+- **A** archives merged-branch artifacts under `local/loops/` into
+  `local/loops/.archive/`, never deleting them, via
+  `scripts/custodian-reap.sh`
 - **B** audits memory for duplicates / contradictions / staleness
 - **E** researches external advances
 - **F** checks the run's own log order and opens the GitHub report
@@ -275,8 +279,9 @@ the cron.
 Governing rail: custodian proposes, human disposes. Read-only/regenerable
 work auto-applies. Anything that writes a memory or an agent lands as a
 checkbox and applies only through a human-checked `apply` step, which is
-previewable and reversible. Design rationale + full decision log live in
-`docs/decisions/looper-custodian.md`.
+previewable and reversible: `scripts/custodian-backup.sh` snapshots before the
+first edit and `undo` restores that snapshot. Design rationale + full decision
+log live in `docs/decisions/looper-custodian.md`.
 
 ---
 

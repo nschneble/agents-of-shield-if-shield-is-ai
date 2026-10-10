@@ -31,7 +31,8 @@ jq -rn --arg index "$INDEX" '
   def is_viol:
     (txt | test("prettier --check fail|fails prettier|failed prettier --check|still failed prettier|silently no-op"; "i"));
 
-  ([inputs]) as $rows
+  # archived gate lines are never re-audited (decision 32)
+  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)]) as $rows
   | ($rows | length)                          as $n
   | ($rows | map(select(is_class)))           as $class
   | ($class | map(select(is_viol)))           as $viol

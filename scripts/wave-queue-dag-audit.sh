@@ -36,7 +36,7 @@ if [ -n "$CENSUS_ROOT" ]; then
     [ -n "$snapshot" ] || continue
     paths+=("$snapshot")
     census_hits=$((census_hits + 1))
-  done < <(find "$CENSUS_ROOT" -type d -name node_modules -prune -o \
+  done < <(find "$CENSUS_ROOT" -type d \( -name node_modules -o -path '*/local/loops/.archive' \) -prune -o \
                 -path '*/local/loops/*' -name run-state.json -print 2>/dev/null | sort)
   [ "$census_hits" -gt 0 ] \
     || { echo "--census found no local/loops snapshot under $CENSUS_ROOT" >&2; exit 2; }

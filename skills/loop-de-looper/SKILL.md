@@ -23,7 +23,7 @@ loop-de-looper(goal)
 └── for each wave in queue:
     ├── the-looper(brief + goal contract) → research → plan → build → verify → review → learn → commit
     │      └── plan emits ESCALATE       → fire specialist, append `gate outputs`, re-dispatch
-    ├── counters → run-state.json → finding audit → governor → usage guard
+    ├── loop-counters.sh → finding audit → governor → usage guard
     └── if crew_trigger(): crew pass     → gating findings loop back; everything else batches
 ├── cleanup batch wave                   → one dispatch over everything that batched
 ├── final crew pass (domain-matched)     → once, last, before declaring goal-complete
@@ -76,7 +76,7 @@ Every gating claim is logged with `gated_by` + `contract_ref` on its `gates.json
 | `single-wave`        | none (one final crew only) | 1 for the whole run                        |
 | `full-orchestration` | cadence (`## Step 2d`)     | 1 per wave, `max_corrective_waves` per run |
 
-**One corrective per wave, then rethink.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped means the approach is wrong: a `rethink`, not a second patch. It earns the one fresh-context retry on the next ranked alternate (`2b-retry`), then STOPs.
+**One corrective per wave, then rethink.** `max_correctives_per_wave: 1`. A second gating finding on the same wave after its corrective has shipped means the approach is wrong: a `rethink`, not a second patch. It earns the one fresh-context retry on the next ranked alternate (`2b-retry`), then STOPs. `max_corrective_waves` likewise needs a gating finding pending.
 
 **One re-crew, scoped, terminal.** A corrective is re-checked exactly once, by the agents whose findings it targeted plus any whose domain its diff touched (`references/protocol-detail.md` `## Step 3`). That re-crew answers CLEARED / NOT-CLEARED on those findings and nothing else. New findings it raises batch. NOT-CLEARED is a STOP to the user, never another corrective. Without this the ladder is infinite: each corrective grows the diff, the re-crew reviews the bigger diff, and the new blocker earns the next corrective — observed at five correctives on one wave.
 
@@ -152,15 +152,15 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `waves_since_crew`             | every wave; reset on crew pass. Reported; triggers only under `crew-cadence`                                    |
 | `cumulative_files_changed`     | sum of `files changed` for shipped waves; reset on crew pass. Reported; triggers only under `crew-cadence`      |
 | `last_review_verdict`          | from the-looper's review step                                                                                   |
-| `total_waves`                  | every wave dispatched, queue + corrective (never reset)                                                         |
+| `total_waves`                  | every wave dispatched: queue, corrective, retry, cleanup (never reset)                                          |
 | `corrective_waves`             | every floor-gated fix, dispatched or direct (`## Corrective budget`); never reset                               |
 | `correctives_this_wave`        | +1 per corrective on the current wave; reset when the wave advances                                             |
 | `consecutive_no_progress`      | +1 on a wave that shipped nothing / re-opened the same blocker; reset on any wave that ships net-new queue work |
-| `wave_retries`                 | +1 on each stuck-wave retry dispatch; never reset                                                               |
+| `wave_retries`                 | +1 per stuck-wave retry dispatch, never reset; `retries_this_wave` too, reset when the wave advances            |
 | `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
 | `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
-Then, in this order: write `run-state.json` (atomic), run `~/.claude/scripts/loop-finding-audit.sh`, evaluate the budget governor, the usage-window guard, and the crew trigger. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
+Then, in order: pipe the classified outcome (`references/state-schemas.md` `## loop-counters outcome`) to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -`, which applies this table, writes the snapshot atomically, and names any tripped rail; run `~/.claude/scripts/loop-finding-audit.sh`; act on the governor, the usage-window guard, and the crew trigger. Before the next dispatch, `loop-counters.sh --state <run-state.json> --next <kind>`; a STOP there dispatches nothing. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
 
 **2d. Crew trigger check.** ONE trigger, evaluated after every wave:
 
@@ -219,7 +219,7 @@ Run state lives on disk, NOT only in the parent's working memory. A long unatten
 
 Three branch-keyed files under `local/loops/<branch>/`. **`<branch>` is the literal branch name, slash included — never flatten it.** A branch `fix/3-thing` gets `local/loops/fix/3-thing/`, a nested path with a directory named `fix`, NOT `local/loops/fix-3-thing/`. Before the first `mkdir`/`Write` of a run, copy the branch name from `git branch --show-current` verbatim into the path — don't reconstruct it from the goal text or sanitize it. Observed twice: a `phase/1d` run flattened to `local/loops/phase-1d/` and lost 24 waves of history to a state-audit script that was reading the correct nested path; a later single-wave run on a `fix/3-…` branch made the identical mistake before self-correcting inside the same turn. A memory note alone did not prevent the second occurrence — this line is the guardrail. Three different jobs: **`gates.jsonl`** is the append-only audit log, source of truth for _what gates ran_; **`run-state.json`** is the mutable position snapshot, source of truth for _where in the queue we are_; **`wave-N.jsonl`** (+ `wave-N-plan.md`) is the executor's per-wave step journal, source of truth for _how far into a wave it got_ (`agents/the-looper.md` `## Step journal`). The journal is a separate file out of necessity — the orchestrator rewrites the snapshot wholesale (write-tmp-then-`mv`), so an executor appending into it would lose its lines to the next `mv`. Granularity matches ownership: the orchestrator checkpoints WAVES, the executor checkpoints STEPS. Write `run-state.json` **atomically** and BEFORE acting on any governor, guard, or trigger. Shapes in `references/state-schemas.md`.
 
-**Validate the JSON after every direct edit to `run-state.json`**, not only when the audit script trips over it. A hand-edit that spans several `Edit` calls in one turn (adding parallel entries to `queue`/`cleanup_batch`/`open_questions`) can drop a comma between them; the file stays plausible-looking and the mistake surfaces later as an opaque parse failure, sometimes inside `loop-finding-audit.sh` itself ("no readable run-state.json"), which then can't tell you where the break is. A one-line `python3 -c "import json; json.load(open(path))"` (or equivalent) immediately after the edit batch catches it while the diff is still in view.
+**Counters are never hand-edited: `loop-counters.sh` writes them, and refuses rather than corrupts.** A hand-edit that spans several `Edit` calls in one turn (adding parallel entries to `queue`/`cleanup_batch`/`open_questions`) can drop a comma between them; the file stays plausible-looking and the mistake surfaces later as an opaque parse failure, sometimes inside `loop-finding-audit.sh` itself ("no readable run-state.json"), which then can't tell you where the break is. Those three stay direct edits: `jq -e .` the file right after the batch, while the diff is in view.
 
 Resume mode (`/loop-de-looper resume`):
 
@@ -231,16 +231,16 @@ Resume mode (`/loop-de-looper resume`):
 
 The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuck-wave retries are not**. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
 
-Evaluated in step 2c after `run-state.json` is written and the finding audit has run, before the crew trigger:
+A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; the three corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave, which `--next cleanup` allows once, over a non-empty batch (`references/state-schemas.md` `## loop-counters outcome`):
 
-| Rail                           | Default | Hit →                                                                                    |
-| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
-| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`) |
-| `max_total_waves`              | 25      | STOP + escalate: queue + corrective waves exceeded the ceiling                           |
-| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable          |
-| `consecutive_no_progress`      | 3       | STOP + escalate: 3 waves without shipping net-new queue work (thrash)                    |
-| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                    |
-| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                   |
+| Rail                           | Default | Hit →                                                                                                    |
+| ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
+| `max_correctives_per_wave`     | 1       | `rethink`: one 2b-retry on the next ranked alternate, then STOP (`## Corrective budget`)                 |
+| `max_total_waves`              | 25      | STOP + escalate: dispatched waves reached the ceiling                                                    |
+| `max_corrective_waves`         | 6       | STOP + escalate: too many floor-gated fixes; drift is structural, not patchable                          |
+| `consecutive_no_progress`      | 3       | `rethink`: one 2b-retry on the next ranked alternate, then STOP + escalate: retry spent, still thrashing |
+| `max_wave_retries`             | 4       | STOP + escalate: the goal is systematically too hard for the executor                                    |
+| `scaffolding_only_correctives` | 2       | STOP + escalate: consecutive correctives touched only test scaffolding                                   |
 
 The scaffolding rail catches a shape the wave counters cannot see. A crew pass against a source-text oracle finds a real hole every time — another spelling, another file, two boxes trading values — so each corrective ships green and earns the next one, and `consecutive_no_progress` never fires because every wave shipped something. Meanwhile the product fix has been finished since wave 1. Two correctives in a row that move no product file means the run is defending its own test, and the answer is usually to delete the test rather than widen it (observed: a 13-line viewport fix that shipped correct in wave 1, then spent three waves rebuilding a scanner around it). The floor is the primary defense against that shape now — oracle completeness is a batched class — and this rail is the backstop for when a finding gets dressed as correctness.
 
@@ -291,7 +291,7 @@ Each of these is a way a real run has gone wrong, and none of them follows from 
 
 ## Crew trigger + budget tuning
 
-Crew defaults: no drift cadence, concentrated risk only; interim passes 3 agents, final pass domain-matched. Budget governor defaults: `max_correctives_per_wave=1`, `max_total_waves=25`, `max_corrective_waves=6`, `consecutive_no_progress=3`, `max_wave_retries=4`, `scaffolding_only_correctives=2`. Usage-window guard default: pause at `95%`.
+Crew defaults: no drift cadence, concentrated risk only; interim passes 3 agents, final pass domain-matched. Budget governor defaults: the `## Budget governor` table. Usage-window guard default: pause at `95%`.
 
 Single canonical override block in the project CLAUDE.md:
 

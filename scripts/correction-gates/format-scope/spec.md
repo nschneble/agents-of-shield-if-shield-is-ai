@@ -73,4 +73,6 @@ and hands it over via `$PRETTIER`.
 the format-scope class re-violated on `linklater/feature-dyslexic-font-
 accessibility` (an out-of-glob `.css` a full-tree `npm run format` silently
 no-oped), caught late by crew. Under this gate that recurrence stays RED
-until the touched file is actually clean, so it cannot re-ship.
+until the touched file is actually clean, so it cannot re-ship. Replay
+drops index rows cited under `local/loops/.archive/` (decision 32), and
+`gate.test.sh` pins that in both directions.

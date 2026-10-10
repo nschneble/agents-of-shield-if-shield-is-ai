@@ -5,7 +5,9 @@
 #
 # Subcommands:
 #   ingest            append only gates.jsonl lines not already indexed
-#   rebuild           wipe + re-derive the whole index from source (safe anytime)
+#   rebuild           wipe + re-derive from live dirs; loses reaped dirs' records
+#   rebuild --include-archive
+#                     same, then local/loops/.archive/<date>/<dir>; keeps them
 #   query <q> [flags]  read-only ranked cited lookup
 #
 # query flags (all substring, case-insensitive):
@@ -46,9 +48,47 @@ resolve_files() {  # repo_root gates_path -> JSON array on stdout
   printf '%s\n' "${files[@]}" | sort -u | jq -R . | jq -cs .
 }
 
+terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
+
+index_gates() {  # repo_root repo gates_path branch cite_base >> stdout
+  local mtime files_json
+  # numeric guard: a non-integer here aborts jq --argjson under set -e
+  mtime=$(file_mtime "$3"); [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
+  files_json=$(resolve_files "$1" "$3")
+  terminated "$3" | jq -c \
+    --arg repo "$2" --arg branch "$4" \
+    --argjson files "$files_json" --argjson mtime "$mtime" \
+    --arg cbase "$5" '
+    {
+      repo:$repo, branch:$branch,
+      wave, kind, agent, verdict,
+      blockers: (.blockers // 0),
+      ran: .ran,
+      task_tool_available: .task_tool_available,
+      summary: (.summary // ""),
+      files: $files,
+      mtime: $mtime,
+      cite: ($cbase + ":" + (input_line_number|tostring))
+    }
+    # copied only if source has the key: feeds the legacy exemption
+    + (if has("verified_by") then {verified_by} else {} end)
+    + (if has("outcome")     then {outcome}     else {} end)'
+}
+
+# reap names a same-day repeat <branch>.<n> only beside an existing <branch>
+archived_branch() {  # archived_dir name_under_date -> branch on stdout
+  local suffix=${2##*.}
+  if [ "$suffix" != "$2" ] && [[ "$suffix" =~ ^[0-9]+$ ]] && [ -d "${1%.*}" ]; then
+    echo "${2%.*}"
+  else
+    echo "$2"
+  fi
+}
+
 ingest() {
+  local include_archive="${1:-0}"
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
-  local cand new gates branch mtime files_json repo rr n
+  local cand new gates branch rel dir repo rr n
   # || cand="" so set -e cannot abort before the named-failure check below
   cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
   new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
@@ -62,28 +102,17 @@ ingest() {
     [ -d "$rr/local/loops" ] || { echo "skip $repo (no local/loops)" >&2; continue; }
     while IFS= read -r gates; do
       branch=${gates#"$rr/local/loops/"}; branch=${branch%/gates.jsonl}
-      # numeric guard: a non-integer here aborts jq --argjson under set -e
-      mtime=$(file_mtime "$gates"); [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
-      files_json=$(resolve_files "$rr" "$gates")
-      jq -c \
-        --arg repo "$repo" --arg branch "$branch" \
-        --argjson files "$files_json" --argjson mtime "$mtime" \
-        --arg cbase "$repo/local/loops/$branch/gates.jsonl" '
-        {
-          repo:$repo, branch:$branch,
-          wave, kind, agent, verdict,
-          blockers: (.blockers // 0),
-          ran: (.ran // null),
-          task_tool_available: (.task_tool_available // null),
-          summary: (.summary // ""),
-          files: $files,
-          mtime: $mtime,
-          cite: ($cbase + ":" + (input_line_number|tostring))
-        }
-        # copied only if source has the key: feeds the legacy exemption
-        + (if has("verified_by") then {verified_by} else {} end)
-        + (if has("outcome")     then {outcome}     else {} end)' "$gates" >> "$cand"
-    done < <(find "$rr/local/loops" -name gates.jsonl 2>/dev/null)
+      index_gates "$rr" "$repo" "$gates" "$branch" \
+        "$repo/local/loops/$branch/gates.jsonl" >> "$cand"
+    done < <(find "$rr/local/loops" -type d -name .archive -prune -o -name gates.jsonl -print 2>/dev/null)
+    [ "$include_archive" -eq 1 ] || continue
+    while IFS= read -r gates; do
+      dir=${gates%/gates.jsonl}; rel=${dir#"$rr/local/loops/"}
+      [[ "$rel" =~ ^\.archive/[0-9]{4}-[0-9]{2}-[0-9]{2}/. ]] || continue
+      branch=$(archived_branch "$dir" "${rel#.archive/*/}")
+      index_gates "$rr" "$repo" "$gates" "$branch" \
+        "$repo/local/loops/$rel/gates.jsonl" >> "$cand"
+    done < <(find "$rr/local/loops/.archive" -mindepth 3 -name gates.jsonl -print 2>/dev/null | sort)
   done
   # anti-join by cite: keep only candidates not already in the index
   jq -c -n --slurpfile idx "$INDEX" --slurpfile cand "$cand" '
@@ -97,7 +126,15 @@ ingest() {
   rm -f "$cand" "$new"
 }
 
-rebuild() { rm -f "$INDEX"; ingest; }
+rebuild() {
+  local include_archive=0
+  case "$#:${1:-}" in
+    0:) ;;
+    1:--include-archive) include_archive=1 ;;
+    *) echo "rebuild takes only --include-archive" >&2; exit 2 ;;
+  esac
+  rm -f "$INDEX"; ingest "$include_archive"
+}
 
 query() {
   local q="" agent="" verdict="" kind="" repo="" file="" blocked=0 limit=20
@@ -141,8 +178,12 @@ query() {
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
-  ingest)  ingest "$@";;
+  ingest)
+    for arg in "$@"; do
+      [ "$arg" != --include-archive ] || { echo "--include-archive is a rebuild flag" >&2; exit 2; }
+    done
+    ingest;;
   rebuild) rebuild "$@";;
   query)   query "$@";;
-  *) echo "usage: $0 {ingest|rebuild|query <q> [--agent|--verdict|--kind|--repo|--file S] [--blocked] [--limit N]}" >&2; exit 2;;
+  *) echo "usage: $0 {ingest|rebuild [--include-archive]|query <q> [--agent|--verdict|--kind|--repo|--file S] [--blocked] [--limit N]}" >&2; exit 2;;
 esac

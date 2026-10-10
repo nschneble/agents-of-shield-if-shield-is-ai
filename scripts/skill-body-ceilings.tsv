@@ -25,7 +25,7 @@
 # Opt-in: a skill with no row here is not checked.
 #
 # skill	ceiling	note
-looper-custodian	8691	8127 actual, 564 under; the ceiling was set at 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
+looper-custodian	8702	PR #97 raised it 8691 -> 8702: Phase A now says --apply archives to local/loops/.archive/<date>/ and never deletes; earlier: 8127 actual, 564 under; the ceiling was set at 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
 #
 # W1 SEEDING. Every skill and agent got a row so the reductions waves W2-W7
 # buy cannot drift back one paragraph at a time. Margin is one mechanism
@@ -33,7 +33,7 @@ looper-custodian	8691	8127 actual, 564 under; the ceiling was set at 8041 + ~650
 # agent is 65% slack, which trips this check's own "guards nothing" note and
 # is a ceiling in name only. Each wave that shrinks a file LOWERS its
 # ceiling in the same commit.
-loop-de-looper	11442	10624 after the branch-path-flatten and run-state.json-validate guardrails; +452 from the reword-vs-reverify and security-relevant-direct-edit guardrails; +178 from the standing-eight-instructions rule; +188 from the correctness-regression-gates-on-existence floor clarification; the ceiling is that sum exactly, so the margin here is ~0 — the next addition has to extract or raise it, deliberately
+loop-de-looper	11572	10624 after the branch-path-flatten and run-state.json-validate guardrails; +452 from the reword-vs-reverify and security-relevant-direct-edit guardrails; +178 from the standing-eight-instructions rule; +188 from the correctness-regression-gates-on-existence floor clarification; +130 for the governor never halting on a unit that succeeded (the --next dispatch gate, gating-only max_corrective_waves, no-progress earning its one retry), a rule change with no body to extract; the ceiling is that sum exactly, so the margin here is ~0 — the next addition has to extract or raise it, deliberately
 looper-build	2110	1759 at W1 seeding, +351 margin
 looper-commit	3393	2828 at W1 seeding, +565 margin
 looper-declutter	4699	4049 at W1 seeding, +650 margin

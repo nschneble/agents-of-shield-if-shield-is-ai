@@ -50,6 +50,16 @@ check "the positive control lands in the modern-era bucket, not legacy" $?
 printf '%s\n' "$out" | grep -q 'VERDICT: 1 of 1'
 check "the verdict line reports 1 of 1 unanimous groups unbacked" $?
 
+# --- the same group archived is never re-audited (decision 32) --------
+{ row r b 1 the-stickler 0 '"llm"' 1
+  row r b 1 the-chemist  0 '"llm"' 2
+  row r b 1 the-auditor  0 null    3
+  row r c 1 the-stickler 0 '"llm"' 1; } \
+  | sed 's#r/local/loops/b/#r/local/loops/.archive/2026-10-01/b/#' > "$index"
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'r/b wave 1'
+check "an archived unanimous group is not audited, exit 0 (got $rc)" $?
+
 # --- the mutation: one reviewer claims execution, finding disappears ----
 { row r b 1 the-stickler 0 '"llm"'        1
   row r b 1 the-chemist  0 '"llm"'        2
@@ -311,7 +321,7 @@ out=$("$check_sh" --index "$index" --census "$empty_root" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'NOTHING CHECKED'
 check "a wholly unparseable corpus exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=45
+EXPECTED_CHECKS=46
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

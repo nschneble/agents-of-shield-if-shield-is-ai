@@ -128,8 +128,10 @@ violation. When receipts cover a meaningful span, G3 can retire into it.
     "correctives_this_wave": 0,
     "consecutive_no_progress": 0,
     "wave_retries": 0,
+    "retries_this_wave": 0,
     "scaffolding_only_correctives": 0,
-    "batched_findings": 1
+    "batched_findings": 1,
+    "cleanup_waves": 0
   },
   "last_crew_wave": 0,
   "pr": {
@@ -149,11 +151,40 @@ violation. When receipts cover a meaningful span, G3 can retire into it.
 
 `goal_contract` is written once, at the end of Step 1, and never edited afterwards — a run that grows its own contract can always justify whatever it did. `queue[].closes` names which asks a wave is meant to close, which is what makes "shipped 9 waves, ask A2 unstarted" visible in the snapshot rather than only in hindsight. `cleanup_batch` accumulates every finding the severity floor did not gate, and drains in one terminal wave; `open_questions` holds what the crew surfaced that the contract does not cover, and drains only by the user answering.
 
-This file is the one of the three that gets overwritten, so it is the only one that can silently lose position while the records beside it stay correct. `~/.claude/scripts/loop-state-audit.sh` compares it against them — the journals settle `waves_shipped`, `total_waves`, `wave_retries` and the queue's shipped entries, `gates.jsonl` settles `last_crew_wave`, and git settles the shas those entries name. Run it before trusting a snapshot on resume (SKILL.md `## State tracking`); exit 0 means every arm was compared and agreed, 1 means a named field disagreed and the records win, 2 means the audit could not settle everything it exists to settle. The `pr` arm is opt-in behind `--pr` because it needs the network.
+This file is the one of the three that gets overwritten, so it is the only one that can silently lose position while the records beside it stay correct. `~/.claude/scripts/loop-state-audit.sh` compares it against them — the journals settle `waves_shipped`, `total_waves` (one per wave plus one per retry), `wave_retries` and the queue's shipped entries, `gates.jsonl` settles `last_crew_wave`, and git settles the shas those entries name. Run it before trusting a snapshot on resume (SKILL.md `## State tracking`); exit 0 means every arm was compared and agreed, 1 means a named field disagreed and the records win, 2 means the audit could not settle everything it exists to settle. The `pr` arm is opt-in behind `--pr` because it needs the network.
 
 `pr.body_sha` hashes the PR body as the LOOP last wrote it (wave-1 creation, then the terminal recap refresh) — the baseline Step 4's user-edit guard compares the live body against to tell its own text from the owner's. Without a persisted baseline that guard has nothing to diff and cannot fire correctly, and `editor.login` can't substitute: the loop authenticates as `@me`, so its edits and the owner's carry the same login. Absent on a run predating the field or one whose PR the loop didn't create — the guard reads absent as "assume user-edited" and takes the augment path, which is the safe direction.
 
 `usage` is the usage-window guard's snapshot (`## Usage-window guard`): `window_reset` is the unix epoch (seconds) when the currently-binding window rolls — the over-threshold window on a pause, else the `representative` window (`anthropic-ratelimit-unified-representative-claim`, the axis the host says is binding) — snapshotted at the last read (a wake compares against it: `now >= window_reset` _corroborates_ a roll, but the fresh probe is the resume gate, not this value). `observed_pct` is that window's last real utilization as a percent, `read_ok: false` when the probe couldn't read the window (unguarded run, not a fabricated 0). `paused: true` marks a run halted on the window and awaiting a scheduled wake — a resume re-probes the real window before continuing, never trusting this snapshot's staleness.
+
+## loop-counters outcome
+
+What the orchestrator pipes to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -` at step 2c: one JSON object, the hand-back already classified. The script owns the arithmetic; the classification — did the wave ship, is a finding gating — stays the model's.
+
+```json
+{
+  "kind": "queue", // "queue" | "cleanup" | "corrective" | "direct-fix" | "retry" | "crew-pass"
+  "shipped": true, // the wave's commit landed; required except on crew-pass
+  "files_changed": 6, // required when shipped
+  "touched_product": true, // the commit touched a product file; required when shipped
+  "net_new": true, // shipped net-new queue work; optional
+  "reopened": false, // re-opened the same blocker; optional
+  "review_verdict": "ship", // from the-looper's review step; optional
+  "gating": false // a floor-gated finding on this wave awaits a corrective; optional
+}
+```
+
+`queue` is any new wave the queue advances to, and with `cleanup` (the cleanup batch wave) is what resets `correctives_this_wave` and `retries_this_wave`. `cleanup` counts as a queue wave and also sets `cleanup_waves`, the marker `--next cleanup` reads: a counter rather than a flag, so the existing count validation covers it, and a kind rather than a field, so the closed kind enum is the only thing to classify. `direct-fix` is a corrective that is not a dispatched wave (`SKILL.md` `## Corrective budget`), so it moves the corrective counters and nothing that counts waves. `crew-pass` takes only `wave` (and optionally `gating`): it resets the two crew-cadence counters and sets `last_crew_wave`. `batched_findings` is recomputed from `cleanup_batch` on every call.
+
+Contract:
+
+- **Refuses rather than corrupts.** Unparseable or unknown-keyed outcome, an outcome contradicting itself (unshipped with files or `net_new`), an unparseable snapshot, any counter it reads or writes that is present but not a non-negative integer (absent reads as 0), or a rail evaluation that errors: exit 2, `NOTHING WRITTEN`, the snapshot byte-identical.
+- **Atomic.** Writes `run-state.json.tmp`, validates it with `jq`, renames it over the snapshot. A `.tmp` left behind is crash residue the custodian clears.
+- **Persists, then reports the governor.** With `--outcome`: exit 0 `GOVERNOR: clear`; exit 1 after writing, `GOVERNOR: STOP` or `GOVERNOR: rethink`, each tripped rail on a `TRIPPED` line with the rail table's action. A STOP rail outranks a rethink. Exit 1 has already persisted the outcome, so never re-pipe it: a retry on any nonzero exit counts the wave twice. Only exit 2 leaves the snapshot untouched.
+- **Rails trip when the counter reaches the limit, never on a unit that succeeded.** The three corrective rails (`max_correctives_per_wave`, `max_corrective_waves`, `scaffolding_only_correctives`) need `gating` true: a shipped corrective spends the budget, only a gating finding after it needs another. `max_correctives_per_wave` and `consecutive_no_progress` read `rethink` (one `2b-retry`) until `retries_this_wave` is 1, then STOP.
+- **`--next queue|corrective|retry|cleanup` gates a dispatch, writing nothing.** Run before each `the-looper` dispatch: `max_total_waves` trips on a queue, corrective or retry, `max_wave_retries` on a retry; `--outcome` evaluates neither. Exit 0 clear, 1 STOP or skip (do not dispatch), 2 a refusal. A query, not an outcome field: the next dispatch is only known after step 2c, whose verdict, crew trigger and crew pass can each change it.
+- **The terminal phase is counted, not budget-gated, and runs once.** The cleanup batch wave is piped as `cleanup`, so it counts in `total_waves`, but no budget rail trips on `--next cleanup`: the ceiling bounds churn (`SKILL.md` `## Budget governor`), and Step 4's goal-complete path needs the cleanup wave and the final crew. `--next cleanup` instead exits 1 `GOVERNOR: skip`, a `SKIP` line naming why, when `cleanup_batch` is empty or `cleanup_waves` is already 1: dispatch nothing and go to the final crew. The final crew is a crew pass: neither counted nor gated.
+- **Limits** default to `SKILL.md` `## Budget governor` and are overridden by the `- budget:` line under `## Loop de Looper` in the project `CLAUDE.md` (the snapshot's repo root, or `--claude-md`); fenced code blocks are skipped, so a quoted template is not read, and a CRLF file parses as LF. An unknown key, a value that is not a positive integer, or a second `- budget:` line in the section refuses, exit 2: a typo silently running the default is the failure.
 
 ## wave-N.jsonl line shapes
 

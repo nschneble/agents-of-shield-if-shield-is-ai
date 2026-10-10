@@ -128,8 +128,14 @@ agree "ZEROED:"
 s="$temp_dir/segment"; mkrun "$s" 1
 printf '%s\n' '{"step":"_declared","wave":1,"dispatch":2,"reason":"retry","steps":["build","commit"]}' \
   >> "$s/wave-1.jsonl"
-jq '.counters.wave_retries = 1' "$s/run-state.json" > "$s/tmp" && mv "$s/tmp" "$s/run-state.json"
+jq '.counters.wave_retries = 1 | .counters.total_waves = 1' "$s/run-state.json" > "$s/tmp" && mv "$s/tmp" "$s/run-state.json"
 out=$("$runner" --dir "$s" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'DRIFT  total_waves              snapshot 1 · journals 2'
+check "SEGMENT: a retry not added to total_waves reddens" $?
+jq '.counters.total_waves = 2' "$s/run-state.json" > "$s/tmp" && mv "$s/tmp" "$s/run-state.json"
+out=$("$runner" --dir "$s" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'ok     total_waves              snapshot 2 · journals 2'
+check "SEGMENT: a retry adds a wave to total_waves" $?
 printf '%s\n' "$out" | grep -q 'DRIFT  waves_shipped            snapshot 1 · journals 0'
 check "SEGMENT: a commit above a later declaration does not ship the wave" $?
 printf '%s\n' "$out" | grep -q 'ok     wave_retries             snapshot 1 · journals 1'
@@ -249,6 +255,6 @@ echo
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 53 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 53\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 55 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 55\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-state-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-state-audit test(s) FAILED"; exit 1; fi

@@ -897,3 +897,90 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     The same trigger was already named for `shadow` and had no detector.
     The checkbox mentions it rather than raising a second proposal, since
     the shadow verb stays on-demand.
+
+31. **A deterministic step is a script, not a paragraph the model
+    executes.** The prompt-audit guide in Anthropic's `claude-api` skill
+    (Group 4, "An LLM executor for a deterministic plan") says to count
+    the model-call sites and ask of each whether its inputs fully determine
+    its output. Phase A's reap and Phase D's snapshot and `undo` do: a
+    branch list, two `gh` queries, an index anti-join, a file copy. The
+    model was running them from prose anyway, and the archive shows the
+    cost. Its six backup dirs carry four `manifest.json` layouts (an
+    `entries` list, a `files` list, `namespaces`, and `entries` beside a
+    renamed date key), one dir has no manifest at all, and one run wrote a
+    `backup-file.sh` of its own into the date dir. A hand-written manifest
+    is one `undo` has to guess at.
+
+    These two moved first because they are the destructive pair. Reap
+    deletes the only copy of a run's records, and the 2026-07-13 incident
+    (decision 13) shows what one wrong reap costs. `undo` is the only way
+    back from an apply, so a snapshot whose shape depends on the model
+    that wrote it cannot be relied on. The same guide's keep-list says
+    fragile operations keep exact scripts, and code is the exact form.
+
+    `scripts/custodian-reap.sh` decides every dir, prints the plan, and
+    deletes only under `--apply` (superseded by decision 32: reap now
+    archives and never deletes). `scripts/custodian-backup.sh` writes the
+    manifest only after every copy verifies, and its `undo` refuses rather
+    than guess. Both have a both-directions suite and declared mutants.
+    The spec now names the command and what each verdict means. The WHY
+    stays where it was.
+
+    The script surfaced cases the prose never decided, and each one keeps
+    rather than guesses. The default branch's own dir passes the ancestry
+    test trivially, so it is kept. A dir whose deletion would take a
+    nested branch's dir is kept. When `gh` fails, the dir is treated the
+    same as when `gh` is absent. `undo` refuses a newest snapshot it
+    cannot read and never falls back to an older one, since that would
+    revert a different apply. One gap stays open and is stated in
+    `phase-d-apply.md`: a file an apply creates has nothing to snapshot,
+    so `undo` leaves it in place.
+
+    A correctness review then refuted the first cut, each finding
+    reproduced in a fixture. Ancestry alone cannot tell a fast-forward
+    merge from a branch that never committed: `custodian-94-e-followups`
+    was created from main, shipped no commit, and planned as merged. So
+    ancestry now counts only when the dir's records name a shipped
+    commit and every one is in the default branch. A merged PR must
+    match the local tip when one exists, since a branch name can be
+    reused; with no local branch, any merged PR of that name counts,
+    which archiving makes safe.
+    `undo` takes `--issue` and refuses another issue's snapshot. A
+    create-only apply writes an empty manifest, so its `undo` is a no-op
+    instead of reverting the apply before it. The rest were mechanical:
+    an unterminated last `gates.jsonl` line shared its predecessor's
+    cite in both ingest and the guard, a newline in a file name split
+    into a relative path `rm -rf` resolved against the working dir, and
+    a symlinked original was copied as its target. `phase-detail.md` and
+    `phase-d-apply.md` state each rule.
+
+32. **Reaping archives a dir; it never deletes one.** Decision 31 moved Phase A's
+    reap into a script, and nine correctness reviews followed. Each found
+    a new way the script would `rm -rf` a dir it should have kept: a
+    default branch spelled `origin/main`, `Main` on a case-blind
+    filesystem, a slashed or nested remote name, a dangling or unset
+    origin/HEAD, an unpushed merge on local main, a PR merged into a
+    feature branch, a reused branch name rewriting cited gate lines.
+    Three of those fixes introduced the next one. "Is this safe to
+    delete" was being inferred from git ancestry, `gh` PR state, ref
+    names and the history index, each with edge cases that multiply when
+    combined, and closing them one at a time is patch accretion, not
+    convergence.
+
+    So the cost of a wrong verdict changes instead of its rate.
+    `--apply` moves a reaped dir to `local/loops/.archive/<date>/`; it
+    never deletes it; the only file it removes is an orphaned
+    `run-state.json.tmp`. Every verdict is reversible by moving the dir back,
+    and the remaining edge cases cost clutter, which a gitignored
+    `local/` absorbs. The archive is pruned from reap, ingest and both
+    census audits, so plain ingest and rebuild never re-index archived
+    gate lines, and they are never re-audited. Emptying it is a separate
+    human step; nothing in the custodian deletes from it. The decision
+    rules stay as the filter, unchanged.
+
+    A plain `rebuild` still drops archived dirs' records, since ingest
+    prunes the archive. `custodian-history.sh rebuild --include-archive`
+    is the opt-in way back: it indexes archived lines under their archived
+    cites, and every audit that reads the index drops a cite under
+    `local/loops/.archive/`, so those lines are queryable but never
+    re-audited.

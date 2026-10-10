@@ -18,6 +18,43 @@ a violating fixture) AND green (clean fixture passes).
 **Self-contained fixtures.** Fixtures are written by the suite — never read
 from gitignored `local/`. Pure bash + jq, self-contained.
 
+## custodian-backup
+
+Both-directions test for Phase D's snapshot and `undo`.
+
+`undo` is the only reversal path for an apply, so the arms that matter most
+are the refusals. A snapshot that reads a file it cannot copy must exit 1
+and write no manifest. The `undo` that follows must then refuse rather than
+fall back to an older snapshot, because the older one belongs to a different
+apply. The same refusal holds for a newest manifest in a hand-written shape
+(the archive holds four), and for a snapshot missing one of its copies.
+Every refusal is checked to have restored nothing.
+
+The ordering fixture puts an older date and a lower seq beside the newest
+snapshot, each holding different content. A wrong pick then restores the
+wrong bytes. Shared content would let it pass unnoticed. The idempotence
+arm runs `undo` twice and requires `no-op` with nothing restored. The backup
+tree is checksummed before `undo` and must match exactly afterwards.
+
+The issue fixture replays the review's case: two applies, then one that
+only creates files, then a hand edit. `undo --issue` for the create-only
+apply must be a no-op that leaves the hand edit, and `undo` for the earlier
+issue must refuse. A `jq` shim that fails only the manifest build proves a
+refused snapshot leaves no empty backup dir to block the next `undo`. The
+symlink fixture replaces the link with a file holding the same bytes, so a
+content compare would wrongly call it unchanged. The directory-link fixture
+re-points a link to a directory, and swaps a file for one, before `undo`:
+a restore that follows the link drops its temp copy inside the directory.
+A real directory in the original's place must fail and stay empty.
+
+The non-numeric `--issue` arm is layered: without the regex check, the
+manifest's `--argjson` still refuses. It was watched failing with both
+layers removed. So is `undo` with no `--issue`: the issue match refuses it
+too.
+
+Fixtures are memory files in a temp dir, and `CUSTODIAN_HOME` always points
+inside it. The real `local/custodian` is never read.
+
 ## custodian-guardrails
 
 Both-directions test for the guardrail replay.
@@ -32,8 +69,18 @@ Also covers two properties the legacy exemption depends on:
   writer (`custodian-history.sh rebuild`) must still classify legacy/exempt, and
   a modern verified_by:null line must classify modern — so the exemption survives
   `history --rebuild` (the writer preserves source key-absence, not a `// null`).
+  A `ran: false` line with a verdict must come through as false and trip G1;
+  `// null` once turned it into null, so G1 never fired on indexed data.
 - G2 ⇔ state-schemas SYNC: G2 must select the SAME lines as the canonical
   provenance lint in state-schemas.md, so the "reused, not forked" claim holds.
+- ARCHIVE: plain `rebuild` indexes live dirs only;
+  `rebuild --include-archive` adds each archived line under its archived
+  cite, after the live dirs. `foo.2` beside `foo` is branch `foo`; a lone
+  `x.2` stays `x.2`. An unknown `rebuild` argument exits 2 and leaves the
+  index alone, `ingest` and `query` refuse the flag, and `query` returns
+  archived records. The replay flags a live G2 line and skips the identical
+  archived one. Mutants pin the archive walk, the suffix rule and the replay
+  filter.
 
 Pure bash + jq, self-contained fixtures.
 
@@ -63,6 +110,12 @@ that scores everything green. Three shapes are pinned against fixture
 scripts, never the real checks: a suite that CAN catch its mutant (killed), a
 suite that cannot (SURVIVED), and a pattern that matches nothing (DID NOT
 APPLY — the false-kill shape, which must be a failure and never a pass).
+
+A fourth arm pins a suite that reads stdin. The harness feeds its table to
+the scoring loop on stdin, and a mutant that sent `grep` to stdin once ate
+the last 72 rows, so sweeps scored 158 of 230 and still exited 0. Suites
+now run with stdin from `/dev/null`, and a sweep that scores fewer mutants
+than it declares exits 2 `SHORT SWEEP`.
 
 ## custodian-phase-order
 
@@ -122,6 +175,70 @@ split cleanly — they stay in this suite for convenience, not cohesion. The
 bulk is arithmetic, not slack — an arm costs two lines (the probe, then
 `check`), so the assertion floor at the foot of the suite already prices most
 of the body. Trim its prose before reaching for its code.
+
+## custodian-reap
+
+Both-directions test for Phase A's reap.
+
+One fixture git repo holds a branch for every verdict: ancestry-merged,
+squash-merged (a merged PR without ancestry), merged with an open PR,
+unmerged, deleted and unmerged, a slash branch, the default branch, a dir
+nesting another branch's dir, and two merged dirs the ingest guard must
+block. One has a `gates.jsonl` line missing from the index and the other a
+`gates.jsonl` that will not parse. The same roster runs in plan mode, which
+must leave the tree byte-identical, and in `--apply` mode, which must delete
+exactly the reap set and prune an emptied slash parent.
+
+Every ancestry-merged dir names its own commit in a `run-state.json`, because
+the review's case hid behind a helper that always committed. `fresh` is
+created from main with no commit, `stray` records a commit off main, and
+`garbled` has a `run-state.json` that will not parse; all three have merged
+tips and must keep. `reused` has a merged PR for another tip, `gonepr` a
+merged PR and no local branch, and `tail` an unterminated last `gates.jsonl`
+line missing from the index. A dot-dir must print `skip`. `ahead` has a
+merged PR its local tip has moved past, and must name it. `--default`
+spelled `origin/HEAD` must keep `main`, and `HEAD`, `@`, a sha or `main~0`
+must exit 2 with a feature branch checked out. So must an unset or
+dangling `origin/HEAD`, even with a `main` present, and a remote ref under
+no configured remote or under two nested ones; `up/stream/main` must keep
+`main`, and auto-detect must strip exactly `origin` beside a remote named
+`origin/release`. An unpushed merge into local `main` must not reap, nor
+may `main` when origin/HEAD points under another remote. The check that
+DEFAULT_REF is exactly `refs/heads/<DEFAULT>` or `refs/remotes/<remote>/<DEFAULT>`
+is a backstop behind the resolution above it, so its mutant removes both.
+Two refusals carry no mutant: a dangling origin/HEAD, and a `--default`
+that resolves to a commit rather than a branch. Each is refused by two
+later checks as well (the resolve check, then the DEFAULT_REF guard or
+the exact-spelling check), so removing any one leaves the arm green.
+A PR merged into a feature branch, for a live or a deleted branch, must not
+reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
+The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
+`gates.jsonl` rewritten under reused cites must be kept, including one that
+differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every
+field ingest writes, in ingest's normal form, since the guard compares them,
+and each guard field has its own single-field arm and mutant. Ingest must
+index `ran` and `task_tool_available` false as false, and the guard must
+still match an older index that stored them as null. `--apply` must
+archive, never delete: reaped dirs move whole under `.archive/<date>/`, a
+second reap of one name lands beside the first, and ingest and reap both
+skip the archive. Every fixture repo
+sets `origin/HEAD` the way a clone does. The newline case
+runs from a decoy working dir holding `bar/`, beside a file named
+`x<newline>bar`. The guardrails suite holds the matching ingest fixture,
+since it is the one that drives `custodian-history.sh`.
+
+`gh` is a stub on PATH that answers from a fixture table, so the real `gh`
+is never called. The absent case sets `GH_BIN` to a missing path rather
+than trimming PATH. GitHub-hosted runners come with `gh` installed, and a
+PATH trimmed enough to hide it could also hide `git` and `jq`. A failing
+stub must produce the same verdict as a missing one.
+
+Two of the exit-2 arms are layered: removing the non-repo or
+default-branch check alone leaves a later check that still exits 2. Each was
+watched failing with every layer removed. The `HEAD` refusal is layered the
+same way over the exact-spelling check, so its mutant removes both. The
+miscased spellings (`Main`, `head`, `Origin/HEAD`) resolve on a case-blind
+macOS filesystem and fail to resolve on Linux; both must exit 2.
 
 ## custodian-skill-lint
 
@@ -207,6 +324,74 @@ Four properties the audit's honesty depends on:
 - EXIT 0 MEANS FULLY CHECKED. A missing snapshot skips two arms, so
   the run exits 2 even with every surviving arm green — a caller
   gating on `$?` must never read a half-run audit as a clean one.
+
+## loop-counters
+
+Both-directions test for the step-2c counter writer and budget governor.
+
+The writer replaced a hand-edit, and the hand-edit's failure was a dropped
+comma that left `run-state.json` unparseable. So the arm that matters most is
+the refusal: thirteen malformed or misclassified outcomes — truncated JSON
+among them — each exit 2 with the existing snapshot byte-identical and no
+`.tmp` left beside it. Every counter the writer reads or writes is checked
+before anything is applied, not only the ones this outcome moves: a
+fractional, negative, boolean, string or array counter would otherwise be
+written back shifted by one or trip a rail on a value that is not a count.
+A rail evaluation that errors refuses the same way, so a broken governor
+can never print `GOVERNOR: clear`; a jq shim that fails only that call is
+the arm.
+
+Eight properties the governor's honesty depends on:
+
+- EVERY COUNTER MOVES BY THE TABLE, PER OUTCOME KIND. A direct fix is a
+  corrective but not a dispatched wave; a retry is a dispatched wave but not a
+  corrective and keeps its wave's correctives; only a new queue wave resets
+  them. Each of those distinctions has an arm, because each is a one-word
+  edit to the writer.
+- EVERY RAIL IS PINNED AT ITS BOUNDARY, both directions: trips on reaching
+  its limit, quiet one short of it. A `>=` turned `>` passes every arm that
+  sits far from the limit.
+- ALL THREE CORRECTIVE RAILS NEED A GATING FINDING. The wave's one
+  corrective is the budget, not a breach; only a second gating finding after
+  it is a `rethink`. Likewise the run's sixth corrective shipping clean is clear;
+  `max_corrective_waves` trips only when a seventh would be needed, and a
+  second scaffolding-only corrective with nothing gating is clear but still
+  counted. And a STOP rail tripped beside a rethink wins.
+- A RAIL NEVER HALTS ON A UNIT THAT SUCCEEDED. The 25th wave and the 4th
+  retry, each shipped, read clear. `max_total_waves` and `max_wave_retries`
+  are checked by `--next`, before the dispatch they would refuse: a queue,
+  corrective or retry dispatch at the ceiling trips the first, a retry
+  dispatch at the limit the second, a queue dispatch never the second, and
+  `--next cleanup` neither. Every query leaves the snapshot byte-identical.
+- THE CLEANUP WAVE RUNS ONCE. `--next cleanup` reads `skip` over an empty
+  `cleanup_batch` or once a `cleanup` outcome has set `cleanup_waves`; the
+  reviewer's case, three cleanup rounds on one snapshot, must read clear,
+  skip, skip with `total_waves` at 1.
+- A RETHINK EARNS ONE RETRY PER WAVE. Outcomes are chained on one snapshot:
+  queue, gating crew, gating corrective (rethink), then a gating retry must
+  read STOP, as must a gating re-crew after a clean retry. A new queue wave
+  resets `retries_this_wave`, so its own rethink earns its own retry.
+  `consecutive_no_progress` shares it: three unshipped queue waves read
+  rethink, an unshipped retry after them STOP, a net-new retry clear.
+- OVERRIDES LAND ON THEIR OWN RAIL. One assertion reads all six limits back
+  from the `- budget:` line, so a crossed key mapping reddens; a `budget:`
+  line under another heading is ignored; with no flag, the snapshot's own
+  repo `CLAUDE.md` is read. A template quoted in a code fence is skipped,
+  a fence closes only on a run at least as long as its opener, and a
+  second `budget:` line or a zero limit refuses. A CRLF file's fence closes
+  too, so its budget line still lands.
+- THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
+  appear in its `SKILL.md` governor row, so the two cannot drift apart.
+
+Every assertion was watched fail: 67 declared mutants in
+`scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
+comparison, rail condition, `--next` kind, override path and refusal
+guard, all killed. The first sweep
+found 13 survivors. Twelve were one harness bug — a `$?` read after a
+command substitution in the check's own description, which made every
+counter assertion pass. The thirteenth was the STOP-outranks-rethink guard,
+unreachable while the per-wave rail was evaluated first; it is evaluated
+last now, so the guard is what decides.
 
 ## loop-receipts
 
@@ -641,6 +826,9 @@ and the positive control comes first:
 - A NULL AGENT IS A ROLLUP. The rollup predicate has four arms and the null one
   had no fixture; it now has one, asserted on the `rollup-agent` counter and on
   the modern-era count staying 0.
+- AN ARCHIVED GROUP IS NOT AUDITED. The positive control's rows, re-cited
+  under `local/loops/.archive/`, exit 0 with no finding, since decision 32
+  never re-audits archived gate lines. A declared mutant drops the filter.
 
 Self-contained: every fixture is written by the suite into a temp dir, and the
 census arm is pointed at a temp root. Nothing reads gitignored `local/` or the

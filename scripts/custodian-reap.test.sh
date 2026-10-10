@@ -1,0 +1,439 @@
+#!/usr/bin/env bash
+# both-directions test; background: docs/test-suites.md#custodian-reap
+set -uo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+runner="$here/custodian-reap.sh"
+
+die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
+trap 'chmod -R u+w "$temp_dir" 2>/dev/null; rm -rf "$temp_dir"' EXIT
+
+fails=0
+checks=0
+check() { # desc, condition-already-evaluated ($?)
+  checks=$((checks + 1))
+  if [ "$2" -eq 0 ]; then printf 'ok    %s\n' "$1"
+  else printf 'FAIL  %s\n' "$1"; fails=$((fails + 1)); fi
+}
+has() { printf '%s\n' "$out" | grep -qxF -- "$1"; }
+
+stub_bin="$temp_dir/bin"
+mkdir -p "$stub_bin" || die_temp "cannot create $stub_bin"
+cat > "$stub_bin/gh" <<'STUB'
+#!/usr/bin/env bash
+[ -z "${GH_STUB_FAIL:-}" ] || { echo "gh: network down" >&2; exit 1; }
+state=""; head=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --state) state=$2; shift 2;;
+    --head)  head=$2;  shift 2;;
+    *) shift;;
+  esac
+done
+row=$(awk -F'\t' -v s="$state" -v h="$head" '$1 == s && $2 == h { print $3 "\t" $4 "\t" ($5 == "" ? "main" : $5); exit }' "$GH_STUB_DB")
+n=${row%%$'\t'*}; rest=${row#*$'\t'}; oid=${rest%%$'\t'*}; base=${rest#*$'\t'}
+if [ -n "$n" ]; then printf '[{"number":%s,"headRefOid":"%s","baseRefName":"%s"}]\n' "$n" "$oid" "$base"; else echo '[]'; fi
+STUB
+chmod +x "$stub_bin/gh"
+
+gitq() { git -C "$repo" -c user.email=fixture@test -c user.name=fixture "$@"; }
+branch_commit() { # name — a branch off main carrying one commit
+  gitq checkout -q -b "$1" main && echo "$1" > "$repo/$(echo "$1" | tr / -).txt" \
+    && gitq add -A && gitq commit -q -m "$1" && gitq checkout -q main
+}
+gates() { # branch, line count — a gates.jsonl with n lines
+  local i
+  mkdir -p "$loops/$1"
+  for i in $(seq 1 "$2"); do
+    printf '{"wave":%d,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n' "$i"
+  done > "$loops/$1/gates.jsonl"
+}
+index_upto() { # branch, n — index lines 1..n as ingest would: fields plus cite
+  local i
+  for i in $(seq 1 "$2"); do
+    sed -n "${i}p" "$loops/$1/gates.jsonl" | jq -c --arg c "repo/local/loops/$1/gates.jsonl:$i" \
+      '{wave, kind, agent, verdict, blockers: (.blockers // 0), ran: .ran,
+        task_tool_available: .task_tool_available, summary: (.summary // ""), cite: $c}
+        + (if has("verified_by") then {verified_by} else {} end)
+        + (if has("outcome") then {outcome} else {} end)'
+  done >> "$home/history-index.jsonl"
+}
+index_all() { index_upto "$1" "$(grep -c . "$loops/$1/gates.jsonl")"; }
+record() { # dir, commit — a run-state.json naming one shipped commit
+  mkdir -p "$loops/$1"
+  jq -n --arg c "$2" '{queue: [{wave: 1, status: "shipped", commit: $c}]}' > "$loops/$1/run-state.json"
+}
+sha() { gitq rev-parse "$1"; }
+
+build() { # builds $repo with the full branch roster
+  repo="$temp_dir/$1/repo"; home="$temp_dir/$1/custodian"; loops="$repo/local/loops"
+  mkdir -p "$repo" "$home"
+  git init -q -b main "$repo" || die_temp "git init failed in $repo"
+  echo seed > "$repo/seed.txt"
+  gitq add -A && gitq commit -q -m seed || die_temp "seed commit failed"
+  gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+    && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "origin/HEAD failed"
+  for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest stray garbled tail reused; do
+    branch_commit "$b" || die_temp "branch $b failed"
+  done
+  for b in anc anc-open fix/slash ungated broken nest stray garbled tail; do
+    gitq merge -q --ff-only "$b" 2>/dev/null \
+    || gitq merge -q --no-edit "$b" || die_temp "merge $b failed"; done
+  gitq update-ref refs/remotes/origin/main main || die_temp "push origin/main failed"
+  gitq branch -q fresh main || die_temp "branch fresh failed"
+  for b in anc anc-open sq wip gone gonepr fix/slash ungated broken nest tail reused; do
+    record "$b" "$(sha "$b")"
+  done
+  record stray "$(sha wip)"
+  mkdir -p "$loops/fresh" "$loops/garbled"
+  echo '{"queue":[{"wave":1,"status":"shipped-no-commit","commit":null}]}' > "$loops/fresh/run-state.json"
+  echo '{not json' > "$loops/garbled/run-state.json"
+  printf 'merged\tsq\t12\t%s\nmerged\treused\t30\t%s\nmerged\tgonepr\t31\t%s\n' \
+    "$(sha sq)" "$(sha anc)" "$(sha gonepr)" > "$temp_dir/$1/gh.tsv"
+  printf 'open\tanc-open\t7\t\nopen\twip\t\t\n' >> "$temp_dir/$1/gh.tsv"
+  gitq branch -q -D gone gonepr || die_temp "delete gone failed"
+  for b in anc anc-open sq fix/slash; do gates "$b" 2; index_all "$b"; done
+  gates ungated 2; index_upto ungated 1
+  # lines 2 and 3 identical, so only the line number tells them apart
+  mkdir -p "$loops/tail"
+  printf '{"wave":1,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n{"wave":2,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}\n{"wave":2,"kind":"crew","agent":"the-stickler","ran":true,"blockers":0}' \
+    > "$loops/tail/gates.jsonl"
+  index_upto tail 2
+  printf '{"wave":1}\nnot json\n' > "$loops/broken/gates.jsonl"
+  for b in main nest/inner; do mkdir -p "$loops/$b"; echo '{}' > "$loops/$b/run-state.json"; done
+  mkdir -p "$loops/.claude/.cc-writes"; echo x > "$loops/.claude/.cc-writes/w"
+  echo '{}' > "$loops/wip/run-state.json.tmp"
+  echo '{}' > "$loops/anc/run-state.json.tmp"
+}
+run() { # command and args, run with the fixture env
+  out=$(env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
+    PATH="$stub_bin:$PATH" "$@" 2>&1); rc=$?
+}
+tree() { (cd "$loops" && find . | sort); }
+
+# --- plan mode: every verdict, nothing deleted ---
+case=plan; build "$case"
+before=$(tree)
+run "$runner"
+[ "$rc" -eq 0 ]; check "PLAN: exits 0 (got $rc)" $?
+has $'reap\tanc\tmerged (ancestry)'; check "PLAN: ancestry-merged branch reaps" $?
+has $'reap\tsq\tmerged (PR #12)'; check "PLAN: squash-merged PR reaps without ancestry" $?
+has $'keep\tanc-open\tkept (open PR #7)'; check "PLAN: an open PR keeps even a merged tip" $?
+has $'keep\twip\tkept (unmerged)'; check "PLAN: unmerged branch is kept" $?
+has $'keep\tgone\tkept (unmerged)'; check "PLAN: deleted unmerged branch is kept" $?
+has $'reap\tfix/slash\tmerged (ancestry)'; check "PLAN: slash branch is one dir, reaped" $?
+has $'keep\tungated\tkept (unindexed — ingest gap)'; check "PLAN: one unindexed gates line blocks the reap" $?
+has $'keep\tbroken\tkept (unindexed — ingest gap)'; check "PLAN: unreadable gates.jsonl blocks the reap" $?
+has $'keep\tmain\tkept (default branch)'; check "PLAN: the default branch's dir is kept" $?
+has $'keep\tnest\tkept (nests dir nest/inner)'; check "PLAN: a dir nesting another branch dir is kept" $?
+mkdir -p "$loops/anc/.cache" && echo x > "$loops/anc/.cache/x"
+run "$runner"
+has $'keep\tanc\tkept (nests dir anc/.cache)'; check "PLAN: a dir holding a skipped non-branch dir is kept" $?
+rm -f "$loops/anc/.cache/x" && rmdir "$loops/anc/.cache"
+run "$runner"
+has $'clear\twip\trun-state.json.tmp'; check "PLAN: orphaned tmp on a kept dir is cleared" $?
+has $'clear\tanc\trun-state.json.tmp'; check "PLAN: orphaned tmp on a reaped dir is cleared" $?
+has $'keep\tfresh\tkept (merged tip, no recorded commit)'
+check "PLAN: a branch with no commit of its own is not merged by ancestry" $?
+has $'keep\tstray\tkept (recorded commit off origin/main)'; check "PLAN: a recorded commit off main blocks ancestry" $?
+has $'keep\tgarbled\tkept (run-state.json unreadable)'; check "PLAN: an unreadable run-state blocks ancestry" $?
+has $'keep\ttail\tkept (unindexed — ingest gap)'; check "PLAN: an unterminated last gates line is its own cite" $?
+has $'keep\treused\tkept (unmerged)'; check "PLAN: a merged PR for another tip of the name does not count" $?
+has $'reap\tgonepr\tmerged (PR #31)'; check "PLAN: a deleted branch's merged PR counts" $?
+has $'skip\t.claude/.cc-writes\tnot a branch name'; check "PLAN: a dot-dir is skipped, not a branch dir" $?
+! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t\\.claude'; check "PLAN: a dot-dir gets no verdict" $?
+has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=plan'; check "PLAN: summary counts every dir" $?
+[ "$(tree)" = "$before" ]; check "PLAN: deletes nothing without --apply" $?
+
+# --- --default spelled as a ref still guards the default branch's dir ---
+gitq update-ref refs/remotes/origin/main main
+for spelling in origin/main refs/heads/main refs/remotes/origin/main; do
+  run "$runner" --default "$spelling"
+  has $'keep\tmain\tkept (default branch)'; check "DEFAULT: --default $spelling keeps the main dir" $?
+done
+
+# --- a symbolic --default resolves to the branch it names, or refuses ---
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+for spelling in origin/HEAD refs/remotes/origin/HEAD; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' \
+    && has $'reap\tanc\tmerged (ancestry)'
+  check "DEFAULT: --default $spelling resolves to main (got $rc)" $?
+done
+run "$runner"
+has $'keep\tmain\tkept (default branch)'; check "DEFAULT: origin/HEAD, auto-detected, resolves to main" $?
+gitq checkout -q wip
+for spelling in HEAD head Head @ "$(sha main)" main~0 Main MAIN origin/head Origin/HEAD; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+  check "DEFAULT: --default $spelling names no default branch, refused (got $rc)" $?
+done
+gitq checkout -q main
+
+# --- a remote with a slash in its name strips to the branch it names ---
+gitq remote add up/stream "$temp_dir/no-such-upstream.git"
+gitq update-ref refs/remotes/up/stream/main main
+for spelling in up/stream/main refs/remotes/up/stream/main; do
+  run "$runner" --default "$spelling"
+  [ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)'
+  check "DEFAULT: --default $spelling, a slashed remote, keeps the main dir (got $rc)" $?
+done
+gitq update-ref refs/remotes/nowhere/main main
+run "$runner" --default nowhere/main
+[ "$rc" -eq 2 ]; check "DEFAULT: a remote ref under no configured remote is refused (got $rc)" $?
+gitq update-ref -d refs/remotes/nowhere/main
+
+# --- auto-detect measures merges against origin's ref, not local main ---
+gitq branch -q unpushed main && gitq checkout -q unpushed && echo unpushed > "$repo/unpushed.txt" \
+  && gitq add unpushed.txt && gitq commit -q -m unpushed && gitq checkout -q main \
+  || die_temp "branch unpushed failed"
+record unpushed "$(sha unpushed)"
+pre_main=$(sha main)
+gitq checkout -q wip && gitq update-ref refs/heads/main "$(sha unpushed)"
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tunpushed\tmerged (ancestry)'
+check "DEFAULT: an unpushed merge into local main does not reap (got $rc)" $?
+gitq update-ref refs/heads/main "$pre_main" && gitq checkout -q main
+
+# --- a remote nested in origin's name never re-splits origin's ref ---
+gitq config remote.origin/release.url "$temp_dir/no-such-release.git"
+gitq update-ref refs/remotes/origin/release/main main
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)'
+check "DEFAULT: a nested remote leaves origin/HEAD on origin/main alone (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/release/main
+run "$runner"
+[ "$rc" -eq 0 ] && ! has $'keep\tmain\tkept (default branch)'
+check "DEFAULT: auto-detect strips exactly origin from origin/release/main (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+run "$runner" --default origin/release/main
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: a ref two remote names could split is refused (got $rc)" $?
+gitq update-ref -d refs/remotes/origin/release/main
+gitq config --remove-section remote.origin/release
+
+# --- origin/HEAD under another remote splits that remote, not origin ---
+gitq remote add upstream "$temp_dir/no-such-upstream2.git"
+gitq update-ref refs/remotes/upstream/main main
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/upstream/main
+run "$runner"
+[ "$rc" -eq 0 ] && has $'keep\tmain\tkept (default branch)' && ! has $'reap\tmain\tmerged (ancestry)'
+check "DEFAULT: origin/HEAD under another remote keeps the main dir (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+gitq update-ref -d refs/remotes/upstream/main
+gitq remote remove upstream
+
+# --- an unset or dangling origin/HEAD is refused, never guessed ---
+gitq branch master main
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+run "$runner"
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: a dangling origin/HEAD is refused, not guessed (got $rc)" $?
+gitq symbolic-ref --delete refs/remotes/origin/HEAD
+run "$runner"
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qE $'^(keep|reap)\t'
+check "DEFAULT: an unset origin/HEAD is refused, though a main exists (got $rc)" $?
+gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+gitq branch -D -q master
+
+# --- a merged PR behind the local tip is named, not called unmerged ---
+gitq checkout -q -b ahead main && echo ahead > "$repo/ahead.txt" \
+  && gitq add ahead.txt && gitq commit -q -m ahead || die_temp "branch ahead failed"
+printf 'merged\tahead\t40\t%s\n' "$(sha ahead)" >> "$temp_dir/$case/gh.tsv"
+echo more >> "$repo/ahead.txt" && gitq commit -q -am more && gitq checkout -q main \
+  || die_temp "ahead tip failed"
+record ahead "$(sha ahead)"
+run "$runner"
+has $'keep\tahead\tkept (merged PR #40, local tip ahead)'
+check "AHEAD: a merged PR behind the local tip keeps, and says so" $?
+has $'keep\treused\tkept (unmerged)'; check "AHEAD: another tip's merged PR is still not named" $?
+
+# --- a PR merged into a branch other than the default is not merged ---
+gitq checkout -q -b stacked main && echo stacked > "$repo/stacked.txt" \
+  && gitq add stacked.txt && gitq commit -q -m stacked && gitq checkout -q main \
+  || die_temp "branch stacked failed"
+record stacked "$(sha stacked)"
+printf 'merged\tstacked\t50\t%s\tfeature-base\n' "$(sha stacked)" >> "$temp_dir/$case/gh.tsv"
+mkdir -p "$loops/gonestack" && record gonestack "$(sha stacked)"
+printf 'merged\tgonestack\t51\t%s\tfeature-base\n' "$(sha stacked)" >> "$temp_dir/$case/gh.tsv"
+run "$runner"
+! has $'reap\tstacked\tmerged (PR #50)' && ! has $'reap\tgonestack\tmerged (PR #51)'
+check "STACKED: a PR merged into another feature branch does not reap" $?
+gitq checkout -q -b nonum main && echo nonum > "$repo/nonum.txt" \
+  && gitq add nonum.txt && gitq commit -q -m nonum && gitq checkout -q main \
+  || die_temp "branch nonum failed"
+record nonum "$(sha nonum)"
+printf 'merged\tnonum\tnull\t%s\n' "$(sha nonum)" >> "$temp_dir/$case/gh.tsv"
+run "$runner"
+! printf '%s\n' "$out" | grep -q $'^reap\tnonum\t'
+check "NUMBERLESS: a merged PR with no number is not taken as a merge" $?
+
+# --- gh absent or failing: never a guessed merge ---
+run env GH_BIN="$temp_dir/no-such-gh" "$runner"
+has $'keep\tsq\tkept (merge unverifiable — gh absent)'; check "GH ABSENT: squash merge is kept, not guessed" $?
+has $'reap\tanc\tmerged (ancestry)'; check "GH ABSENT: recorded ancestry still reaps" $?
+has $'keep\tfresh\tkept (merged tip, no recorded commit)'; check "GH ABSENT: a bare merged tip still keeps" $?
+has $'keep\twip\tkept (merge unverifiable — gh absent)'; check "GH ABSENT: unmerged reads unverifiable" $?
+run env GH_STUB_FAIL=1 "$runner"
+has $'keep\tsq\tkept (merge unverifiable — gh absent)'; check "GH FAILING: squash merge is kept, not guessed" $?
+[ "$rc" -eq 0 ]; check "GH FAILING: still exits 0 (got $rc)" $?
+
+# --- ingest guard with no index at all ---
+mv "$home/history-index.jsonl" "$home/held.jsonl"
+run "$runner"
+has $'keep\tanc\tkept (unindexed — ingest gap)'; check "NO INDEX: a gated merged dir is kept" $?
+mv "$home/held.jsonl" "$home/history-index.jsonl"
+
+# --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
+case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
+repo="$temp_dir/$case/rss-reader"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
+mkdir -p "$repo" "$home" && git init -q -b main "$repo" || die_temp "e2e init failed"
+gitq commit -q --allow-empty -m seed && gitq checkout -q -b fix-ci \
+  && gitq commit -q --allow-empty -m fix && gitq checkout -q main && gitq merge -q --ff-only fix-ci \
+  && gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+  && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "e2e repo failed"
+record fix-ci "$(sha fix-ci)"
+for i in 1 2 3; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":0,"summary":"run1 line %d"}\n' "$i" "$i"; done \
+  > "$loops/fix-ci/gates.jsonl"
+ingest() { REPOS_ROOT="$temp_dir/$case" CUSTODIAN_HOME="$home" "$here/custodian-history.sh" ingest >/dev/null 2>&1; }
+ingest || die_temp "e2e ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: lines the real ingest indexed let the merged dir reap" $?
+for i in 1 2; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":1,"summary":"run2 line %d"}\n' "$i" "$i"; done \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+check "E2E: a rewritten gates.jsonl under reused cites is kept, not reaped" $?
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+mv "$home/history-index.jsonl" "$home/held.jsonl"; ingest || die_temp "e2e fresh ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: a line ingest wrote with every field reaps" $?
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":2,"ran":false,"summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+check "E2E: a rewrite differing only in blockers, ran and verified_by is kept" $?
+
+# --- each guard field on its own: a rewrite changing only it is kept ---
+base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
+for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
+  '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)'; do
+  : > "$home/history-index.jsonl"
+  printf '%s\n' "$base_line" > "$loops/fix-ci/gates.jsonl"; ingest || die_temp "field ingest failed"
+  printf '%s\n' "$base_line" | jq -c "$change" > "$loops/fix-ci/gates.jsonl"
+  run "$runner"
+  has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
+  check "FIELD: a rewrite changing only $change is kept" $?
+done
+
+# --- ingest keeps false; an index written before it did still matches ---
+: > "$home/history-index.jsonl"
+printf '%s\n' "$base_line" | jq -c '.ran = false | .task_tool_available = false' > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "false ingest failed"
+jq -e '.ran == false and .task_tool_available == false' "$home/history-index.jsonl" >/dev/null
+check "INGEST: ran and task_tool_available false are indexed as false" $?
+jq -c '.ran = null | .task_tool_available = null' "$home/history-index.jsonl" > "$home/old.jsonl" \
+  && mv "$home/old.jsonl" "$home/history-index.jsonl" || die_temp "old index rewrite failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "FIELD: an older index holding null for a false ran still matches" $?
+mv "$home/held.jsonl" "$home/history-index.jsonl" 2>/dev/null || true
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"; : > "$home/history-index.jsonl"; ingest || die_temp "field reset ingest failed"
+
+# --- an archived dir is out of every later scan, ingest included ---
+printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
+  > "$loops/fix-ci/gates.jsonl"
+ingest || die_temp "e2e archive ingest failed"
+run "$runner" --apply
+has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: restored to its indexed content, the dir reaps" $?
+before_idx=$(grep -c . "$home/history-index.jsonl")
+ingest && [ "$(grep -c . "$home/history-index.jsonl")" -eq "$before_idx" ]
+check "E2E: ingest does not re-index an archived gates.jsonl" $?
+run "$runner"
+! printf '%s\n' "$out" | grep -qE $'^(skip|keep|reap)\t.*archive'
+check "E2E: reap does not enumerate its own archive" $?
+
+# --- apply: archives exactly the reap set, deletes nothing ---
+case=apply; build "$case"
+run "$runner" --apply
+[ "$rc" -eq 0 ]; check "APPLY: exits 0 (got $rc)" $?
+has $'summary\trepo\treap=4 keep=13 clear=2 failed=0 mode=apply'; check "APPLY: summary names apply mode" $?
+[ ! -e "$loops/anc" ] && [ ! -e "$loops/sq" ] && [ ! -e "$loops/gonepr" ]; check "APPLY: merged dirs leave local/loops" $?
+arch="$loops/.archive/$(date +%Y-%m-%d)"
+[ -f "$arch/anc/run-state.json" ] && [ -f "$arch/anc/gates.jsonl" ] && [ -f "$arch/sq/run-state.json" ] \
+  && [ -f "$arch/gonepr/run-state.json" ] && [ -f "$arch/fix/slash/run-state.json" ]
+check "APPLY: every reaped dir is archived whole, slash branch included" $?
+has "$(printf 'archived\tanc\tlocal/loops/.archive/%s/anc' "$(date +%Y-%m-%d)")"
+check "APPLY: each archive move is printed with its destination" $?
+[ ! -e "$loops/fix" ]; check "APPLY: an emptied slash parent is pruned" $?
+[ -d "$loops/anc-open" ] && [ -d "$loops/ungated" ] && [ -d "$loops/broken" ] \
+  && [ -d "$loops/main" ] && [ -d "$loops/gone" ] && [ -d "$loops/nest/inner" ] \
+  && [ -d "$loops/fresh" ] && [ -d "$loops/tail" ] && [ -d "$loops/reused" ] \
+  && [ -d "$loops/.claude/.cc-writes" ]
+check "APPLY: every kept dir survives" $?
+[ ! -e "$loops/wip/run-state.json.tmp" ] && [ -e "$loops/wip/run-state.json" ]
+check "APPLY: tmp cleared, the kept snapshot beside it untouched" $?
+run "$runner" --apply
+has $'summary\trepo\treap=0 keep=13 clear=0 failed=0 mode=apply'; check "APPLY: a second apply reaps nothing" $?
+cp -R "$arch/anc" "$loops/anc"
+run "$runner" --apply
+[ -f "$arch/anc/run-state.json" ] && [ -f "$arch/anc.2/run-state.json" ]
+check "APPLY: a second reap of one name archives beside the first, not over it" $?
+
+# --- a glob character in the repo path does not unhide the archive ---
+case='glob[1]'; build "$case"
+run "$runner" --apply
+run "$runner"
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q 'archive'
+check "GLOB PATH: a repo path with [ ] still keeps the archive out of the scan (got $rc)" $?
+
+# --- a newline in a file name never yields a dir outside local/loops ---
+case=newline; build "$case"
+branch_commit bar && gitq merge -q --ff-only bar || die_temp "branch bar failed"
+decoy="$temp_dir/$case/cwd"; mkdir -p "$decoy/bar"
+jq -n --arg c "$(sha bar)" '{queue: [{commit: $c}]}' > "$decoy/bar/run-state.json"
+echo x > "$loops/wip/x"$'\n'"bar"
+out=$(cd "$decoy" && env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
+  PATH="$stub_bin:$PATH" "$runner" --apply 2>&1)
+[ -e "$decoy/bar/run-state.json" ]; check "NEWLINE: a dir named by a split path is never deleted" $?
+! printf '%s\n' "$out" | grep -q $'\tbar\t'; check "NEWLINE: the split fragment gets no verdict" $?
+
+# --- a deletion that fails exits 1 ---
+if [ "$(id -u)" -ne 0 ]; then
+  case=locked; build "$case"
+  chmod a-w "$loops/fix"
+  run "$runner" --apply
+  [ "$rc" -eq 1 ]; check "LOCKED: a failed deletion exits 1 (got $rc)" $?
+  has $'summary\trepo\treap=4 keep=13 clear=2 failed=1 mode=apply'; check "LOCKED: summary counts the failure" $?
+  chmod u+w "$loops/fix"
+fi
+
+# --- unusable input exits 2 ---
+case=usage; build "$case"
+run "$runner" --bogus
+[ "$rc" -eq 2 ]; check "USAGE: unknown flag exits 2 (got $rc)" $?
+run "$runner" --default no-such-branch
+[ "$rc" -eq 2 ]; check "USAGE: unresolvable default exits 2 (got $rc)" $?
+mkdir -p "$temp_dir/notrepo"
+out=$(GIT_CEILING_DIRECTORIES="$temp_dir" REPO_ROOT="$temp_dir/notrepo" CUSTODIAN_HOME="$home" "$runner" 2>&1); rc=$?
+[ "$rc" -eq 2 ]; check "USAGE: a non-repo exits 2 (got $rc)" $?
+repo="$temp_dir/bare"; mkdir -p "$repo"; git init -q -b main "$repo"
+gitq commit -q --allow-empty -m seed
+gitq remote add origin "$temp_dir/no-such-origin.git"
+gitq update-ref refs/remotes/origin/main main && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+run "$runner"
+[ "$rc" -eq 0 ] && has $'summary\tbare\treap=0 keep=0 clear=0 failed=0 mode=plan (no local/loops)'
+check "EMPTY: a repo with no local/loops reports zero and exits 0" $?
+
+echo
+if [ "$fails" -eq 0 ]; then echo "all $checks custodian-reap test(s) passed"; exit 0
+else echo "$fails of $checks custodian-reap test(s) FAILED"; exit 1; fi

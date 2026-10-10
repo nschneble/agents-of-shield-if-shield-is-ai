@@ -87,6 +87,20 @@ check "a non-matching pattern reports DID NOT APPLY, exit 1 (got $rc)" $?
 ! printf '%s\n' "$out" | grep -q '  killed          ghost'
 check "a mutant that never applied is not scored as killed" $?
 
+# --- a suite that reads stdin cannot eat the rest of the table ---------
+cat > "$root/scripts/greedy.test.sh" <<'SH'
+#!/usr/bin/env bash
+cat >/dev/null
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+exec bash "$here/subject.test.sh"
+SH
+chmod +x "$root/scripts/greedy.test.sh"
+{ printf 'first|subject.sh|greedy.test.sh|%s\n' 's/\Qbad:*|*:bad\E/bad:*/'
+  printf 'second|subject.sh|greedy.test.sh|%s\n' 's/\Qbad:*|*:bad\E/*:bad/'; } > "$table"
+run
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q '  killed          second'
+check "a suite reading stdin leaves the next mutant to run, exit 0 (got $rc)" $?
+
 # --- a red baseline stops the run rather than scoring against it --------
 cat > "$root/scripts/broken.test.sh" <<'SH'
 #!/usr/bin/env bash
@@ -119,7 +133,7 @@ out=$("$harness" --list 2>&1); rc=$?
   && ! printf '%s\n' "$out" | grep -q 'killed'
 check "--list prints the real table and runs nothing (got $rc)" $?
 
-EXPECTED_CHECKS=9
+EXPECTED_CHECKS=10
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \
