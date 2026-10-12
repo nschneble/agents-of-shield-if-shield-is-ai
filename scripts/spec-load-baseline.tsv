@@ -168,9 +168,15 @@
 # still matches.
 # +14 custodian-run: phase-detail.md says plain ingest and rebuild never
 # re-index an archived gates.jsonl, and its lines are never re-audited.
-orchestrator-run	25752	1898
+# +179 orchestrator-run / +102 orchestrated-wave for custodian #98's
+# missing-gate-log fix: every hand-back gets an executor-handback gate
+# line, an empty or missing log is a STOP at the wave boundary, and
+# looper-commit's pre-flight refuses a later wave with no hand-back line.
+# Three runs shipped with no gates.jsonl before this; nothing caught them
+# until the weekly report.
+orchestrator-run	25931	1898
 pre-flight	2452	2617
-orchestrated-wave	17650	10317
+orchestrated-wave	17752	10317
 crew-agent	13738	0
 custodian-run	21015	7346
 defend-run	8086	0
