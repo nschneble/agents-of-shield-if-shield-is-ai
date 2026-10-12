@@ -23,6 +23,7 @@ Before commit, confirm:
 3. `format`, `lint`, `test`, `build` all green (or project equivalent; skip irrelevant ones for non-code waves per `looper-build` SKILL.md branching)
 4. No `cat > file` or other Bash-bypass write evidence in diff (`git log` and `git diff` should match; look for files created without normal write-path signal)
 5. `git status` clean of untracked stray files (e.g. tool-generated scorecard.png leaks per memory `feedback-lunchlady-scorecard-leak`)
+6. Orchestrated wave after the first: `jq -se 'any(.[]; .kind == "executor-handback")' local/loops/<branch>/gates.jsonl` exits 0 (`<branch>` verbatim, slash included). Missing, empty, or no such line means earlier waves' verify/review went unrecorded (`skills/loop-de-looper/references/rails.md` `## Gate artifacts`). Wave 1 is exempt: its log is legitimately empty until the orchestrator logs its hand-back.
 
 Any pre-flight fail → STOP. Tell orchestrator what blocking.
 

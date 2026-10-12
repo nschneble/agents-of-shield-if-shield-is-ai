@@ -160,7 +160,7 @@ Scope stop conditions fire → Loop de Looper stops. Do NOT improvise around a s
 | `scaffolding_only_correctives` | +1 on a corrective whose commit touches no product file; reset on any wave that touches one                     |
 | `batched_findings`             | count of `cleanup_batch` entries; reported, never a rail                                                        |
 
-Then, in order: pipe the classified outcome (`references/state-schemas.md` `## loop-counters outcome`) to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -`, which applies this table, writes the snapshot atomically, and names any tripped rail; run `~/.claude/scripts/loop-finding-audit.sh`; act on the governor, the usage-window guard, and the crew trigger. Before the next dispatch, `loop-counters.sh --state <run-state.json> --next <kind>`; a STOP there dispatches nothing. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
+Then, in order: log the hand-back (`references/rails.md`); pipe the classified outcome (`references/state-schemas.md` `## loop-counters outcome`) to `~/.claude/scripts/loop-counters.sh --state <run-state.json> --outcome -`, which applies this table, writes the snapshot atomically, and names any tripped rail; run `~/.claude/scripts/loop-finding-audit.sh`; act on the governor, the usage-window guard, and the crew trigger. Before the next dispatch, `loop-counters.sh --state <run-state.json> --next <kind>`; a STOP there dispatches nothing. Persist before you might STOP or PAUSE, so a halt still leaves a resumable snapshot.
 
 **2d. Crew trigger check.** ONE trigger, evaluated after every wave:
 
@@ -263,7 +263,7 @@ Two wave-boundary halts the governor's churn rails cannot see. Both finish the i
 - **A corrective's re-crew returns NOT-CLEARED** → STOP, escalate. The fix did not hold; a second patch on the same wave is not the answer (`## Corrective budget`)
 - **Crew finds a gating blocker requiring rollback** → STOP, escalate (no auto-revert commits)
 - **Budget governor STOP rail hit** → STOP, escalate with the persisted state report; resumable after the user raises a ceiling
-- **Finding audit fails** (`~/.claude/scripts/loop-finding-audit.sh` exit 1) → STOP, quote the offending line. A corrective the run cannot justify against the floor and the contract is the exact drift this skill exists to prevent. Exit 2 is NOT a stop: the audit could not settle every arm (an unreadable snapshot, a counter that is not a count). Report which arms it named as unsettled and continue — but do not read it as a pass, and repair the record it could not read at the next wave boundary
+- **Finding audit fails** (`~/.claude/scripts/loop-finding-audit.sh` exit 1) → STOP, quote the offending line. A corrective the run cannot justify against the floor and the contract is the exact drift this skill exists to prevent. Exit 2 is NOT a stop, save `empty or missing gate log` (2c's write failed): STOP. Else report the arms it named as unsettled and continue — but do not read it as a pass, and repair the record it could not read at the next wave boundary
 - **Context pressure at a wave boundary** → finish the wave, halt before the next dispatch. Clean handoff, not a failure
 - **Usage window at/above 95% at a wave boundary** → finish the wave, pause, schedule a self-resume. A PAUSE, not a STOP
 - **Queue exhausted, required-not-loopable items remain** → surface explicit list, await user action
