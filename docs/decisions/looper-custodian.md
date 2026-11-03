@@ -984,3 +984,17 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     cites, and every audit that reads the index drops a cite under
     `local/loops/.archive/`, so those lines are queryable but never
     re-audited.
+
+33. **Citation resolution is a script; the helper only reads.** Phase B
+    delegated decision 14's existence-plus-`grep` resolution, first to
+    Read-only helpers that could show MOVED but never GONE, then to
+    helpers granted Grep. Both had the model running a search whose inputs
+    fully determine its output, the case decision 31 moves into code.
+    `scripts/custodian-cite-check.sh` now resolves every extracted
+    citation before dispatch and prints one
+    `RESOLVED`/`MOVED`/`GONE`/`UNRESOLVED` row each; `GONE` needs a clean
+    walk of user-global and every `--repo` root with zero hits, and any
+    errored walk is `UNRESOLVED`. Helpers get Read plus those rows and
+    judge meaning only. `--repo` is passed once per configured repo,
+    because a walk of every repo dir hits sandbox read-denies and could
+    never reach `GONE`.

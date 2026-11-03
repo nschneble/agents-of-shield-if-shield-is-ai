@@ -426,6 +426,23 @@ run "$runner" --default no-such-branch
 mkdir -p "$temp_dir/notrepo"
 out=$(GIT_CEILING_DIRECTORIES="$temp_dir" REPO_ROOT="$temp_dir/notrepo" CUSTODIAN_HOME="$home" "$runner" 2>&1); rc=$?
 [ "$rc" -eq 2 ]; check "USAGE: a non-repo exits 2 (got $rc)" $?
+run "$runner" --repo
+[ "$rc" -eq 2 ]; check "USAGE: --repo with no value exits 2 (got $rc)" $?
+run "$runner" --repo ""
+[ "$rc" -eq 2 ]; check "USAGE: an empty --repo exits 2 (got $rc)" $?
+
+out=$(env -u REPO_ROOT CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
+  PATH="$stub_bin:$PATH" "$runner" --repo "$repo" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && has $'reap\tanc\tmerged (ancestry)'
+check "REPO FLAG: alone, it selects the repo (got $rc)" $?
+out=$(env REPO_ROOT="$temp_dir/notrepo" GIT_CEILING_DIRECTORIES="$temp_dir" CUSTODIAN_HOME="$home" \
+  GH_STUB_DB="$temp_dir/$case/gh.tsv" PATH="$stub_bin:$PATH" "$runner" --repo "$repo" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && has $'reap\tanc\tmerged (ancestry)'
+check "REPO FLAG: a real --repo beats a non-repo env REPO_ROOT (got $rc)" $?
+run env GIT_CEILING_DIRECTORIES="$temp_dir" "$runner" --repo "$temp_dir/notrepo"
+[ "$rc" -eq 2 ] && has "not a git repo: $temp_dir/notrepo"
+check "REPO FLAG: a non-repo --repo beats a real env REPO_ROOT (got $rc)" $?
+
 repo="$temp_dir/bare"; mkdir -p "$repo"; git init -q -b main "$repo"
 gitq commit -q --allow-empty -m seed
 gitq remote add origin "$temp_dir/no-such-origin.git"
