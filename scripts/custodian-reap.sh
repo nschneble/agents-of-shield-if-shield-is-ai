@@ -19,7 +19,7 @@ usage() {
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    --repo)    needs_value --repo "$#"; REPO_FLAG="$2"; shift 2;;
+    --repo)    needs_value --repo "$#"; [ -n "$2" ] || { echo "--repo needs a value" >&2; exit 2; }; REPO_FLAG="$2"; shift 2;;
     --default) needs_value --default "$#"; DEFAULT="$2"; shift 2;;
     --apply)   APPLY=1; shift;;
     -h|--help) usage; exit 0;;

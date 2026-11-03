@@ -15,7 +15,7 @@ needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --repo)   needs_value --repo   "$#"; REPO_FLAG="$2"; shift 2;;
+    --repo)   needs_value --repo   "$#"; [ -n "$2" ] || { echo "--repo needs a value" >&2; exit 2; }; REPO_FLAG="$2"; shift 2;;
     --branch) needs_value --branch "$#"; BRANCH="$2"; shift 2;;
     --dir)    needs_value --dir    "$#"; DIR="$2";    shift 2;;
     --pr)     CHECK_PR=1; shift;;

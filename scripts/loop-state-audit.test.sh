@@ -263,12 +263,14 @@ agree "NOTHING-snapshot:"
 [ "$rc" -eq 2 ]; check "USAGE: a value-taking flag with no value exits 2" $?
 "$runner" --repo >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 2 ]; check "USAGE: --repo with no value exits 2" $?
+"$runner" --repo "" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ]; check "USAGE: an empty --repo exits 2" $?
 
 echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 60 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 60\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 61 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 61\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-state-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-state-audit test(s) FAILED"; exit 1; fi

@@ -256,7 +256,7 @@ check "SYMBOL: a symbol anchored only by a bare name is never GONE" $?
 has_row UNRESOLVED path .git/index.lock
 check "UNRESOLVED: a path under .git/ is transient state, never GONE" $?
 
-# --- GONE needs every root searched; a narrow root only decides RESOLVED ---
+# --- GONE needs every root searched; a narrow root decides RESOLVED ---
 E="$temp_dir/elsewhere"
 put "$E/refs/proto-ref.md" 'linked_only_sym=1'
 mkdir -p "$C/skills/linked"

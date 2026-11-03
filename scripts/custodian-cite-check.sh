@@ -105,7 +105,7 @@ walk() { # root; sets WALK to its cached listing, returns 1 if the walk errored
   [ "$(cat "$WALK.rc")" -eq 0 ]
 }
 
-# prints matches one per line; returns 2 when the walk errored and found none
+# prints matches one per line; returns 2 when the walk errored, no hits
 search_find() { # root, suffix|name, value, [keep-ignored]
   local out rc=0
   walk "$1" || rc=2

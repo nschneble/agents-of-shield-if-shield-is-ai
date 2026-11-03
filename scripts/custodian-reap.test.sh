@@ -428,6 +428,8 @@ out=$(GIT_CEILING_DIRECTORIES="$temp_dir" REPO_ROOT="$temp_dir/notrepo" CUSTODIA
 [ "$rc" -eq 2 ]; check "USAGE: a non-repo exits 2 (got $rc)" $?
 run "$runner" --repo
 [ "$rc" -eq 2 ]; check "USAGE: --repo with no value exits 2 (got $rc)" $?
+run "$runner" --repo ""
+[ "$rc" -eq 2 ]; check "USAGE: an empty --repo exits 2 (got $rc)" $?
 
 out=$(env -u REPO_ROOT CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
   PATH="$stub_bin:$PATH" "$runner" --repo "$repo" 2>&1); rc=$?
