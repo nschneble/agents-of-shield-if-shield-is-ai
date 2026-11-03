@@ -255,6 +255,135 @@ check "SYMBOL: a symbol anchored only by a bare name is never GONE" $?
 has_row UNRESOLVED path .git/index.lock
 check "UNRESOLVED: a path under .git/ is transient state, never GONE" $?
 
+# --- GONE needs every root searched; a narrow root only decides RESOLVED ---
+E="$temp_dir/elsewhere"
+put "$E/refs/proto-ref.md" 'linked_only_sym=1'
+mkdir -p "$C/skills/linked"
+ln -s "$E/refs" "$C/skills/linked/references"
+put "$C/skills/hs/references/home-ref.md"
+put "$C/skills/hs/notes.txt" 'visible_sym_m=1'
+put "$R/beta/cross/cross-file.md" 'beta_only_sym=1'
+put "$R/alpha/app/routes/[slug].tsx"
+put "$R/alpha/app/routes/x.tsx"
+put "$PA/wide.md" '- repo as first segment `beta/cross/cross-file.md`
+- in beta `cross/cross-file.md`
+- no repo named `cross/cross-file.md`
+- home only `references/home-ref.md`
+- brackets `app/[slug].tsx`
+- bracket class `app/[x].tsx`
+- absent `docs/nowhere-at-all.md`
+- home relative `skills/hs/SKILL.md`
+- `scripts/tool.sh` calls `beta_only_sym`'
+run "$PA/wide.md"
+detail_is RESOLVED path beta/cross/cross-file.md "$R/beta/cross/cross-file.md"
+check "WIDE project: a cite led by a repo name resolves in that repo" $?
+detail_is RESOLVED path cross/cross-file.md "$R/beta/cross/cross-file.md"
+check "WIDE project: a repo named on the line resolves there" $?
+[ "$(printf '%s\n' "$out" | awk -F'\t' '$3 == 3 && $1 == "MOVED" && $6 == "'"$R"'/beta/cross/cross-file.md"' | wc -l)" -eq 1 ]
+check "WIDE project: another repo's file, unnamed, is MOVED, never GONE" $?
+detail_is MOVED path references/home-ref.md "$C/skills/hs/references/home-ref.md"
+check "WIDE project: a file only under the home root is MOVED, never GONE" $?
+detail_is MOVED path 'app/[slug].tsx' "$R/alpha/app/routes/[slug].tsx"
+check "LITERAL: brackets in a cited name are not a glob class" $?
+has_row GONE path 'app/[x].tsx'
+check "LITERAL near miss: [x].tsx does not match x.tsx" $?
+gone_detail=$(row GONE path docs/nowhere-at-all.md | cut -f6)
+n_roots=0
+for r in "$C" "$R/alpha" "$R/alpha-two" "$R/beta"; do
+  case "$gone_detail" in *"find $r -path"*) n_roots=$((n_roots + 1));; esac
+done
+[ "$n_roots" -eq 4 ]
+check "INVARIANT: GONE quotes a search under every root ($n_roots of 4)" $?
+has_row MOVED path skills/hs/SKILL.md
+check "WIDE project near miss: a home-relative cite is not RESOLVED" $?
+detail_is MOVED symbol beta_only_sym "$R/beta/cross/cross-file.md"
+check "WIDE symbol: a symbol only in another repo is MOVED, never GONE" $?
+put "$AM/wide.md" '- the beta flag lives in `only-alpha/item.md`
+- home relative `skills/hs/SKILL.md`
+- relinked `~/.claude/skills/gone-skill/references/proto-ref.md`
+- the beta flag `docs/absent-named.md`'
+run "$AM/wide.md"
+detail_is MOVED path only-alpha/item.md "$R/alpha/only-alpha/item.md"
+check "WIDE agent: a prose repo name does not narrow GONE to that repo" $?
+detail_is RESOLVED path skills/hs/SKILL.md "$C/skills/hs/SKILL.md"
+check "WIDE agent: an unnamed relative cite tries the home root" $?
+detail_is MOVED path '~/.claude/skills/gone-skill/references/proto-ref.md' "$C/skills/linked/references/proto-ref.md"
+check "SYMLINK: the home search follows a symlinked dir" $?
+row GONE path docs/absent-named.md | grep -qF "find $R/alpha -path"
+check "WIDE agent: GONE under a named repo still searched the others" $?
+put "$AM/self.md" '- `~/.claude/skills/hs/vanished-self.md` held `self_only_sym`
+- `~/.claude/skills/hs/vanished-vis.md` held `visible_sym_m`'
+run "$AM/self.md"
+has_row GONE path '~/.claude/skills/hs/vanished-self.md' && ! has_row MOVED symbol self_only_sym
+check "MEMORY: the memory file's own text is never a relocation hit" $?
+detail_is MOVED path '~/.claude/skills/hs/vanished-vis.md' "$C/skills/hs/notes.txt"
+check "MEMORY near miss: the same symbol outside a memory dir is MOVED" $?
+put "$C/agent-memory/the-y/moved-mem.md"
+put "$AM/sibling-mem.md"
+put "$AM/names.md" '- migrated `~/.claude/agent-memory/the-old/moved-mem.md`
+- sibling `sibling-mem.md`
+- itself `names.md`'
+run "$AM/names.md"
+detail_is MOVED path '~/.claude/agent-memory/the-old/moved-mem.md' "$C/agent-memory/the-y/moved-mem.md"
+check "MEMORY: a memory file moved to another memory dir is MOVED, never GONE" $?
+detail_is RESOLVED path sibling-mem.md "$AM/sibling-mem.md"
+check "MEMORY: a bare name of a sibling memory file resolves" $?
+! detail_is RESOLVED path names.md "$AM/names.md"
+check "MEMORY near miss: a memory file never resolves a cite to itself" $?
+run --pairs "$AM/self.md" "$AM/names.md"
+! printf '%s\n' "$out" | awk -F'\t' '$1 == $2 { f = 1 } END { exit !f }'
+check "MEMORY: --pairs never pairs a memory file with itself" $?
+put "$R/beta/local/build/out.js"
+put "$PB/ignored-suffix.md" '- build output `build/out.js` only in ignored scratch
+- build output `build/other.js` nowhere'
+run "$PB/ignored-suffix.md"
+has_row UNRESOLVED path build/out.js && ! has_row GONE path build/out.js
+check "IGNORED: a gitignored file at the cited path suffix is never GONE" $?
+has_row GONE path build/other.js
+check "IGNORED near miss: no copy at all is GONE" $?
+put "$PB/dep-relative.md" '- package-relative `pkg/index.js` installed
+- package-relative `pkg/never-shipped.js` absent'
+run "$PB/dep-relative.md"
+has_row UNRESOLVED path pkg/index.js && ! has_row GONE path pkg/index.js
+check "DEPENDENCY: a path present under node_modules is never GONE" $?
+has_row GONE path pkg/never-shipped.js
+check "DEPENDENCY near miss: the same shape absent from node_modules is GONE" $?
+put "$E/gamma-real/docs/deep/kept-gamma.md" 'gamma_link_sym=1'
+git init -q "$E/gamma-real"
+mkdir -p "$temp_dir/Repos2"
+ln -s "$E/gamma-real" "$temp_dir/Repos2/gamma"
+put "$AM/gamma.md" '- gamma `docs/kept-gamma.md`
+- gamma `docs/old-gamma.md` holds `gamma_link_sym`
+- symbol behind a link `~/.claude/skills/gone-three/old.txt` held `linked_only_sym`'
+out=$("$runner" --home "$H" --repos-dir "$temp_dir/Repos2" "$AM/gamma.md" 2>/dev/null)
+detail_is MOVED path docs/kept-gamma.md "$temp_dir/Repos2/gamma/docs/deep/kept-gamma.md"
+check "SYMLINK: a symlinked repo root is searched" $?
+detail_is MOVED path docs/old-gamma.md "$temp_dir/Repos2/gamma/docs/deep/kept-gamma.md"
+check "SYMLINK: the symbol grep follows a symlinked repo root" $?
+detail_is MOVED path '~/.claude/skills/gone-three/old.txt' "$C/skills/linked/references/proto-ref.md"
+check "SYMLINK: the symbol grep follows a symlinked dir under home" $?
+put "$temp_dir/shim/find" "#!/bin/sh
+printf '%s\\n' \"\$2\" >> '$temp_dir/find.log'
+exec '$(command -v find)' \"\$@\""
+chmod +x "$temp_dir/shim/find"
+PATH="$temp_dir/shim:$PATH" "$runner" --home "$H" --repos-dir "$R" "$PA/wide.md" >/dev/null 2>&1
+[ -s "$temp_dir/find.log" ] && [ "$(sort "$temp_dir/find.log" | uniq -c | awk '$1 > 2' | wc -l)" -eq 0 ]
+check "CACHE: each root is walked once per run, not once per search" $?
+if [ "$(id -u)" -ne 0 ]; then
+  mkdir -p "$R/beta/sealed"; chmod 000 "$R/beta/sealed"
+  run "$PA/wide.md"
+  has_row UNRESOLVED path docs/nowhere-at-all.md && ! has_row GONE path docs/nowhere-at-all.md
+  check "INVARIANT: an errored search under a non-owner root is never GONE" $?
+  chmod 755 "$R/beta/sealed"
+  put "$R/beta/local/locked.md" 'locked_probe_sym=1'
+  chmod 000 "$R/beta/local/locked.md"
+  put "$PB/locked.md" '- `src/absent-two.ts` holds `locked_probe_sym`'
+  run "$PB/locked.md"
+  has_row GONE path src/absent-two.ts
+  check "IGNORED: an unreadable gitignored file is never searched" $?
+  chmod 644 "$R/beta/local/locked.md"
+fi
+
 # --- summary and exit codes ---
 run "$PA/symbols.md"
 [ "$(printf '%s\n' "$out" | tail -1)" = $'summary\tcitations_total=6\tcitations_resolved=5\tresolved=4\tmoved=1\tgone=1\tunresolved=0' ]

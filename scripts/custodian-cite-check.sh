@@ -60,7 +60,10 @@ encode() { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
 repo_names=""
 for r in "${REPOS[@]+"${REPOS[@]}"}"; do repo_names+="$(basename "$r"),"; done
 
-HOME_PRUNE=( file-history shell-snapshots debug paste-cache session-env todos cache )
+HOME_PRUNE=( file-history shell-snapshots debug paste-cache session-env todos cache seed-admin bridge-spawn ide )
+CACHE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/cite-check.XXXXXX") && [ -d "$CACHE_DIR" ] \
+  || { echo "mktemp -d gave no usable dir (TMPDIR=${TMPDIR:-unset})" >&2; exit 2; }
+trap 'rm -rf "$CACHE_DIR"' EXIT
 
 # a gitignored hit is a backup or scratch copy, not where the target went
 drop_ignored() { # root, hits
@@ -76,30 +79,78 @@ drop_ignored() { # root, hits
   printf '%s\n' "$2" | sort
 }
 
-# prints matches one per line; returns 2 when the search itself errored
-search_find() { # root, find-test, value, [keep-ignored]
-  local root=$1 test=$2 value=$3 keep=${4:-} prune=( -name .git -o -name node_modules ) p out rc
-  if [ "$root" = "$CLAUDE_DIR" ]; then
-    for p in "${HOME_PRUNE[@]}"; do prune+=( -o -path "$root/$p" ); done
+glob_escape() { printf '%s' "$1" | sed 's/[][*?\\]/\\&/g'; }
+
+# runs in command substitutions, so the cache lives on disk, keyed by root
+walk() { # root; sets WALK to its cached listing, returns 1 if the walk errored
+  local rc files prune=( -name .git ) p skip=()
+  local memory=( -path '*/.claude/projects/*/memory' -o -path '*/.claude/agent-memory' )
+  WALK="$CACHE_DIR/$(printf '%s' "$1" | cksum | tr ' ' '-')"
+  if [ ! -e "$WALK.rc" ]; then
+    if [ "$1" = "$CLAUDE_DIR" ]; then
+      for p in "${HOME_PRUNE[@]}"; do prune+=( -o -path "$(glob_escape "$1")/$p" ); done
+      skip=( ! -name '*.jsonl' )
+    fi
+    find -L "$1" \( "${prune[@]}" \) -prune -o -name node_modules -print -prune -o -print >"$WALK.all" 2>/dev/null \
+      && find -L "$1" \( "${prune[@]}" -o -name node_modules -o "${memory[@]}" \) -prune \
+        -o -type f "${skip[@]+"${skip[@]}"}" -print >"$WALK.files" 2>/dev/null
+    rc=$?
+    files=$(drop_ignored "$1" "$(cat "$WALK.files" 2>/dev/null)")
+    if [ -n "$files" ]; then printf '%s\n' "$files"; fi >"$WALK.files"
+    echo "$rc" >"$WALK.rc"
   fi
-  out=$(find "$root" \( "${prune[@]}" \) -prune -o "$test" "$value" -print 2>/dev/null)
-  rc=$?
-  [ -n "$keep" ] || out=$(drop_ignored "$root" "$out")
+  [ "$(cat "$WALK.rc")" -eq 0 ]
+}
+
+# prints matches one per line; returns 2 when the walk errored and found none
+search_find() { # root, suffix|name, value, [keep-ignored]
+  local out rc=0
+  walk "$1" || rc=2
+  out=$(MODE=$2 VALUE=$3 SELF=${mem_abs:-} awk '
+    BEGIN { m = ENVIRON["MODE"]; v = ENVIRON["VALUE"]; sfx = "/" v }
+    $0 == ENVIRON["SELF"] || $0 ~ /\/node_modules$/ { next }
+    m == "name" { n = split($0, s, "/"); if (s[n] == v) print; next }
+    length($0) > length(sfx) && substr($0, length($0) - length(sfx) + 1) == sfx
+  ' "$WALK.all")
+  [ -n "${4:-}" ] || out=$(drop_ignored "$1" "$out")
   [ -n "$out" ] && printf '%s\n' "$out"
-  [ "$rc" -eq 0 ] || [ -n "$out" ] || return 2
+  [ -n "$out" ] || return "$rc"
 }
 
 search_grep() { # root, symbol
-  local root=$1 sym=$2 ex=( --exclude-dir=.git --exclude-dir=node_modules ) p out rc
-  if [ "$root" = "$CLAUDE_DIR" ]; then
-    for p in "${HOME_PRUNE[@]}"; do ex+=( --exclude-dir="$p" ); done
-    ex+=( --exclude='*.jsonl' )
+  local out rc=0
+  walk "$1" || rc=2
+  if [ -s "$WALK.files" ]; then
+    out=$(tr '\n' '\0' <"$WALK.files" | xargs -0 sh -c 'grep -lIF -D skip -e "$0" -- "$@" 2>/dev/null; [ $? -le 1 ]' "$2") || rc=2
   fi
-  out=$(grep -rlIF -D skip "${ex[@]}" -e "$sym" "$root" 2>/dev/null)
-  rc=$?
-  out=$(drop_ignored "$root" "$out")
+  out=$(drop_ignored "$1" "${out:-}")
   [ -n "$out" ] && printf '%s\n' "$out"
-  [ "$rc" -le 1 ] || [ -n "$out" ] || return 2
+  [ -n "$out" ] || return "$rc"
+}
+
+installed_dependency() { # rel, roots... -> the rel under a node_modules dir
+  local rel=$1 r d
+  shift
+  for r in "$@"; do
+    walk "$r"
+    while IFS= read -r d; do
+      [ -e "$d/$rel" ] && { printf '%s' "$d/$rel"; return 0; }
+    done < <(awk '/\/node_modules$/' "$WALK.all")
+  done
+  return 1
+}
+
+ignored_copy() { # rel, roots... -> a gitignored file the rel is a suffix of
+  local rel=$1 r hit
+  shift
+  for r in "$@"; do
+    hit=$(search_find "$r" suffix "$rel" keep) && [ -n "$hit" ] && { printf '%s' "${hit%%$'\n'*}"; return 0; }
+  done
+  return 1
+}
+
+every_root() { # preferred roots... -> each candidate root once, preferred first
+  printf '%s\n' "$@" "$CLAUDE_DIR" "${REPOS[@]+"${REPOS[@]}"}" | awk 'NF && !seen[$0]++'
 }
 
 reloc_root_for() { # abs path -> the root its relocation searches
@@ -199,8 +250,8 @@ emit() { # verdict, memory_file, line, kind, citation, detail
 
 check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
   local mem=$1 line=$2 tok=$3 cite=$4 named=$5 owner=$6 agent=$7
-  local roots=() rels=() named_list=() r abs base hit sym verdict k
-  local searched="" errored=0 located=0 bare=0
+  local roots=() named_list=() wide=() r rel abs base sym verdict k i npref note
+  local searched="" errored=0 located=0 bare=0 hit=""
   tok=${tok#./}
   case "$tok" in
     "~/"*|/*)
@@ -212,36 +263,36 @@ check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
         emit RESOLVED "$mem" "$line" path "$cite" "$abs"; return
       fi
       [ -n "$r" ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "no search root covers $abs"; return; }
-      roots=( "$r" ); rels=( "${abs#"$r"/}" ); located=1
+      roots=( "$r" ); rel=${abs#"$r"/}; located=1
       ;;
     *)
-      if [ -n "$owner" ]; then
-        [ "$owner" = "-" ] && { emit UNRESOLVED "$mem" "$line" path "$cite" "owning repo is not a configured repo"; return; }
-        roots=( "$owner" )
-      elif [ "$agent" -eq 1 ]; then
+      rel=${tok%/}
+      [ "$owner" = "-" ] && { emit UNRESOLVED "$mem" "$line" path "$cite" "owning repo is not a configured repo"; return; }
+      [ -n "$owner" ] && roots=( "$owner" )
+      if [ -n "$owner" ] || [ "$agent" -eq 1 ]; then
         if [ -n "$named" ]; then
           IFS=',' read -r -a named_list <<< "$named"
           for k in "${named_list[@]}"; do
             for r in "${REPOS[@]+"${REPOS[@]}"}"; do [ "$(basename "$r")" = "$k" ] && roots+=( "$r" ); done
           done
-        else
-          roots=( "${REPOS[@]+"${REPOS[@]}"}" )
+        elif [ "$agent" -eq 1 ]; then
+          roots=( "${REPOS[@]+"${REPOS[@]}"}" "$CLAUDE_DIR" )
         fi
       fi
       [ "${#roots[@]}" -gt 0 ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "no root for a repo-relative citation"; return; }
-      for r in "${roots[@]}"; do rels+=( "${tok%/}" ); done
-      [[ "${tok%/}" == */* ]] || bare=1
+      [[ "$rel" == */* ]] || bare=1
       ;;
   esac
 
   if [ "$agent" -eq 1 ] && [ -z "$named" ] && [ "$located" -eq 0 ]; then
-    for k in "${!roots[@]}"; do [ -d "${roots[$k]}" ] || unset "roots[$k]" "rels[$k]"; done
+    for k in "${!roots[@]}"; do [ -d "${roots[$k]}" ] || unset "roots[$k]"; done
     [ "${#roots[@]}" -gt 0 ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "no configured repo exists"; return; }
+    roots=( "${roots[@]}" )
   fi
   for r in "${roots[@]}"; do
     [ -d "$r" ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "root missing: $r"; return; }
   done
-  base=$(basename "${tok%/}")
+  base=$(basename "$rel")
   line_roots+=( "${roots[@]}" )
 
   if [ "$bare" -eq 1 ]; then
@@ -250,7 +301,7 @@ check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
       [ -d "$r" ] || continue
       hit=""
       [ -e "$r/$base" ] && hit="$r/$base"
-      [ -n "$hit" ] || hit=$(search_find "$r" -name "$base" keep) || errored=1
+      [ -n "$hit" ] || hit=$(search_find "$r" name "$base" keep) || errored=1
       if [ -n "$hit" ]; then
         abs=$(printf '%s\n' "$hit" | head -1)
         line_files+=( "$abs" ); emit RESOLVED "$mem" "$line" path "$cite" "$abs"; return
@@ -265,36 +316,42 @@ check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
     return
   fi
 
-  for k in "${!roots[@]}"; do
-    abs="${roots[$k]}/${rels[$k]}"
-    if [ -e "$abs" ]; then
-      line_files+=( "$abs" ); line_anchored=1; emit RESOLVED "$mem" "$line" path "$cite" "$abs"; return
+  for r in "${roots[@]}"; do
+    if [ -e "$r/$rel" ]; then
+      line_files+=( "$r/$rel" ); line_anchored=1; emit RESOLVED "$mem" "$line" path "$cite" "$r/$rel"; return
     fi
   done
-  for k in "${!roots[@]}"; do
-    if is_dependency_path "${roots[$k]}" "${rels[$k]}"; then
-      emit UNRESOLVED "$mem" "$line" path "$cite" "dependency or gitignored path absent: ${rels[$k]}"; return
+  for r in "${roots[@]}"; do
+    if is_dependency_path "$r" "$rel"; then
+      emit UNRESOLVED "$mem" "$line" path "$cite" "dependency or gitignored path absent: $rel"; return
     fi
   done
 
+  while IFS= read -r r; do wide+=( "$r" ); done < <(every_root "${roots[@]}")
+  npref=$(printf '%s\n' "${roots[@]}" | awk '!seen[$0]++' | wc -l | tr -d ' ')
   verdict=MOVED
-  for k in "${!roots[@]}"; do
-    r=${roots[$k]}
-    hit=$(search_find "$r" -path "*/${rels[$k]}") || errored=1
+  for i in "${!wide[@]}"; do
+    r=${wide[$i]}
+    [ -d "$r" ] || { errored=1; searched+="root missing: $r; "; continue; }
+    note="0 hits"
+    hit=$(search_find "$r" suffix "$rel") || note=errored
     if [ -n "$hit" ]; then
-      [ "$located" -eq 1 ] || verdict=RESOLVED
+      [ "$located" -eq 0 ] && [ "$i" -lt "$npref" ] && verdict=RESOLVED
       break
     fi
-    hit=$(search_find "$r" -name "$base") || errored=1
-    searched+="find $r -path '*/${rels[$k]}' -o -name $base; "
+    hit=$(search_find "$r" name "$base") || note=errored
     [ -n "$hit" ] && break
+    [ "$note" = errored ] && errored=1
+    searched+="find $r -path '*/$rel' -o -name $base: $note; "
   done
   if [ -z "$hit" ]; then
     for sym in "${line_syms[@]+"${line_syms[@]}"}"; do
-      for r in "${roots[@]}"; do
-        hit=$(search_grep "$r" "$sym") || errored=1
-        searched+="grep -rlF -e $sym $r; "
+      for r in "${wide[@]}"; do
+        [ -d "$r" ] || continue
+        note="0 hits"
+        hit=$(search_grep "$r" "$sym") || { note=errored; errored=1; }
         [ -n "$hit" ] && break 2
+        searched+="grep -rlF -e $sym $r: $note; "
       done
     done
   fi
@@ -304,13 +361,17 @@ check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
     emit "$verdict" "$mem" "$line" path "$cite" "$abs"
   elif [ "$errored" -eq 1 ]; then
     emit UNRESOLVED "$mem" "$line" path "$cite" "relocation search errored: ${searched%; }"
+  elif abs=$(installed_dependency "$rel" "${wide[@]}"); then
+    emit UNRESOLVED "$mem" "$line" path "$cite" "dependency path present: $abs"
+  elif abs=$(ignored_copy "$rel" "${wide[@]}"); then
+    emit UNRESOLVED "$mem" "$line" path "$cite" "gitignored copy present: $abs"
   else
-    emit GONE "$mem" "$line" path "$cite" "${searched%; }: 0 hits"
+    emit GONE "$mem" "$line" path "$cite" "${searched%; }"
   fi
 }
 
 check_symbol() { # mem, line, symbol
-  local mem=$1 line=$2 sym=$3 f r hit errored=0 searched=""
+  local mem=$1 line=$2 sym=$3 f r hit errored=0 searched="" note
   for f in "${line_files[@]+"${line_files[@]}"}"; do
     if [ -d "$f" ]; then
       hit=$(search_grep "$f" "$sym" | head -1)
@@ -321,16 +382,18 @@ check_symbol() { # mem, line, symbol
   done
   [ "${#line_roots[@]}" -gt 0 ] || { emit UNRESOLVED "$mem" "$line" symbol "$sym" "no search root on this line"; return; }
   while IFS= read -r r; do
-    hit=$(search_grep "$r" "$sym") || errored=1
-    searched+="grep -rlF -e $sym $r; "
+    [ -d "$r" ] || { errored=1; searched+="root missing: $r; "; continue; }
+    note="0 hits"
+    hit=$(search_grep "$r" "$sym") || { note=errored; errored=1; }
     [ -n "$hit" ] && { emit MOVED "$mem" "$line" symbol "$sym" "$(printf '%s\n' "$hit" | head -1)"; return; }
-  done < <(printf '%s\n' "${line_roots[@]}" | sort -u)
+    searched+="grep -rlF -e $sym $r: $note; "
+  done < <(every_root "${line_roots[@]}")
   if [ "$errored" -eq 1 ]; then
     emit UNRESOLVED "$mem" "$line" symbol "$sym" "relocation search errored: ${searched%; }"
   elif [ "$line_anchored" -eq 0 ]; then
-    emit UNRESOLVED "$mem" "$line" symbol "$sym" "no located path on this line to anchor it: ${searched%; }: 0 hits"
+    emit UNRESOLVED "$mem" "$line" symbol "$sym" "no located path on this line to anchor it: ${searched%; }"
   else
-    emit GONE "$mem" "$line" symbol "$sym" "${searched%; }: 0 hits"
+    emit GONE "$mem" "$line" symbol "$sym" "${searched%; }"
   fi
 }
 
