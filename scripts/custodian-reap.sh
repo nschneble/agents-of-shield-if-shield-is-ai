@@ -2,7 +2,7 @@
 # custodian-reap — Phase A verdict per local/loops dir; --apply archives
 set -uo pipefail
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+REPO_FLAG=""
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
@@ -12,12 +12,14 @@ remote=""
 APPLY=0
 
 usage() {
-  echo "usage: REPO_ROOT=<repo> $0 [--default BRANCH] [--apply]" >&2
+  echo "usage: $0 [--repo PATH] [--default BRANCH] [--apply]" >&2
+  echo "  --repo wins over env REPO_ROOT; default is this script's repo" >&2
   echo "  prints reap/keep/clear per local/loops dir; --apply archives reaped dirs" >&2
 }
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
+    --repo)    needs_value --repo "$#"; REPO_FLAG="$2"; shift 2;;
     --default) needs_value --default "$#"; DEFAULT="$2"; shift 2;;
     --apply)   APPLY=1; shift;;
     -h|--help) usage; exit 0;;
@@ -25,6 +27,7 @@ while [ $# -gt 0 ]; do
     *)   echo "unexpected arg: $1" >&2; exit 2;;
   esac
 done
+REPO_ROOT="${REPO_FLAG:-${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
 
 git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 \
   || { echo "not a git repo: $REPO_ROOT" >&2; exit 2; }

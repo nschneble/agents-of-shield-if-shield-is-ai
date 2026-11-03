@@ -2,10 +2,10 @@
 # loop-state-audit — asserts run-state.json agrees with the append-only
 # records beside it (gates.jsonl, wave-N.jsonl); logs are the oracle. A
 # field the logs can't settle reports NOT EVALUABLE, never guessed.
-# Usage: loop-state-audit.sh [--branch NAME] [--dir PATH] [--pr]
+# Usage: loop-state-audit.sh [--repo P] [--branch B] [--dir P] [--pr]
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+REPO_FLAG=""
 BRANCH=""
 DIR=""
 CHECK_PR=0
@@ -15,17 +15,20 @@ needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --repo)   needs_value --repo   "$#"; REPO_FLAG="$2"; shift 2;;
     --branch) needs_value --branch "$#"; BRANCH="$2"; shift 2;;
     --dir)    needs_value --dir    "$#"; DIR="$2";    shift 2;;
     --pr)     CHECK_PR=1; shift;;
     -h|--help)
-      echo "usage: $0 [--branch NAME] [--dir PATH] [--pr]" >&2
+      echo "usage: $0 [--repo PATH] [--branch NAME] [--dir PATH] [--pr]" >&2
       echo "  asserts run-state.json agrees with gates.jsonl + wave-N.jsonl" >&2
+      echo "  --repo wins over env REPO_ROOT; default is this script's repo" >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   echo "unexpected arg: $1" >&2; exit 2;;
   esac
 done
+REPO_ROOT="${REPO_FLAG:-${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
 
 [ -n "$BRANCH" ] || BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 [ -n "$DIR" ] || DIR="$REPO_ROOT/local/loops/$BRANCH"
@@ -151,7 +154,7 @@ elif git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   done < <(jq -r '.queue[]? | select(.status == "shipped") | .commit // empty' "$STATE")
   cmp_field "shipped commits resolve" "$bad_sha" "0" "git"
 else
-  notes+=("NOT EVALUABLE  shipped commits resolve: REPO_ROOT ($REPO_ROOT) is not a git repo — set it to the repo owning this run dir")
+  notes+=("NOT EVALUABLE  shipped commits resolve: repo root $REPO_ROOT is not a git repo — pass --repo for the repo owning this run dir")
   skipped_arms=$((skipped_arms + 1))
 fi
 

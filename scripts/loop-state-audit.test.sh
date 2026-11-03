@@ -231,6 +231,18 @@ check "REPO_ROOT: and it reports no fabricated sha drift" $?
 check "REPO_ROOT: git's own error does not leak into the report" $?
 agree "REPO_ROOT:"
 
+resolved='ok     shipped commits resolve'
+out=$(env -u REPO_ROOT "$runner" --repo "$temp_dir" --dir "$g" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  shipped commits resolve'
+check "REPO FLAG: alone, a non-repo root makes the sha arm decline" $?
+out=$(REPO_ROOT="$temp_dir" "$runner" --repo "$here/.." --dir "$g" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q "$resolved"
+check "REPO FLAG: a real --repo beats a non-repo env REPO_ROOT" $?
+agree "REPO FLAG-over-env:"
+out=$(REPO_ROOT="$here/.." "$runner" --repo "$temp_dir" --dir "$g" 2>&1); rc=$?
+printf '%s\n' "$out" | grep -q 'NOT EVALUABLE  shipped commits resolve'
+check "REPO FLAG: a non-repo --repo beats a real env REPO_ROOT" $?
+
 # --- NOTHING CHECKED is not clean either, at both the headline and the
 #     exit code, or an unreadable run dir greens the audit forever. ---
 out=$("$runner" --dir "$temp_dir/absent" 2>&1); rc=$?
@@ -249,12 +261,14 @@ agree "NOTHING-snapshot:"
 [ "$rc" -eq 2 ]; check "USAGE: an unknown flag exits 2" $?
 "$runner" --dir >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 2 ]; check "USAGE: a value-taking flag with no value exits 2" $?
+"$runner" --repo >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ]; check "USAGE: --repo with no value exits 2" $?
 
 echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter, so the count is
 # verified too. Pegged at the exact number of arms, not a round number
 # under it — slack here is arms that can be deleted in silence.
-[ "$checks" -eq 55 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 55\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 60 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 60\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-state-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-state-audit test(s) FAILED"; exit 1; fi
