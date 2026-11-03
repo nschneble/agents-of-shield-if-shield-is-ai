@@ -526,6 +526,8 @@ run_cron
 check "PERMISSION-DENIAL: still exits 0 — denial doesn't change the run's own outcome (got $rc)" "$r"
 issue 'Custodian permission denial'; check "PERMISSION-DENIAL: opens the permission-denial issue" $?
 issue 'Write'; check "PERMISSION-DENIAL: issue names the denied tool" $?
+issue "local/custodian/$TEST_DATE/attempt-1.out"; check "PERMISSION-DENIAL: issue cites the log repo-relative" $?
+! issue "$case_dir"; check "PERMISSION-DENIAL: issue leaks no absolute path" $?
 [ "$(calls osascript)" -ge 1 ] && r=0 || r=1
 check "PERMISSION-DENIAL: fires a notification (osascript called $(calls osascript)x)" "$r"
 

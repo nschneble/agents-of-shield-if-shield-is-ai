@@ -9,7 +9,7 @@ changing a report body.
 
 ## Sanitization
 
-- **Public repo → the body is written SANITIZED by default (hard rule).** `agents-of-shield-if-shield-is-ai` is a **public** repo, so the auto-mode classifier blocks a `gh issue create` whose body carries excess internal detail — and the unattended cron cannot answer that prompt, so a non-sanitized body hard-blocks the weekly publish (2026-07-20 resume hit exactly this). The full per-line detail already lives in `custodian-log.jsonl` (gitignored, local). So the issue body keeps only what a human needs to _approve a checkbox_, and pushes the rest to the local log. **Strip from the body:** other repos' branch names + PR numbers (Phase A/C → give counts + a repo-agnostic gloss, e.g. "reaped 8 merged dirs across 3 repos"; keep exact `repo/branch:line` cites in the log only); crew **agent code names** (use the role — "the documentation-review crew agent", "the agent-refiner", "the pre-flight adversary", "the verify skill"); and **absolute `~/.claude/…` paths** (name the memory/skill by its bare slug, not its filesystem path). **Keep verbatim:** Phase B's quoted memory _evidence lines_ — those are this repo's own memory, they're what the human verifies the proposal against, and they carry none of the flagged cross-repo/agent/abs-path detail. State once at the top of the body that specifics were kept off the public issue on purpose. (If a body still trips the classifier, trim further — never work around the denial.)
+- **Public repo → the body is written SANITIZED by default (hard rule).** `agents-of-shield-if-shield-is-ai` is a **public** repo, so the auto-mode classifier blocks a `gh issue create` whose body carries excess internal detail — and the unattended cron cannot answer that prompt, so a non-sanitized body hard-blocks the weekly publish (2026-07-20 resume hit exactly this). The full per-line detail already lives in `custodian-log.jsonl` (gitignored, local). So the issue body keeps only what a human needs to _approve a checkbox_, and pushes the rest to the local log. **Strip from the body:** other repos' branch names + PR numbers (Phase A/C → give counts + a repo-agnostic gloss, e.g. "reaped 8 merged dirs across 3 repos"; keep exact `repo/branch:line` cites in the log only); crew **agent code names** (use the role — "the documentation-review crew agent", "the agent-refiner", "the pre-flight adversary", "the verify skill"); and **absolute `~/.claude/…` paths** (name the memory/skill by its bare slug, not its filesystem path; a `GONE` detail's roots read as user-global or a repo name). **Keep verbatim:** Phase B's quoted memory _evidence lines_ — those are this repo's own memory, they're what the human verifies the proposal against, and they carry none of the flagged cross-repo/agent/abs-path detail. State once at the top of the body that specifics were kept off the public issue on purpose. (If a body still trips the classifier, trim further — never work around the denial.)
 
 ## The body's phase lines
 
@@ -29,17 +29,16 @@ Nothing here is a checkbox — the fix is to resume the run or repair its snapsh
   ```text
   LEGAL-TREATISE SHAPE — do NOT lead like this:
   - [ ] B-retire-3 — Memory feedback-old-probe.md:12 cites --ratelimit-probe;
-    existence-plus-grep against the user-global root is empty, relocation search
-    grep -rl ratelimit-probe empty, git log -S ratelimit-probe shows removal.
+    cite-check GONE, grep -rlF -e --ratelimit-probe 0 hits in user-global and
+    every listed repo, git log -S ratelimit-probe shows removal.
     Retire per provably-gone-not-moved; breadcrumb [[feedback-old-probe]].
     validate-by: path-check.
 
   PLAIN-LEAD SHAPE — do this (plain first, detail after):
   - [ ] B-retire-3 — A saved note points at a command-line flag that no longer
     exists anywhere, so the advice it gives can't be followed. It's safe to drop.
-    Memory feedback-old-probe.md:12 cites --ratelimit-probe. Existence-plus-grep
-    against the user-global root is empty; relocation search grep -rl
-    ratelimit-probe across the memory dir + scripts is empty; git log -S
-    ratelimit-probe shows removal. Retire, leave a [[feedback-old-probe]]
-    breadcrumb. validate-by: path-check.
+    Memory feedback-old-probe.md:12 cites --ratelimit-probe. Cite-check says
+    GONE: grep -rlF -e --ratelimit-probe found 0 hits in user-global and in each
+    listed repo; git log -S ratelimit-probe shows removal. Retire, leave a
+    [[feedback-old-probe]] breadcrumb. validate-by: path-check.
   ```

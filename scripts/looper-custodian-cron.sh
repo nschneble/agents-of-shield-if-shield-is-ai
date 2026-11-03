@@ -81,7 +81,7 @@ if names:
 # gets seen and fixed, layered on top of whatever the run's own outcome
 # was.
 alert_permission_denied() {
-  local denied="$1" logfile="$2"
+  local denied="$1" logfile="local/custodian/$DATE/${2##*/}"
   osascript -e "display notification \"Tool call(s) blocked by the allowlist: $denied\" with title \"looper-custodian PERMISSION DENIED\"" >>"$LOG" 2>&1 || true
   gh issue create \
     --title "Custodian permission denial $DATE" \
