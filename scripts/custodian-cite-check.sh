@@ -54,11 +54,14 @@ elif [ -d "$REPOS_DIR" ]; then
     [ -e "$d.git" ] && REPOS+=( "${d%/}" )
   done
 fi
+[ "${#REPOS[@]}" -gt 0 ] || { echo "no git repos under $REPOS_DIR; pass --repo or --repos-dir" >&2; exit 2; }
 
 encode() { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
 
 repo_names=""
 for r in "${REPOS[@]+"${REPOS[@]}"}"; do repo_names+="$(basename "$r"),"; done
+top_dirs=""
+for d in /*; do top_dirs+="${d#/},"; done
 
 HOME_PRUNE=( file-history shell-snapshots debug paste-cache session-env todos cache seed-admin bridge-spawn ide )
 CACHE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/cite-check.XXXXXX") && [ -d "$CACHE_DIR" ] \
@@ -168,9 +171,10 @@ is_dependency_path() { # root, rel
 }
 
 extract() { # memory file -> line, kind, token, verbatim, named repos
-  awk -v names="$repo_names" '
+  awk -v names="$repo_names" -v tops="$top_dirs" '
     BEGIN {
       nn = split(names, rn, ",")
+      nt = split(tops, tl, ","); for (i = 1; i <= nt; i++) if (tl[i] != "") top[tl[i]] = 1
       ext = "^(sh|bash|zsh|md|json|jsonl|yml|yaml|ts|tsx|js|jsx|mjs|cjs|py|rb|erb|tsv|csv|toml|plist|txt|css|scss|html|go|rs|sql|lock|vue|svelte)$"
     }
     /^[ \t]*(```|~~~)/ { fence = !fence; next }
@@ -213,6 +217,7 @@ extract() { # memory file -> line, kind, token, verbatim, named repos
       sub(/:[0-9]+(-[0-9]+)?$/, "", tok); sub(/#L[0-9]+(-L?[0-9]+)?$/, "", tok)
       if (tok ~ /[<>*?{}$|]/ || tok ~ /\.\.\./ || tok ~ /…/ || tok ~ /:\/\// || tok ~ /^[@-]/) return
       if (tok ~ /^\/[^\/.]*$/) return
+      if (tok ~ /^\// && !((segs = split(tok, seg, "/")) > 1 && seg[2] in top)) return
       if (tok ~ /\//) {
         segs = split(tok, seg, "/"); last = seg[segs]
         if (tok !~ /[A-Za-z]/) return
@@ -258,11 +263,11 @@ check_path() { # mem, line, token, verbatim, named, owner, in_agent_memory
       case "$tok" in "~/"*) abs="$HOME_DIR/${tok#\~/}";; *) abs=$tok;; esac
       abs=${abs%/}
       r=$(reloc_root_for "$abs")
+      [ -n "$r" ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "no search root covers $abs"; return; }
       if [ -e "$abs" ]; then
-        [ -n "$r" ] && line_files+=( "$abs" ) && line_roots+=( "$r" ) && line_anchored=1
+        line_files+=( "$abs" ); line_roots+=( "$r" ); line_anchored=1
         emit RESOLVED "$mem" "$line" path "$cite" "$abs"; return
       fi
-      [ -n "$r" ] || { emit UNRESOLVED "$mem" "$line" path "$cite" "no search root covers $abs"; return; }
       roots=( "$r" ); rel=${abs#"$r"/}; located=1
       ;;
     *)
@@ -397,6 +402,8 @@ check_symbol() { # mem, line, symbol
   fi
 }
 
+reset_line() { line_files=(); line_roots=(); line_syms=(); line_anchored=0; }
+
 for mem in "${MEM_FILES[@]}"; do
   mem_abs="$(cd "$(dirname "$mem")" && pwd)/$(basename "$mem")"
   owner=""; agent=0
@@ -412,12 +419,10 @@ for mem in "${MEM_FILES[@]}"; do
   esac
   records=$(extract "$mem") || { echo "extraction failed: $mem" >&2; exit 2; }
   cur=""
-  line_files=(); line_roots=(); line_syms=(); line_anchored=0
   while IFS=$'\t' read -r ln kind tok raw named; do
     [ -n "$ln" ] || continue
     if [ "$ln" != "$cur" ]; then
-      cur=$ln; line_files=(); line_roots=(); line_anchored=0
-      line_syms=()
+      cur=$ln; reset_line
       while IFS=$'\t' read -r _ k2 t2 _ _; do
         [ "$k2" = symbol ] && line_syms+=( "$t2" )
       done < <(printf '%s\n' "$records" | awk -F'\t' -v l="$ln" '$1 == l')

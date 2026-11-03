@@ -283,6 +283,13 @@ undo-follows-dir-link|custodian-backup.sh|custodian-backup.test.sh|s/\[ ! -L "\$
 undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L "\$original" \] \|\| \[ ! -d "\$original" \]; \}/true/
 undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! parent_unmoved "\$original"; then/if false; then/
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
+reap-repo-env-beats-flag|custodian-reap.sh|custodian-reap.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
+lsa-repo-env-beats-flag|loop-state-audit.sh|loop-state-audit.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
+cite-gone-preferred-roots-only|custodian-cite-check.sh|custodian-cite-check.test.sh|s/every_root "\$\{roots\[/printf '%s\\n' "\${roots[/
+cite-gone-errored-root-uncounted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ "\$note" = errored \] && errored=1/:/
+cite-empty-repo-set-unguarded|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\|\| \{ echo "no git repos under/|| true || { echo "no git repos under/
+cite-outside-root-resolves|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ -n "\$r" \] \|\| \{ emit UNRESOLVED/[ -n "\$r" ] || [ -e "\$abs" ] || { emit UNRESOLVED/
+cite-route-extracted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\Q && seg[2] in top\E//
 TABLE
 }
 

@@ -163,6 +163,7 @@ waited=0
 while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 50 ]; do sleep 0.2; waited=$((waited + 1)); done
 if kill -0 "$pid" 2>/dev/null; then
   kill "$pid" 2>/dev/null
+  # open both ends so a child blocked on the fifo can exit
   exec 4<>"$fifo"; exec 4>&-
   false
 else
@@ -383,6 +384,67 @@ if [ "$(id -u)" -ne 0 ]; then
   check "IGNORED: an unreadable gitignored file is never searched" $?
   chmod 644 "$R/beta/local/locked.md"
 fi
+
+# --- an empty repo set can never prove GONE, so it is bad input ---
+mkdir -p "$temp_dir/no-git/plain-dir"
+"$runner" --home "$H" --repos-dir "$temp_dir/typo-dir" "$PA/symbols.md" >/dev/null 2>"$temp_dir/err"
+[ "$?" -eq 2 ] && grep -qF 'no git repos under' "$temp_dir/err"
+check "EMPTY REPOS: a missing --repos-dir exits 2" $?
+"$runner" --home "$H" --repos-dir "$temp_dir/no-git" "$PA/symbols.md" >/dev/null 2>"$temp_dir/err"
+[ "$?" -eq 2 ] && grep -qF 'no git repos under' "$temp_dir/err"
+check "EMPTY REPOS: a dir holding no git repo exits 2" $?
+REPOS_ROOT="$temp_dir/typo-dir" "$runner" --home "$H" "$PA/symbols.md" >/dev/null 2>"$temp_dir/err"
+[ "$?" -eq 2 ] && grep -qF 'no git repos under' "$temp_dir/err"
+check "EMPTY REPOS: a typo'd \$REPOS_ROOT exits 2" $?
+mkdir -p "$temp_dir/one-repo"
+git init -q "$temp_dir/one-repo/solo"
+out=$("$runner" --home "$H" --repos-dir "$temp_dir/one-repo" "$AM/wide.md" 2>/dev/null); rc=$?
+[ "$rc" -ne 2 ] && printf '%s\n' "$out" | grep -q '^summary'
+check "EMPTY REPOS near miss: one repo under the dir runs normally (got $rc)" $?
+
+# --- an absolute path outside every root is never RESOLVED ---
+O="$temp_dir/outside"
+put "$O/out-file.md"
+put "$PA/outside.md" "- outside \`$O/out-file.md\` exists
+- inside \`$R/alpha/scripts/tool.sh\` exists"
+run "$PA/outside.md"
+row UNRESOLVED path "$O/out-file.md" | grep -qF 'no search root covers'
+check "OUTSIDE: an existing path outside every root is UNRESOLVED" $?
+detail_is RESOLVED path "$R/alpha/scripts/tool.sh" "$R/alpha/scripts/tool.sh"
+check "OUTSIDE near miss: an existing absolute path under a repo resolves" $?
+run --pairs "$PA/outside.md"
+! printf '%s\n' "$out" | grep -qF "$O/out-file.md" && printf '%s\n' "$out" | grep -qF "$R/alpha/scripts/tool.sh"
+check "OUTSIDE: --pairs omits it and keeps the in-root path" $?
+
+# --- an absolute token under no top-level dir is a route, not a file ---
+put "$PA/routes.md" '- routes `/auth/me` `/openapi.json` `/users/me` and `/settings/api`
+- home `~/.claude/skills/hs/route-gone.md` vanished'
+printf -- '- real `%s` vanished\n' "$R/alpha/docs/abs-gone.md" >> "$PA/routes.md"
+run "$PA/routes.md"
+n_routes=0
+for p in /auth/me /openapi.json /users/me /settings/api; do cited "$p" && n_routes=$((n_routes + 1)); done
+[ "$n_routes" -eq 0 ]
+check "ROUTE: API routes are not file citations ($n_routes cited)" $?
+has_row GONE path '~/.claude/skills/hs/route-gone.md' && has_row GONE path "$R/alpha/docs/abs-gone.md"
+check "ROUTE near miss: ~/ and real absolute paths still reach GONE" $?
+
+# --- --repo and --home pick the roots ---
+put "$AM/narrow.md" '- unnamed `beta-only/thing.md`'
+out=$("$runner" --home "$H" --repos-dir "$R" --repo beta "$AM/narrow.md" 2>/dev/null)
+detail_is RESOLVED path beta-only/thing.md "$R/beta/beta-only/thing.md"
+check "REPO NAME: --repo beta resolves beta's file" $?
+out=$("$runner" --home "$H" --repo "$R/beta" "$AM/narrow.md" 2>/dev/null)
+detail_is RESOLVED path beta-only/thing.md "$R/beta/beta-only/thing.md"
+check "REPO PATH: --repo with a path resolves without --repos-dir" $?
+out=$("$runner" --home "$H" --repos-dir "$R" --repo alpha "$AM/narrow.md" 2>/dev/null)
+! printf '%s\n' "$out" | grep -qF "$R/beta/" && cited beta-only/thing.md
+check "REPO narrows: a file only in an excluded repo never resolves there" $?
+out=$("$runner" --home "$temp_dir/other-home" --repos-dir "$R" "$PA/cells.md" 2>/dev/null)
+! has_row RESOLVED path '~/.claude/skills/hs/SKILL.md'
+check "HOME miss: --home elsewhere does not resolve this home's file" $?
+out=$("$runner" --home "$H" --repos-dir "$R" "$PA/cells.md" 2>/dev/null)
+has_row RESOLVED path '~/.claude/skills/hs/SKILL.md'
+check "HOME hit: --home picks the ~/ root" $?
 
 # --- summary and exit codes ---
 run "$PA/symbols.md"
