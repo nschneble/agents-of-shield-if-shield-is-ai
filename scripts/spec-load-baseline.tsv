@@ -174,7 +174,12 @@
 # looper-commit's pre-flight refuses a later wave with no hand-back line.
 # Three runs shipped with no gates.jsonl before this; nothing caught them
 # until the weekly report.
-orchestrator-run	25931	1898
+#
+# +183 always on orchestrator-run: protocol-detail.md's crew mechanics
+# now re-run a reviewer's "this test is red" outside the sandbox before
+# it gates. All 3 wrong overrides in a 936-verdict replay were sandboxed
+# runs, and one sent out a needless corrective.
+orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
