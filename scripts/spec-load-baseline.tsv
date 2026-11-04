@@ -213,10 +213,14 @@
 # +42 always on custodian-run: phase-detail.md names the reap reason for
 # a merged PR head that is not a commit id, and says readers count lines
 # by indexed content rather than calling such lines identical.
+#
+# +71 always on custodian-run: artifacts.md defines the experiment
+# record's status line, and Phase D's step 5 records a shipped follow-up
+# with `status`.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21970	7599
+custodian-run	22041	7599
 defend-run	8086	0
 declutter-run	6661	0

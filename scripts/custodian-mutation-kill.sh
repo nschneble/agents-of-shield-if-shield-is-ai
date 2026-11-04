@@ -334,6 +334,11 @@ cite-route-extracted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\Q &
 exp-duplicate-unguarded|custodian-experiments.sh|custodian-experiments.test.sh|s/die "already recorded: #\$issue \$item"/:/
 exp-verdict-unchecked|custodian-experiments.sh|custodian-experiments.test.sh|s/\|\| die "--verdict must be one of: \$VERDICTS"//
 exp-list-unfiltered|custodian-experiments.sh|custodian-experiments.test.sh|s/select\(\$i == "" or/select(true or/
+exp-status-unrecorded-accepted|custodian-experiments.sh|custodian-experiments.test.sh|s/is_recorded "\$issue" "\$item" \|\| die "not recorded: #\$issue \$item"/true/
+exp-status-oldest-wins|custodian-experiments.sh|custodian-experiments.test.sh|s/\Qvalue: .[-1]}\E/value: .[0]}/
+exp-status-ignored-by-list|custodian-experiments.sh|custodian-experiments.test.sh|s/\| \$newest\["[^"]*"\] as \$s/| null as \$s/
+exp-status-listed-as-record|custodian-experiments.sh|custodian-experiments.test.sh|s/\Q| .[] | select(.type != "status")\E/| .[] | select(true)/
+exp-status-key-drops-issue|custodian-experiments.sh|custodian-experiments.test.sh|s/\Qgroup_by([.issue, .item])\E\n(\s+\| map\(\{key: )"[^"]*"/group_by(.item)\n$1"\\(.[0].item)"/
 TABLE
 }
 
