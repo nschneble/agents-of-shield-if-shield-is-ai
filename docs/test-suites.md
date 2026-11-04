@@ -212,6 +212,10 @@ later checks as well (the resolve check, then the DEFAULT_REF guard or
 the exact-spelling check), so removing any one leaves the arm green.
 A PR merged into a feature branch, for a live or a deleted branch, must not
 reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
+A merged PR whose head is not the tip reaps only when that head contains
+it: a head absent locally goes to the stub's `gh api` compare (`ahead`
+reaps; `diverged`, a 404, or an unknown status keeps), and a head present
+locally is decided by `git merge-base`, with no compare row to fall back on.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
 `gates.jsonl` rewritten under reused cites must be kept, including one that
 differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every

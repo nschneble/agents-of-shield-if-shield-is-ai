@@ -944,7 +944,8 @@ violations: 0`. Meanwhile this spec's own extraction was shaped around
     commit and every one is in the default branch. A merged PR must
     match the local tip when one exists, since a branch name can be
     reused; with no local branch, any merged PR of that name counts,
-    which archiving makes safe.
+    which archiving makes safe. (Since widened: a merged head that
+    contains the local tip counts too, so a bot commit on top still reaps.)
     `undo` takes `--issue` and refuses another issue's snapshot. A
     create-only apply writes an empty manifest, so its `undo` is a no-op
     instead of reverting the apply before it. The rest were mechanical:

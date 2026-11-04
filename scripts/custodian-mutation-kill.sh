@@ -262,6 +262,12 @@ format-scope-replay-audits-archive|scripts/correction-gates/format-scope/replay.
 reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
 reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
 reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/
+reap-contained-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/merged_containing "\$branch" "\$tip" && \[ -n "\$contained_prs" \]/false/
+reap-compare-ahead-refused|custodian-reap.sh|custodian-reap.test.sh|s/\Q      ahead|identical)\E/      identical)/
+reap-compare-diverged-contained|custodian-reap.sh|custodian-reap.test.sh|s/\Q      behind|diverged) ;;\E/      behind) ;;\n      diverged) contained_prs=\$n;;/
+reap-compare-failure-contained|custodian-reap.sh|custodian-reap.test.sh|s/\*\) unverified_prs="\$unverified_prs\$\{unverified_prs:\+,\}\$n";;/*) contained_prs=\$n;;/
+reap-local-head-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if git -C "\$REPO_ROOT" cat-file -e "\$oid\^\{commit\}" 2>\/dev\/null; then/if false; then/
+reap-unverified-reason-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$unverified_prs" \]; then/elif false; then/
 backup-copy-failure-ignored|custodian-backup.sh|custodian-backup.test.sh|s/\|\| \{ echo "copy failed: \$original" >&2; failed=\$\(\(failed \+ 1\)\); \}/|| true/
 backup-manifest-despite-partial|custodian-backup.sh|custodian-backup.test.sh|s/if \[ "\$failed" -gt 0 \]; then/if false; then/
 backup-seq-fixed|custodian-backup.sh|custodian-backup.test.sh|s/seq=\$\(\( \$\{seq:-0\} \+ 1 \)\)/seq=1/

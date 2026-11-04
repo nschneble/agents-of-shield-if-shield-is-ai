@@ -112,6 +112,33 @@ merged_behind() { # branch, tip -> merged PRs whose head the tip has moved past
   printf '%s' "$found"
 }
 
+merged_containing() { # branch, tip -> sets contained_prs, unverified_prs
+  local raw n oid status
+  contained_prs=""; unverified_prs=""
+  [ -n "$2" ] || return 0
+  raw=$(cd "$REPO_ROOT" && "$GH_BIN" pr list --state merged --head "$1" --json number,headRefOid,baseRefName 2>/dev/null) \
+    || return 1
+  while IFS=$'\t' read -r n oid; do
+    [ -n "$n" ] || continue
+    if [[ ! "$oid" =~ ^[0-9a-f]{40}$ ]]; then
+      unverified_prs="$unverified_prs${unverified_prs:+,}$n"; continue
+    fi
+    if git -C "$REPO_ROOT" cat-file -e "$oid^{commit}" 2>/dev/null; then
+      git -C "$REPO_ROOT" merge-base --is-ancestor "$2" "$oid" 2>/dev/null \
+        && contained_prs="$contained_prs${contained_prs:+,}$n"
+      continue
+    fi
+    # gh prints the error body to stdout, so only an exact token counts
+    status=$(cd "$REPO_ROOT" && "$GH_BIN" api "repos/{owner}/{repo}/compare/$2...$oid" --jq .status 2>/dev/null) \
+      || status=""
+    case "$status" in
+      ahead|identical) contained_prs="$contained_prs${contained_prs:+,}$n";;
+      behind|diverged) ;;
+      *) unverified_prs="$unverified_prs${unverified_prs:+,}$n";;
+    esac
+  done < <(printf '%s' "$raw" | jq -r --arg base "$DEFAULT" '.[]? | select(.baseRefName == $base) | [.number, .headRefOid] | @tsv' 2>/dev/null)
+}
+
 terminated() { cat -- "$1" && { [ -z "$(tail -c 1 -- "$1")" ] || echo; }; }
 
 uncited_count() { # gates path, branch -> lines whose cite is not indexed
@@ -180,7 +207,7 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
     reason="kept (nests dir ${nested#"$loops/"})"
   else
     tip=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "refs/heads/$branch") || tip=""
-    gh_ok=1; open=""; merged_pr=""
+    gh_ok=1; open=""; merged_pr=""; contained_prs=""; unverified_prs=""
     open=$(gh_prs "$branch" open "") || gh_ok=0
     if [ "$gh_ok" -eq 1 ]; then merged_pr=$(gh_prs "$branch" merged "$tip") || gh_ok=0; fi
     ancestry=0; tip_note=""
@@ -201,8 +228,12 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
       verdict=reap; reason="merged (ancestry)"
     elif [ "$gh_ok" -eq 1 ] && [ -n "$merged_pr" ]; then
       verdict=reap; reason="merged (PR #$merged_pr)"
+    elif [ "$gh_ok" -eq 1 ] && merged_containing "$branch" "$tip" && [ -n "$contained_prs" ]; then
+      verdict=reap; reason="merged (PR #$contained_prs)"
     elif [ "$gh_ok" -eq 1 ] && behind=$(merged_behind "$branch" "$tip") && [ -n "$behind" ]; then
       reason="kept (merged PR #$behind, local tip ahead)"
+    elif [ -n "$unverified_prs" ]; then
+      reason="kept (merge unverifiable — PR #$unverified_prs compare failed)"
     elif [ -n "$tip_note" ]; then
       reason=$tip_note
     elif [ "$gh_ok" -eq 0 ]; then

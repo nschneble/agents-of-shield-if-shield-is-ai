@@ -27,6 +27,13 @@ mkdir -p "$stub_bin" || die_temp "cannot create $stub_bin"
 cat > "$stub_bin/gh" <<'STUB'
 #!/usr/bin/env bash
 [ -z "${GH_STUB_FAIL:-}" ] || { echo "gh: network down" >&2; exit 1; }
+if [ "$1" = api ]; then
+  basehead=${2##*/compare/}
+  status=$(awk -F'\t' -v b="${basehead%%...*}" -v h="${basehead#*...}" '$1 == b && $2 == h { print $3; exit }' \
+    "${GH_STUB_COMPARE:-/dev/null}")
+  [ -n "$status" ] || { echo '{"message":"Not Found","status":"404"}'; echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+  echo "$status"; exit 0
+fi
 state=""; head=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -112,7 +119,7 @@ build() { # builds $repo with the full branch roster
 }
 run() { # command and args, run with the fixture env
   out=$(env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
-    PATH="$stub_bin:$PATH" "$@" 2>&1); rc=$?
+    GH_STUB_COMPARE="$temp_dir/$case/compare.tsv" PATH="$stub_bin:$PATH" "$@" 2>&1); rc=$?
 }
 tree() { (cd "$loops" && find . | sort); }
 
@@ -288,6 +295,32 @@ mv "$home/history-index.jsonl" "$home/held.jsonl"
 run "$runner"
 has $'keep\tanc\tkept (unindexed — ingest gap)'; check "NO INDEX: a gated merged dir is kept" $?
 mv "$home/held.jsonl" "$home/history-index.jsonl"
+
+# --- a merged PR whose head contains the local tip reaps ---
+case=contain; mkdir -p "$temp_dir/$case"
+repo="$temp_dir/$case/repo"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
+mkdir -p "$repo" "$home" && git init -q -b main "$repo" && gitq commit -q --allow-empty -m seed \
+  && gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+  && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "contain repo failed"
+for b in botfix split gone404 odd localhead localdiv; do branch_commit "$b" || die_temp "branch $b failed"; done
+for b in botfix split gone404 odd localhead localdiv; do record "$b" "$(sha "$b")"; done
+remote_head() { printf '%040d' "$1"; }
+local_child() { gitq commit-tree -p "$1" -m bot "$(gitq rev-parse "$1^{tree}")"; }
+lh=$(local_child "$(sha localhead)") && ld=$(local_child "$(sha main)") || die_temp "local heads failed"
+{ printf 'merged\tbotfix\t60\t%s\n' "$(remote_head 1)"; printf 'merged\tsplit\t61\t%s\n' "$(remote_head 2)"
+  printf 'merged\tgone404\t62\t%s\n' "$(remote_head 3)"; printf 'merged\todd\t63\t%s\n' "$(remote_head 4)"
+  printf 'merged\tlocalhead\t64\t%s\nmerged\tlocaldiv\t65\t%s\n' "$lh" "$ld"; } > "$temp_dir/$case/gh.tsv"
+{ printf '%s\t%s\tahead\n' "$(sha botfix)" "$(remote_head 1)"; printf '%s\t%s\tdiverged\n' "$(sha split)" "$(remote_head 2)"
+  printf '%s\t%s\tbogus\n' "$(sha odd)" "$(remote_head 4)"; } > "$temp_dir/$case/compare.tsv"
+run "$runner"
+has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: a merged head ahead of the local tip reaps" $?
+has $'keep\tsplit\tkept (unmerged)'; check "CONTAIN: a merged head diverged from the local tip keeps" $?
+has $'keep\tgone404\tkept (merge unverifiable — PR #62 compare failed)'
+check "CONTAIN: a compare that 404s keeps, and says so" $?
+has $'keep\todd\tkept (merge unverifiable — PR #63 compare failed)'
+check "CONTAIN: an unknown compare status keeps, and says so" $?
+has $'reap\tlocalhead\tmerged (PR #64)'; check "CONTAIN: a local head is decided by local ancestry" $?
+has $'keep\tlocaldiv\tkept (unmerged)'; check "CONTAIN: a local head not containing the tip keeps" $?
 
 # --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
 case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
