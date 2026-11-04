@@ -34,6 +34,8 @@ done
 # the pattern must be unique in the file.
 #
 # perl + equivalent-mutant gotchas: looper-custodian.md decision 25
+# no mutant unpins char_len: GNU tr is byte-wise in any locale, so CI
+# cannot tell the forms apart; only BSD tr needs the LC_ALL=C pin
 # gotcha: the replacement side interpolates too, a stray `\{` breaks awk
 # gotcha: inside \Q..\E a `\$` matches backslash-dollar, so hand-escape
 # every dollar sign instead of trusting the quotemeta to cover it
@@ -318,7 +320,6 @@ undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! par
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 reap-repo-env-beats-flag|custodian-reap.sh|custodian-reap.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
 lint-char-len-counts-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/char_len\(\) \{ printf '%s' "\$1" \| LC_ALL=C tr -d '[^']*' \| wc -c \| tr -d ' '; \}/char_len() { printf '%s' "\${#1}"; }/
-lint-char-len-locale-unpinned|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\| LC_ALL=C tr -d /| tr -d /
 lint-desc-len-off-by-one|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$desc_len" -le "\$DESC_MAX" \]/[ "\$desc_len" -lt "\$DESC_MAX" ]/
 lint-desc-msg-reports-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/description is \$desc_len chars/description is \${#desc} chars/
 lint-disc-tokens-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/est_str_tokens\(\) \{ echo \$\(\( \$\(char_len "\$1"\) \/ 4 \)\); \}/est_str_tokens() { echo \$(( \${#1} \/ 4 )); }/
