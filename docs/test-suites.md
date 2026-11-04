@@ -275,6 +275,12 @@ violation and 0 when clean, and — crucially for the two-tier design — that a
 ADVISORY-only fixture (over the token budgets, nothing structurally wrong)
 still exits 0. Pure bash + jq-free, self-contained fixtures under a temp dir.
 
+The name, description and compatibility limits are counted in characters, as
+the Agent Skills spec states them, under `LC_ALL=C` and under a UTF-8 locale
+alike: a two-byte-character value exactly at each limit passes and one
+character over fails with its character count in the message. The C side is
+any caller without a UTF-8 locale, where `${#var}` counts bytes.
+
 ## doc-bloat-scan
 
 Both-directions test for the comment-bloat detector.

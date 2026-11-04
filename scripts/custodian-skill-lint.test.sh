@@ -557,5 +557,59 @@ check "G-h: both spellings of a self-cite agree" "$result"
 [ "$sig_self" = "0|" ] && result=0 || result=1
 check "G-h: and they agree on silence — a file citing itself is not a chain" "$result"
 
+# ── Length in characters on both sides of the locale axis ─────────────────────
+
+# a two-byte `é` repeated N times: N characters, 2N bytes
+repeat_e() { local n="$1" out=""; while [ "$n" -gt 0 ]; do out="${out}é"; n=$((n - 1)); done; printf '%s' "$out"; }
+
+len_fixture() { # name  field  count -> skill dir
+  local d="$temp_dir/$1"
+  mkdir -p "$d"
+  if [ "$2" = "name" ]; then
+    printf -- '---\nname: %s\ndescription: Use this when a name is long.\n---\nBody.\n' "$(repeat_e "$3")" > "$d/SKILL.md"
+  elif [ "$2" = "description" ]; then
+    printf -- '---\nname: %s\ndescription: %s\n---\nBody.\n' "$1" "$(repeat_e "$3")" > "$d/SKILL.md"
+  else
+    printf -- '---\nname: %s\ndescription: Use this when a field is long.\n%s: %s\n---\nBody.\n' \
+      "$1" "$2" "$(repeat_e "$3")" > "$d/SKILL.md"
+  fi
+  printf '%s' "$d"
+}
+
+len_at_desc_max=$(len_fixture len-desc-at-max description 1024)
+len_over_desc_max=$(len_fixture len-desc-over-max description 1025)
+len_at_compat_max=$(len_fixture len-compat-at-max compatibility 500)
+len_over_compat_max=$(len_fixture len-compat-over-max compatibility 501)
+len_at_name_max=$(len_fixture len-name-at-max name 64)
+len_over_name_max=$(len_fixture len-name-over-max name 65)
+
+utf8_locale=""
+for cand in C.UTF-8 en_US.UTF-8 C.utf8 en_US.utf8; do
+  if [ "$(LC_ALL=$cand bash -c 's=é; printf %s "${#s}"' 2>/dev/null)" = "1" ]; then
+    utf8_locale=$cand; break
+  fi
+done
+[ -n "$utf8_locale" ] && result=0 || result=1
+check "LEN: a UTF-8 locale exists to run the other side of the axis" "$result"
+
+for loc in C ${utf8_locale:+"$utf8_locale"}; do
+  out=$(LC_ALL=$loc "$linter" "$len_at_desc_max" "$len_at_compat_max"); rc=$?
+  [ "$rc" -eq 0 ] && result=0 || result=1
+  check "LEN[$loc]: description of 1024 chars in 2048 bytes passes" "$result"
+  ! printf '%s\n' "$out" | grep -q 'compatibility-length'; check "LEN[$loc]: compatibility of 500 chars passes" $?
+  out=$(LC_ALL=$loc "$linter" "$len_at_name_max" "$len_over_name_max")
+  ! printf '%s\n' "$out" | grep -q 'name-length.*len-name-at-max'; check "LEN[$loc]: name of 64 chars has no length finding" $?
+  printf '%s\n' "$out" | grep -q 'name-length.*len-name-over-max.*name is 65 chars'
+  check "LEN[$loc]: name of 65 chars flagged with its char count" $?
+
+  out=$(LC_ALL=$loc "$linter" "$len_over_desc_max" "$len_over_compat_max"); rc=$?
+  [ "$rc" -eq 1 ] && result=0 || result=1
+  check "LEN[$loc]: over-limit lengths exit 1" "$result"
+  printf '%s\n' "$out" | grep -q 'description-length.*len-desc-over-max.*description is 1025 chars'
+  check "LEN[$loc]: description of 1025 chars flagged with its char count" $?
+  printf '%s\n' "$out" | grep -q 'compatibility-length.*len-compat-over-max.*compatibility is 501 chars'
+  check "LEN[$loc]: compatibility of 501 chars flagged with its char count" $?
+done
+
 printf '\n%d failure(s)\n' "$fails"
 [ "$fails" -eq 0 ]

@@ -306,6 +306,12 @@ undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L
 undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! parent_unmoved "\$original"; then/if false; then/
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 reap-repo-env-beats-flag|custodian-reap.sh|custodian-reap.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
+lint-char-len-counts-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/char_len\(\) \{ printf '%s' "\$1" \| LC_ALL=C tr -d '[^']*' \| wc -c \| tr -d ' '; \}/char_len() { printf '%s' "\${#1}"; }/
+lint-char-len-locale-unpinned|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\| LC_ALL=C tr -d /| tr -d /
+lint-desc-len-off-by-one|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$desc_len" -le "\$DESC_MAX" \]/[ "\$desc_len" -lt "\$DESC_MAX" ]/
+lint-desc-msg-reports-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/description is \$desc_len chars/description is \${#desc} chars/
+lint-name-len-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$name_len" -le/[ "\${#name}" -le/
+lint-compat-len-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$compat_len" -le/[ "\${#compat}" -le/
 lsa-repo-env-beats-flag|loop-state-audit.sh|loop-state-audit.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
 cite-gone-preferred-roots-only|custodian-cite-check.sh|custodian-cite-check.test.sh|s/every_root "\$\{roots\[/printf '%s\\n' "\${roots[/
 cite-gone-errored-root-uncounted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ "\$note" = errored \] && errored=1/:/
