@@ -25,7 +25,7 @@
 # Opt-in: a skill with no row here is not checked.
 #
 # skill	ceiling	note
-looper-custodian	8702	PR #97 raised it 8691 -> 8702: Phase A now says --apply archives to local/loops/.archive/<date>/ and never deletes; earlier: 8127 actual, 564 under; the ceiling was set at 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
+looper-custodian	8811	raised 8702 -> 8811 for the experiment record (Phase E checks custodian-experiments.sh before proposing, plus its integration line) and carn joining the repo list; before that PR #97 raised it 8691 -> 8702: Phase A now says --apply archives to local/loops/.archive/<date>/ and never deletes; earlier: 8127 actual, 564 under; the ceiling was set at 8041 + ~650 for one mechanism, priced off the receipts sweep; the report body's rendering detail took it from 9667
 #
 # W1 SEEDING. Every skill and agent got a row so the reductions waves W2-W7
 # buy cannot drift back one paragraph at a time. Margin is one mechanism

@@ -30,6 +30,8 @@ jobs:
         run: ./scripts/custodian-fingerprint-cache.test.sh
       - name: Custodian Phase B citation resolver (both directions)
         run: ./scripts/custodian-cite-check.test.sh
+      - name: Custodian experiment record (both directions)
+        run: ./scripts/custodian-experiments.test.sh
       - name: Custodian Phase A reap (both directions)
         run: ./scripts/custodian-reap.test.sh
       - name: Custodian Phase D snapshot + undo (both directions)

@@ -290,6 +290,9 @@ cite-gone-errored-root-uncounted|custodian-cite-check.sh|custodian-cite-check.te
 cite-empty-repo-set-unguarded|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\|\| \{ echo "no git repos under/|| true || { echo "no git repos under/
 cite-outside-root-resolves|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ -n "\$r" \] \|\| \{ emit UNRESOLVED/[ -n "\$r" ] || [ -e "\$abs" ] || { emit UNRESOLVED/
 cite-route-extracted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\Q && seg[2] in top\E//
+exp-duplicate-unguarded|custodian-experiments.sh|custodian-experiments.test.sh|s/die "already recorded: #\$issue \$item"/:/
+exp-verdict-unchecked|custodian-experiments.sh|custodian-experiments.test.sh|s/\|\| die "--verdict must be one of: \$VERDICTS"//
+exp-list-unfiltered|custodian-experiments.sh|custodian-experiments.test.sh|s/select\(\$i == "" or/select(true or/
 TABLE
 }
 
