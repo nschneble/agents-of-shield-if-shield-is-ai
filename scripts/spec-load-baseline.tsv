@@ -197,10 +197,16 @@
 # by GitHub's compare API, keeps when the compare can't decide, and is
 # skipped for a tip already in the default so a reused name's old PR
 # never reaps new work.
+#
+# +151 always / +102 conditional on custodian-run: ingest now keys a
+# line on its cite and content, so phase-detail.md says how it reports
+# CHANGED and VANISHED lines and that readers take the newest record per
+# cite (artifacts.md says so too), and history-verb.md stops sending an
+# ingest gap to a hand fix.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21638	7515
+custodian-run	21789	7617
 defend-run	8086	0
 declutter-run	6661	0

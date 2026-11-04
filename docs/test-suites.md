@@ -84,6 +84,24 @@ Also covers two properties the legacy exemption depends on:
 
 Pure bash + jq, self-contained fixtures.
 
+## custodian-history
+
+Both-directions test for `custodian-history.sh ingest` and the readers of
+its index.
+
+Ingest keys a line on its cite and content, so the fixture rewrites one
+line, deletes a line mid-file and appends after it, and truncates a file.
+Each must report `CHANGED` or `VANISHED`, append the new content beside the
+old record, and leave every earlier record byte-identical; an unchanged
+re-ingest adds and reports nothing. `CHANGED` reports once and a line
+reverted to older content is re-appended once. An archived or deleted
+source reports nothing. `query` and the guardrail replay must count a cite
+once, as its newest record, in both directions: a violation rewritten
+clean stops counting, one rewritten twice counts once. The last check
+diffs `custodian-index.jq`'s projection against the reap guard's, the
+textual half of the agreement whose behavioral half is custodian-reap's
+field arms.
+
 ## custodian-log-recall
 
 Both-directions test for the recall check.
@@ -217,10 +235,12 @@ it: a head absent locally goes to the stub's `gh api` compare (`ahead`
 reaps; `diverged`, a 404, or an unknown status keeps), and a head present
 locally is decided by `git merge-base`, with no compare row to fall back on.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
-`gates.jsonl` rewritten under reused cites must be kept, including one that
-differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every
-field ingest writes, in ingest's normal form, since the guard compares them,
-and each guard field has its own single-field arm and mutant. Ingest must
+`gates.jsonl` rewritten under reused cites must be kept until the next
+ingest, then reap, including one that differs only in `blockers`, `ran` or
+`verified_by`. `index_upto` writes every field ingest writes, in ingest's
+normal form, since the guard compares them, and each guard field has its
+own single-field arm and mutant; each arm then re-ingests and must reap,
+which proves ingest's key tells apart every field the guard does. Ingest must
 index `ran` and `task_tool_available` false as false, and the guard must
 still match an older index that stored them as null. `--apply` must
 archive, never delete: reaped dirs move whole under `.archive/<date>/`, a

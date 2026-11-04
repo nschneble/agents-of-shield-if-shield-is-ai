@@ -4,7 +4,8 @@
 # grafting the ctx pattern onto looper structured log.
 #
 # Subcommands:
-#   ingest            append only gates.jsonl lines not already indexed
+#   ingest            append gates.jsonl lines whose cite + content is new;
+#                     print CHANGED/VANISHED for indexed lines the file lost
 #   rebuild           wipe + re-derive from live dirs; loses reaped dirs' records
 #   rebuild --include-archive
 #                     same, then local/loops/.archive/<date>/<dir>; keeps them
@@ -20,6 +21,7 @@ REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 REPOS=(linklater tuffgal tuffgal-action agents-of-shield-if-shield-is-ai rss-reader carn)
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # probe stat flavor once: GNU stat -f wrongly reads fs status, not mtime
 if stat -c %Y / >/dev/null 2>&1; then
@@ -88,11 +90,12 @@ archived_branch() {  # archived_dir name_under_date -> branch on stdout
 ingest() {
   local include_archive="${1:-0}"
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
-  local cand new gates branch rel dir repo rr n
+  local cand new walked gates branch rel dir repo rr n report changed vanished
   # || cand="" so set -e cannot abort before the named-failure check below
   cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
   new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
-  [ -n "$cand" ] && [ -n "$new" ] || {
+  walked=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || walked=""
+  [ -n "$cand" ] && [ -n "$new" ] && [ -n "$walked" ] || {
     echo "FATAL: custodian-history: mktemp gave no temp file" \
          "(TMPDIR=${TMPDIR:-unset}); cannot ingest" >&2
     exit 2
@@ -104,6 +107,7 @@ ingest() {
       branch=${gates#"$rr/local/loops/"}; branch=${branch%/gates.jsonl}
       index_gates "$rr" "$repo" "$gates" "$branch" \
         "$repo/local/loops/$branch/gates.jsonl" >> "$cand"
+      printf '%s\n' "$repo/local/loops/$branch/gates.jsonl" >> "$walked"
     done < <(find "$rr/local/loops" -type d -name .archive -prune -o -name gates.jsonl -print 2>/dev/null)
     [ "$include_archive" -eq 1 ] || continue
     while IFS= read -r gates; do
@@ -112,18 +116,33 @@ ingest() {
       branch=$(archived_branch "$dir" "${rel#.archive/*/}")
       index_gates "$rr" "$repo" "$gates" "$branch" \
         "$repo/local/loops/$rel/gates.jsonl" >> "$cand"
+      printf '%s\n' "$repo/local/loops/$rel/gates.jsonl" >> "$walked"
     done < <(find "$rr/local/loops/.archive" -mindepth 3 -name gates.jsonl -print 2>/dev/null | sort)
   done
-  # anti-join by cite: keep only candidates not already in the index
-  jq -c -n --slurpfile idx "$INDEX" --slurpfile cand "$cand" '
-    ($idx | map({key:.cite, value:true}) | from_entries) as $seen
-    | $cand[] | select(($seen[.cite] // false) | not)
+  jq -c -n -L "$HERE" --slurpfile idx "$INDEX" --slurpfile cand "$cand" '
+    include "custodian-index";
+    ($idx | current | map({key: .cite, value: gate_key}) | from_entries) as $cur
+    | $cand[] | select($cur[.cite] != gate_key)
   ' > "$new"
+  report=$(jq -r -n -L "$HERE" --slurpfile idx "$INDEX" --slurpfile cand "$cand" \
+    --rawfile walked "$walked" '
+    include "custodian-index";
+    ($walked | split("\n") | map({key: ., value: true}) | from_entries) as $files
+    | ($cand | map({key: .cite, value: gate_key}) | from_entries) as $now
+    | $idx | current[]
+    | select($files[.cite | sub(":[0-9]+$"; "")] // false)
+    | if $now[.cite] == null then "VANISHED \(.cite)"
+      elif $now[.cite] != gate_key then "CHANGED \(.cite)"
+      else empty end')
+  [ -z "$report" ] || printf '%s\n' "$report"
+  changed=$(printf '%s\n' "$report" | grep -c '^CHANGED ' || true)
+  vanished=$(printf '%s\n' "$report" | grep -c '^VANISHED ' || true)
   n=$(grep -c . "$new" || true)
   cat "$new" >> "$INDEX"
   # || true, not || echo 0: grep -c already prints 0 before exiting 1
-  echo "ingested ${n:-0} new record(s); index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
-  rm -f "$cand" "$new"
+  echo "ingested ${n:-0} new record(s); $changed changed, $vanished vanished;" \
+       "index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
+  rm -f "$cand" "$new" "$walked"
 }
 
 rebuild() {
@@ -152,12 +171,13 @@ query() {
     esac
   done
   [ -s "$INDEX" ] || { echo "empty index — run: $0 ingest" >&2; return 0; }
-  jq -rn \
+  jq -rn -L "$HERE" \
     --arg q "$q" --arg agent "$agent" --arg verdict "$verdict" \
     --arg kind "$kind" --arg repo "$repo" --arg file "$file" \
     --argjson blocked "$blocked" --argjson limit "$limit" '
+    include "custodian-index";
     def ci($s): ($s // "") | ascii_downcase;
-    [ inputs
+    [ [inputs] | current[]
       | select($q=="" or (ci(.summary+" "+(.agent//"")+" "+(.verdict//"")+" "+(.kind//"")) | contains(ci($q))))
       | select($agent==""   or (ci(.agent)   | contains(ci($agent))))
       | select($verdict=="" or (ci(.verdict) | contains(ci($verdict))))

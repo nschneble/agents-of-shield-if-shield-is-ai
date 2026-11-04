@@ -188,6 +188,18 @@ check "REPLAY: the archived twin adds nothing to the counts" $?
 ! printf '%s\n' "$out" | grep -q '\.archive/'
 check "REPLAY GREEN: the identical archived row is never reported" $?
 
+jq -c '.summary = "a.css passed prettier"' "$rp/live.jsonl" > "$rp/fixed.jsonl"
+cat "$rp/live.jsonl" "$rp/fixed.jsonl" > "$rp/rewritten.jsonl"
+out=$("$replay" --index "$rp/rewritten.jsonl" 2>&1)
+printf '%s
+' "$out" | grep -q '1 records · format-scope class 1 · would-have-caught 0 '
+check "REPLAY: a rewritten line counts once, as its newest record" $?
+cat "$rp/fixed.jsonl" "$rp/live.jsonl" > "$rp/reverted.jsonl"
+out=$("$replay" --index "$rp/reverted.jsonl" 2>&1)
+printf '%s
+' "$out" | grep -q '1 records · format-scope class 1 · would-have-caught 1 '
+check "REPLAY: a line rewritten back to failing counts once, as failing" $?
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all format-scope gate tests passed"; exit 0
 else echo "$fails format-scope gate test(s) FAILED"; exit 1; fi

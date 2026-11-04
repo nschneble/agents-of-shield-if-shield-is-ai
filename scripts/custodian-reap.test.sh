@@ -333,7 +333,7 @@ has $'keep\tstalelocal\tkept (merged tip, no recorded commit)'
 check "CONTAIN: a tip already on main stays kept on the local path too" $?
 has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: the gate leaves a tip off main to containment" $?
 
-# --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
+# --- the real ingest, then reap: a rewrite blocks the reap until ingested ---
 case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
 repo="$temp_dir/$case/rss-reader"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
 mkdir -p "$repo" "$home" && git init -q -b main "$repo" || die_temp "e2e init failed"
@@ -350,10 +350,13 @@ run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: lines the real ingest indexed let the merged dir reap" $?
 for i in 1 2; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":1,"summary":"run2 line %d"}\n' "$i" "$i"; done \
   > "$loops/fix-ci/gates.jsonl"
-ingest || die_temp "e2e re-ingest failed"
 run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
-check "E2E: a rewritten gates.jsonl under reused cites is kept, not reaped" $?
+check "E2E: a gates.jsonl rewritten under reused cites is kept until ingested" $?
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "E2E: ingest indexes the rewrite under its reused cites, and the dir reaps" $?
 printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
   > "$loops/fix-ci/gates.jsonl"
 mv "$home/history-index.jsonl" "$home/held.jsonl"; ingest || die_temp "e2e fresh ingest failed"
@@ -361,12 +364,15 @@ run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: a line ingest wrote with every field reaps" $?
 printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":2,"ran":false,"summary":""}\n' \
   > "$loops/fix-ci/gates.jsonl"
-ingest || die_temp "e2e re-ingest failed"
 run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
 check "E2E: a rewrite differing only in blockers, ran and verified_by is kept" $?
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "E2E: ingest indexes that rewrite, and the dir reaps" $?
 
-# --- each guard field on its own: a rewrite changing only it is kept ---
+# --- each guard field on its own: a rewrite changing only it is kept, then indexed ---
 base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
 for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
   '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)'; do
@@ -376,6 +382,10 @@ for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blo
   run "$runner"
   has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
   check "FIELD: a rewrite changing only $change is kept" $?
+  ingest || die_temp "field re-ingest failed"
+  run "$runner"
+  has $'reap\tfix-ci\tmerged (ancestry)'
+  check "FIELD: ingest indexes a rewrite changing only $change, and it reaps" $?
 done
 
 # --- ingest keeps false; an index written before it did still matches ---

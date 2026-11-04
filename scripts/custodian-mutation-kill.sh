@@ -256,6 +256,22 @@ history-false-tta-nulled|custodian-history.sh|custodian-reap.test.sh|s/task_tool
 reap-guard-splits-false-null|custodian-reap.sh|custodian-reap.test.sh|s{\Q(.ran // null), (.task_tool_available // null)\E}{.ran, .task_tool_available}g
 history-archive-unwalked|custodian-history.sh|custodian-guardrails.test.sh|s/\[ "\$include_archive" -eq 1 \] \|\| continue/continue/
 history-strips-any-suffix|custodian-history.sh|custodian-guardrails.test.sh|s/\[ -d "\$\{1%\.\*\}" \]/true/
+history-key-cite-only|custodian-history.sh|custodian-history.test.sh|s/select\(\$cur\[\.cite\] != gate_key\)/select(\$cur[.cite] == null)/
+history-changed-unreported|custodian-history.sh|custodian-history.test.sh|s/elif \$now\[\.cite\] != gate_key then/elif false then/
+history-vanished-unreported|custodian-history.sh|custodian-history.test.sh|s/if \$now\[\.cite\] == null then/if false then/
+history-reports-unwalked|custodian-history.sh|custodian-history.test.sh|s/select\(\$files\[\.cite \| sub\(":\[0-9\]\+\$"; ""\)\] \/\/ false\)/select(true)/
+history-reports-superseded|custodian-history.sh|custodian-history.test.sh|s/\| \$idx \| current\[\]/| \$idx[]/
+history-index-overwritten|custodian-history.sh|custodian-history.test.sh|s/cat "\$new" >> "\$INDEX"/cat "\$new" > "\$INDEX"/
+history-summary-counts-dropped|custodian-history.sh|custodian-history.test.sh|s/\$changed changed, \$vanished vanished/0 changed, 0 vanished/
+history-query-lists-superseded|custodian-history.sh|custodian-history.test.sh|s/\[ \[inputs\] \| current\[\]/[ inputs/
+index-current-keeps-oldest|custodian-index.jq|custodian-history.test.sh|s/\.\[\$r\.cite \| tostring\] = \$r/.[\$r.cite | tostring] \/\/= \$r/
+index-key-drops-wave|custodian-index.jq|custodian-reap.test.sh|s/\Q[.wave, .kind,\E/[.kind,/
+index-key-drifts-from-reap|custodian-index.jq|custodian-history.test.sh|s{\Q (.summary // ""),\E}{}
+guardrails-counts-superseded|custodian-guardrails.sh|custodian-history.test.sh|s/ \| current\) as \$rows/) as \$rows/
+replay-counts-superseded|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s/ \| current\) as \$rows/) as \$rows/
+history-mismatch-exits-nonzero|custodian-history.sh|custodian-history.test.sh|s/\[ -z "\$report" \] \|\| printf '%s\\n' "\$report"/[ -z "\$report" ]/
+history-reports-unchanged|custodian-history.sh|custodian-history.test.sh|s/      else empty end'\)/      else "CHANGED \\(.cite)" end')/
+history-key-cite-only-blocks-reap|custodian-history.sh|custodian-reap.test.sh|s/select\(\$cur\[\.cite\] != gate_key\)/select(\$cur[.cite] == null)/
 guardrails-audits-archive|custodian-guardrails.sh|custodian-guardrails.test.sh|s{\Q | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 unanimity-audits-archive|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 format-scope-replay-audits-archive|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
