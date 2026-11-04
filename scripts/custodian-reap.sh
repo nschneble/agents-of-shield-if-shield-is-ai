@@ -228,7 +228,7 @@ for dir in ${branch_dirs[@]+"${branch_dirs[@]}"}; do
       verdict=reap; reason="merged (ancestry)"
     elif [ "$gh_ok" -eq 1 ] && [ -n "$merged_pr" ]; then
       verdict=reap; reason="merged (PR #$merged_pr)"
-    elif [ "$gh_ok" -eq 1 ] && merged_containing "$branch" "$tip" && [ -n "$contained_prs" ]; then
+    elif [ "$gh_ok" -eq 1 ] && [ -z "$tip_note" ] && merged_containing "$branch" "$tip" && [ -n "$contained_prs" ]; then
       verdict=reap; reason="merged (PR #$contained_prs)"
     elif [ "$gh_ok" -eq 1 ] && behind=$(merged_behind "$branch" "$tip") && [ -n "$behind" ]; then
       reason="kept (merged PR #$behind, local tip ahead)"

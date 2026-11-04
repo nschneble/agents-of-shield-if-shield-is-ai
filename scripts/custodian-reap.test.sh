@@ -321,6 +321,17 @@ has $'keep\todd\tkept (merge unverifiable — PR #63 compare failed)'
 check "CONTAIN: an unknown compare status keeps, and says so" $?
 has $'reap\tlocalhead\tmerged (PR #64)'; check "CONTAIN: a local head is decided by local ancestry" $?
 has $'keep\tlocaldiv\tkept (unmerged)'; check "CONTAIN: a local head not containing the tip keeps" $?
+# a reused name restarted on an older main commit: the old PR's head contains it
+gitq branch stale main~0 && gitq branch stalelocal main~0 || die_temp "stale branches failed"
+for b in stale stalelocal; do mkdir -p "$loops/$b"; echo '{"queue":[{"wave":1,"status":"in_progress"}]}' > "$loops/$b/run-state.json"; done
+{ printf 'merged\tstale\t66\t%s\n' "$(remote_head 5)"; printf 'merged\tstalelocal\t67\t%s\n' "$lh"; } >> "$temp_dir/$case/gh.tsv"
+printf '%s\t%s\tahead\n' "$(sha stale)" "$(remote_head 5)" >> "$temp_dir/$case/compare.tsv"
+run "$runner"
+has $'keep\tstale\tkept (merged tip, no recorded commit)'
+check "CONTAIN: a tip already on main is never reaped by containment" $?
+has $'keep\tstalelocal\tkept (merged tip, no recorded commit)'
+check "CONTAIN: a tip already on main stays kept on the local path too" $?
+has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: the gate leaves a tip off main to containment" $?
 
 # --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
 case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"

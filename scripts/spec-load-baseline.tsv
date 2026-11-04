@@ -191,10 +191,16 @@
 # scripts/custodian-experiments.sh before proposing, Phase D's step 5
 # says the orchestrator writes each finished experiment's report, and
 # artifacts.md defines the record. Also carn joins the repo list.
+#
+# +121 always on custodian-run: phase-detail.md's Phase A now says a
+# merged PR whose head contains the local tip counts, decided locally or
+# by GitHub's compare API, keeps when the compare can't decide, and is
+# skipped for a tip already in the default so a reused name's old PR
+# never reaps new work.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21517	7515
+custodian-run	21638	7515
 defend-run	8086	0
 declutter-run	6661	0
