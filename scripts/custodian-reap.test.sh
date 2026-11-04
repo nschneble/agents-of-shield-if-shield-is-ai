@@ -27,6 +27,13 @@ mkdir -p "$stub_bin" || die_temp "cannot create $stub_bin"
 cat > "$stub_bin/gh" <<'STUB'
 #!/usr/bin/env bash
 [ -z "${GH_STUB_FAIL:-}" ] || { echo "gh: network down" >&2; exit 1; }
+if [ "$1" = api ]; then
+  basehead=${2##*/compare/}
+  status=$(awk -F'\t' -v b="${basehead%%...*}" -v h="${basehead#*...}" '$1 == b && $2 == h { print $3; exit }' \
+    "${GH_STUB_COMPARE:-/dev/null}")
+  [ -n "$status" ] || { echo '{"message":"Not Found","status":"404"}'; echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+  echo "$status"; exit 0
+fi
 state=""; head=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -112,7 +119,7 @@ build() { # builds $repo with the full branch roster
 }
 run() { # command and args, run with the fixture env
   out=$(env REPO_ROOT="$repo" CUSTODIAN_HOME="$home" GH_STUB_DB="$temp_dir/$case/gh.tsv" \
-    PATH="$stub_bin:$PATH" "$@" 2>&1); rc=$?
+    GH_STUB_COMPARE="$temp_dir/$case/compare.tsv" PATH="$stub_bin:$PATH" "$@" 2>&1); rc=$?
 }
 tree() { (cd "$loops" && find . | sort); }
 
@@ -289,7 +296,50 @@ run "$runner"
 has $'keep\tanc\tkept (unindexed — ingest gap)'; check "NO INDEX: a gated merged dir is kept" $?
 mv "$home/held.jsonl" "$home/history-index.jsonl"
 
-# --- the real ingest, then reap: a rewritten gates.jsonl is not indexed ---
+# --- a merged PR whose head contains the local tip reaps ---
+case=contain; mkdir -p "$temp_dir/$case"
+repo="$temp_dir/$case/repo"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
+mkdir -p "$repo" "$home" && git init -q -b main "$repo" && gitq commit -q --allow-empty -m seed \
+  && gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
+  && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "contain repo failed"
+for b in botfix split gone404 odd localhead localdiv same badhead; do branch_commit "$b" || die_temp "branch $b failed"; done
+for b in botfix split gone404 odd localhead localdiv same badhead; do record "$b" "$(sha "$b")"; done
+remote_head() { printf '%040d' "$1"; }
+local_child() { gitq commit-tree -p "$1" -m bot "$(gitq rev-parse "$1^{tree}")"; }
+lh=$(local_child "$(sha localhead)") && ld=$(local_child "$(sha main)") || die_temp "local heads failed"
+{ printf 'merged\tbotfix\t60\t%s\n' "$(remote_head 1)"; printf 'merged\tsplit\t61\t%s\n' "$(remote_head 2)"
+  printf 'merged\tgone404\t62\t%s\n' "$(remote_head 3)"; printf 'merged\todd\t63\t%s\n' "$(remote_head 4)"
+  printf 'merged\tlocalhead\t64\t%s\nmerged\tlocaldiv\t65\t%s\n' "$lh" "$ld"
+  printf 'merged\tsame\t68\t%s\nmerged\tbadhead\t69\tnot-a-sha\n' "$(remote_head 6)"; } > "$temp_dir/$case/gh.tsv"
+{ printf '%s\t%s\tahead\n' "$(sha botfix)" "$(remote_head 1)"; printf '%s\t%s\tdiverged\n' "$(sha split)" "$(remote_head 2)"
+  printf '%s\t%s\tbogus\n' "$(sha odd)" "$(remote_head 4)"; printf '%s\t%s\tidentical\n' "$(sha same)" "$(remote_head 6)"
+  printf '%s\tnot-a-sha\tahead\n' "$(sha badhead)"; } > "$temp_dir/$case/compare.tsv"
+run "$runner"
+has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: a merged head ahead of the local tip reaps" $?
+has $'keep\tsplit\tkept (unmerged)'; check "CONTAIN: a merged head diverged from the local tip keeps" $?
+has $'keep\tgone404\tkept (merge unverifiable — PR #62 compare failed)'
+check "CONTAIN: a compare that 404s keeps, and says so" $?
+has $'keep\todd\tkept (merge unverifiable — PR #63 compare failed)'
+check "CONTAIN: an unknown compare status keeps, and says so" $?
+has $'reap\tlocalhead\tmerged (PR #64)'; check "CONTAIN: a local head is decided by local ancestry" $?
+has $'keep\tlocaldiv\tkept (unmerged)'; check "CONTAIN: a local head not containing the tip keeps" $?
+has $'reap\tsame\tmerged (PR #68)'; check "CONTAIN: a compare reporting identical reaps" $?
+has $'keep\tbadhead\tkept (merge unverifiable — PR #69 head is not a commit id)'
+check "CONTAIN: a head that is not a commit id keeps, and says why" $?
+# a reused name restarted on older main: the old PR's head contains it
+gitq commit -q --allow-empty -m newer && gitq update-ref refs/remotes/origin/main main \
+  && gitq branch stale main~1 && gitq branch stalelocal main~1 || die_temp "stale branches failed"
+for b in stale stalelocal; do mkdir -p "$loops/$b"; echo '{"queue":[{"wave":1,"status":"in_progress"}]}' > "$loops/$b/run-state.json"; done
+{ printf 'merged\tstale\t66\t%s\n' "$(remote_head 5)"; printf 'merged\tstalelocal\t67\t%s\n' "$lh"; } >> "$temp_dir/$case/gh.tsv"
+printf '%s\t%s\tahead\n' "$(sha stale)" "$(remote_head 5)" >> "$temp_dir/$case/compare.tsv"
+run "$runner"
+has $'keep\tstale\tkept (merged tip, no recorded commit)'
+check "CONTAIN: a tip already on main is never reaped by containment" $?
+has $'keep\tstalelocal\tkept (merged tip, no recorded commit)'
+check "CONTAIN: a tip already on main stays kept on the local path too" $?
+has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: the gate leaves a tip off main to containment" $?
+
+# --- real ingest, then reap: a rewrite blocks the reap until ingested ---
 case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
 repo="$temp_dir/$case/rss-reader"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
 mkdir -p "$repo" "$home" && git init -q -b main "$repo" || die_temp "e2e init failed"
@@ -306,10 +356,13 @@ run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: lines the real ingest indexed let the merged dir reap" $?
 for i in 1 2; do printf '{"wave":%d,"kind":"crew","agent":"the-stickler","blockers":1,"summary":"run2 line %d"}\n' "$i" "$i"; done \
   > "$loops/fix-ci/gates.jsonl"
-ingest || die_temp "e2e re-ingest failed"
 run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
-check "E2E: a rewritten gates.jsonl under reused cites is kept, not reaped" $?
+check "E2E: a gates.jsonl rewritten under reused cites is kept until ingested" $?
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "E2E: ingest indexes the rewrite under its reused cites, and the dir reaps" $?
 printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":0,"ran":true,"verified_by":"executable","summary":""}\n' \
   > "$loops/fix-ci/gates.jsonl"
 mv "$home/history-index.jsonl" "$home/held.jsonl"; ingest || die_temp "e2e fresh ingest failed"
@@ -317,12 +370,15 @@ run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'; check "E2E: a line ingest wrote with every field reaps" $?
 printf '{"wave":1,"kind":"crew","agent":"the-stickler","blockers":2,"ran":false,"summary":""}\n' \
   > "$loops/fix-ci/gates.jsonl"
-ingest || die_temp "e2e re-ingest failed"
 run "$runner"
 has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
 check "E2E: a rewrite differing only in blockers, ran and verified_by is kept" $?
+ingest || die_temp "e2e re-ingest failed"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "E2E: ingest indexes that rewrite, and the dir reaps" $?
 
-# --- each guard field on its own: a rewrite changing only it is kept ---
+# --- each guard field alone: a rewrite of only it keeps, then indexes ---
 base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
 for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
   '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)'; do
@@ -332,6 +388,10 @@ for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blo
   run "$runner"
   has $'keep\tfix-ci\tkept (unindexed — ingest gap)'
   check "FIELD: a rewrite changing only $change is kept" $?
+  ingest || die_temp "field re-ingest failed"
+  run "$runner"
+  has $'reap\tfix-ci\tmerged (ancestry)'
+  check "FIELD: ingest indexes a rewrite changing only $change, and it reaps" $?
 done
 
 # --- ingest keeps false; an index written before it did still matches ---

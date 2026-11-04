@@ -36,7 +36,10 @@ info() { printf 'INFO      %-22s %s: %s\n' "$1" "$2" "$3"; advisories=$((advisor
 # --- Token estimate: chars/4, the standard rough BPE proxy (see header note) ---
 est_file_tokens() { # file -> approx token count
   local c; c=$(wc -c < "$1" 2>/dev/null | tr -d ' '); echo $(( ${c:-0} / 4 )); }
-est_str_tokens() { echo $(( ${#1} / 4 )); }
+est_str_tokens() { echo $(( $(char_len "$1") / 4 )); }
+
+# ${#var} counts bytes unless LC_CTYPE is utf-8; this counts code points
+char_len() { printf '%s' "$1" | LC_ALL=C tr -d '\200-\277' | wc -c | tr -d ' '; }
 
 # --- Frontmatter helpers (block between the first two `---` fences) ---
 has_frontmatter() { [ "$(head -n 1 "$1" 2>/dev/null)" = "---" ]; }
@@ -250,7 +253,8 @@ lint_skill() {
     local name; name=$(frontmatter_value "$f" name)
     name="${name#[\"\']}"; name="${name%[\"\']}"
     if [ -n "$name" ]; then
-      [ "${#name}" -le "$NAME_MAX" ] || viol "name-length" "$f" "name is ${#name} chars (max $NAME_MAX)"
+      local name_len; name_len=$(char_len "$name")
+      [ "$name_len" -le "$NAME_MAX" ] || viol "name-length" "$f" "name is $name_len chars (max $NAME_MAX)"
       if ! printf '%s' "$name" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$' || printf '%s' "$name" | grep -q -- '--'; then
         viol "name-pattern" "$f" "name \`$name\` must be lowercase a-z/0-9/hyphen, no leading/trailing or consecutive hyphens"
       fi
@@ -263,7 +267,8 @@ lint_skill() {
     if [ -z "$desc" ]; then
       [ "$seen_desc" -eq 1 ] && viol "description-empty" "$f" "\`description:\` is present but empty"
     else
-      [ "${#desc}" -le "$DESC_MAX" ] || viol "description-length" "$f" "description is ${#desc} chars (max $DESC_MAX)"
+      local desc_len; desc_len=$(char_len "$desc")
+      [ "$desc_len" -le "$DESC_MAX" ] || viol "description-length" "$f" "description is $desc_len chars (max $DESC_MAX)"
       case "$desc" in
         I\ *|I\'*) info "adv-description-firstperson" "$f" "description opens first-person (\"I …\") — lead with the capability" ;;
       esac
@@ -278,7 +283,8 @@ lint_skill() {
     local compat; compat=$(frontmatter_value "$f" compatibility)
     compat="${compat#[\"\']}"; compat="${compat%[\"\']}"
     if [ -n "$compat" ]; then
-      [ "${#compat}" -le "$COMPAT_MAX" ] || viol "compatibility-length" "$f" "compatibility is ${#compat} chars (max $COMPAT_MAX)"
+      local compat_len; compat_len=$(char_len "$compat")
+      [ "$compat_len" -le "$COMPAT_MAX" ] || viol "compatibility-length" "$f" "compatibility is $compat_len chars (max $COMPAT_MAX)"
     fi
   fi
 

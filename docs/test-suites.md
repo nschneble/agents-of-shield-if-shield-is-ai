@@ -84,6 +84,34 @@ Also covers two properties the legacy exemption depends on:
 
 Pure bash + jq, self-contained fixtures.
 
+## custodian-history
+
+Both-directions test for `custodian-history.sh ingest` and the readers of
+its index.
+
+Ingest compares a line with its cite's last record, so the fixture rewrites
+one line, deletes a line mid-file and appends after it, and truncates a
+file. A rewrite reports `CHANGED` once; a deleted or truncated line reports
+`VANISHED` and a line that only moved reports nothing. New content is
+appended beside the old record and every earlier record stays
+byte-identical; an unchanged re-ingest adds and reports nothing, and a
+line reverted to older content is re-appended once. An archived or deleted
+source reports nothing. `false` must be told apart from `null` and from a
+missing key, and a missing `verified_by` or `outcome` from `null`, in both
+directions, and a line rewritten to `ran` false must reach G1 without a
+rebuild.
+
+`query` and the guardrail replay count each distinct line a log has ever
+held once, by indexed content: after a mid-file deletion the tail counts
+once and the deleted line still counts; a violation rewritten clean still
+counts, and a revert adds nothing. Two lines in one log with the same
+indexed content count as one, the same content in another log counts on
+its own. A property check builds
+records varying each guard field and requires that any two the reap
+guard's projection, read from `custodian-reap.sh`, tells apart, ingest's
+key does too, and that ingest's key tells `ran` false from null where the
+guard does not. A failed ingest must leave no temp file.
+
 ## custodian-log-recall
 
 Both-directions test for the recall check.
@@ -212,11 +240,20 @@ later checks as well (the resolve check, then the DEFAULT_REF guard or
 the exact-spelling check), so removing any one leaves the arm green.
 A PR merged into a feature branch, for a live or a deleted branch, must not
 reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
+A merged PR whose head is not the tip reaps only when that head contains
+it: a head absent locally goes to the stub's `gh api` compare (`ahead` or
+`identical` reaps; `diverged`, a 404, or an unknown status keeps), a head
+that is not a full commit id keeps with no compare, and a head present
+locally is decided by `git merge-base`, with no compare row to fall back on.
+A tip already on main, rooted at an older main commit, never reaps by
+containment on either path.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
-`gates.jsonl` rewritten under reused cites must be kept, including one that
-differs only in `blockers`, `ran` or `verified_by`. `index_upto` writes every
-field ingest writes, in ingest's normal form, since the guard compares them,
-and each guard field has its own single-field arm and mutant. Ingest must
+`gates.jsonl` rewritten under reused cites must be kept until the next
+ingest, then reap, including one that differs only in `blockers`, `ran` or
+`verified_by`. `index_upto` writes every field ingest writes, in ingest's
+normal form, since the guard compares them, and each guard field has its
+own single-field arm and mutant; each arm then re-ingests and must reap,
+which proves ingest's key tells apart every field the guard does. Ingest must
 index `ran` and `task_tool_available` false as false, and the guard must
 still match an older index that stored them as null. `--apply` must
 archive, never delete: reaped dirs move whole under `.archive/<date>/`, a
@@ -250,6 +287,14 @@ own violation with the offending file cited, that exit is 1 on any structural
 violation and 0 when clean, and — crucially for the two-tier design — that an
 ADVISORY-only fixture (over the token budgets, nothing structurally wrong)
 still exits 0. Pure bash + jq-free, self-contained fixtures under a temp dir.
+
+The name, description and compatibility limits are counted in characters, as
+the Agent Skills spec states them, under `LC_ALL=C` and under a UTF-8 locale
+alike: a two-byte-character value exactly at each limit passes and one
+character over fails with its character count in the message. The C side is
+any caller without a UTF-8 locale, where `${#var}` counts bytes. Under
+`LC_ALL=C` the discovery-token estimate counts characters too: a two-byte
+description at the budget stays silent and one token over is flagged.
 
 ## doc-bloat-scan
 

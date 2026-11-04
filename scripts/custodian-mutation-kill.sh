@@ -34,6 +34,8 @@ done
 # the pattern must be unique in the file.
 #
 # perl + equivalent-mutant gotchas: looper-custodian.md decision 25
+# no mutant unpins char_len: GNU tr is byte-wise in any locale, so CI
+# cannot tell the forms apart; only BSD tr needs the LC_ALL=C pin
 # gotcha: the replacement side interpolates too, a stray `\{` breaks awk
 # gotcha: inside \Q..\E a `\$` matches backslash-dollar, so hand-escape
 # every dollar sign instead of trusting the quotemeta to cover it
@@ -218,7 +220,7 @@ reap-default-origin-assumed|custodian-reap.sh|custodian-reap.test.sh|s/case "\$o
 reap-default-ambiguous-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ "\$\(printf '%s\\n' "\$remote" \| wc -l\)" -eq 1 \]/true/; s/\[ "\$DEFAULT_REF" = "refs\/heads\/\$DEFAULT" \] \|\|/true ||/
 reap-default-slashed-remote-first-slash|custodian-reap.sh|custodian-reap.test.sh|s/remotes\/"\$remote"\/\};;/remotes\/}; DEFAULT=\$\{DEFAULT#*\/};;/
 reap-default-unknown-remote-accepted|custodian-reap.sh|custodian-reap.test.sh|s/\[ -n "\$remote" \] \|\| \{ echo "--default \$DEFAULT names no configured remote" >&2; exit 2; \}/remote=\$\{DEFAULT_REF#refs\/remotes\/\}; remote=\$\{remote%%\/*\}/
-reap-merged-behind-dead|custodian-reap.sh|custodian-reap.test.sh|s/behind=\$\(merged_behind "\$branch" "\$tip"\) && \[ -n "\$behind" \]/false/
+reap-merged-behind-dead|custodian-reap.sh|custodian-reap.test.sh|s/behind=\$\(merged_behind "\$merged_raw" "\$tip"\) && \[ -n "\$behind" \]/false/
 reap-merged-behind-any-tip|custodian-reap.sh|custodian-reap.test.sh|s/git -C "\$REPO_ROOT" merge-base --is-ancestor "\$oid" "\$2" 2>\/dev\/null && found/found/
 reap-newline-split-unguarded|custodian-reap.sh|custodian-reap.test.sh|s/-print0 2>\/dev\/null/-print 2>\/dev\/null | tr "\\n" "\\0"/; s/case "\$dir" in "\$loops"\/\?\*\) ;; \*\) continue ;; esac/:/
 reap-dot-dir-not-skipped|custodian-reap.sh|custodian-reap.test.sh|s/if ! git check-ref-format "refs\/heads\/\$branch"; then/if false; then/
@@ -256,12 +258,45 @@ history-false-tta-nulled|custodian-history.sh|custodian-reap.test.sh|s/task_tool
 reap-guard-splits-false-null|custodian-reap.sh|custodian-reap.test.sh|s{\Q(.ran // null), (.task_tool_available // null)\E}{.ran, .task_tool_available}g
 history-archive-unwalked|custodian-history.sh|custodian-guardrails.test.sh|s/\[ "\$include_archive" -eq 1 \] \|\| continue/continue/
 history-strips-any-suffix|custodian-history.sh|custodian-guardrails.test.sh|s/\[ -d "\$\{1%\.\*\}" \]/true/
+history-key-cite-only|custodian-history.sh|custodian-history.test.sh|s/select\(\$cur\[\.cite\] != exact_key\)/select(\$cur[.cite] == null)/
+history-key-cite-only-blocks-reap|custodian-history.sh|custodian-reap.test.sh|s/select\(\$cur\[\.cite\] != exact_key\)/select(\$cur[.cite] == null)/
+history-changed-unreported|custodian-history.sh|custodian-history.test.sh|s/\Qthen "CHANGED \E/then "VANISHED /
+history-vanished-unreported|custodian-history.sh|custodian-history.test.sh|s/\Q else "VANISHED \(.cite)" end\E/ else empty end/
+history-changed-test-inverted|custodian-history.sh|custodian-history.test.sh|s/\+ \$now\[\.cite\]\] \| not\)/+ \$now[.cite]])/
+history-reports-shifted|custodian-history.sh|custodian-history.test.sh|s/select\(\$kept\[log_path \+ "\\t" \+ exact_key\] \| not\)/select(\$now[.cite] != exact_key)/
+history-reports-unchanged|custodian-history.sh|custodian-history.test.sh|s/select\(\$kept\[log_path \+ "\\t" \+ exact_key\] \| not\)/select(true)/
+history-reports-unwalked|custodian-history.sh|custodian-history.test.sh|s/map\(select\(\$files\[log_path\] \/\/ false\)\)/map(.)/
+history-reports-superseded|custodian-history.sh|custodian-history.test.sh|s/\(\$idx \| current \| map\(select/(\$idx | map(select/
+history-index-overwritten|custodian-history.sh|custodian-history.test.sh|s/cat "\$new" >> "\$INDEX"/cat "\$new" > "\$INDEX"/
+history-summary-counts-dropped|custodian-history.sh|custodian-history.test.sh|s/\$changed changed, \$vanished vanished/0 changed, 0 vanished/
+history-query-by-cite|custodian-history.sh|custodian-history.test.sh|s/\[ \[inputs\] \| distinct\[\]/[ [inputs] | current[]/
+history-temp-leak|custodian-history.sh|custodian-history.test.sh|s/  trap 'rm -f "\$\{cand:-\}"[^\n]*EXIT\n//
+index-current-keeps-oldest|custodian-index.jq|custodian-history.test.sh|s/\.\[\$r\.cite \| tostring\] = \$r/.[\$r.cite | tostring] \/\/= \$r/
+index-distinct-by-cite|custodian-index.jq|custodian-history.test.sh|s/\[\$r\.repo, \(\$r \| log_path\), \(\$r \| exact_key\)\]/[\$r.cite]/
+index-distinct-drops-content|custodian-index.jq|custodian-history.test.sh|s/\[\$r\.repo, \(\$r \| log_path\), \(\$r \| exact_key\)\]/[\$r.repo, (\$r | log_path)]/
+index-distinct-drops-path|custodian-index.jq|custodian-history.test.sh|s/\[\$r\.repo, \(\$r \| log_path\), \(\$r \| exact_key\)\]/[\$r.repo, (\$r | exact_key)]/
+index-exact-key-folds-false|custodian-index.jq|custodian-history.test.sh|s/\Q.ran, .task_tool_available,\E/(.ran \/\/ null), (.task_tool_available \/\/ null),/
+index-key-drops-wave|custodian-index.jq|custodian-reap.test.sh|s/\Q[.wave, .kind,\E/[.kind,/
+index-key-drops-summary|custodian-index.jq|custodian-history.test.sh|s{\Q .summary,\E}{}
+guardrails-counts-by-cite|custodian-guardrails.sh|custodian-history.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
+replay-counts-by-cite|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
+history-mismatch-exits-nonzero|custodian-history.sh|custodian-history.test.sh|s/\[ -z "\$report" \] \|\| printf '%s\\n' "\$report"/[ -z "\$report" ]/
 guardrails-audits-archive|custodian-guardrails.sh|custodian-guardrails.test.sh|s{\Q | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 unanimity-audits-archive|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 format-scope-replay-audits-archive|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s{\Q| select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)\E}{}
 reap-default-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/if \[ "\$branch" = "\$DEFAULT" \]; then/if false; then/
 reap-nested-guard-off|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$nested" \]; then/elif false; then/
 reap-delete-failure-uncounted|custodian-reap.sh|custodian-reap.test.sh|s/>&2; failed=\$\(\(failed \+ 1\)\); continue/>&2; continue/
+reap-contained-pr-dead|custodian-reap.sh|custodian-reap.test.sh|s/merged_containing "\$merged_raw" "\$tip" && \[ -n "\$contained_prs" \]/false/
+reap-tip-on-default-contained|custodian-reap.sh|custodian-reap.test.sh|s/ && \[ -z "\$tip_note" \] && merged_containing/ \&\& merged_containing/
+reap-compare-identical-refused|custodian-reap.sh|custodian-reap.test.sh|s/\Q      ahead|identical)\E/      ahead)/
+reap-bad-head-compared|custodian-reap.sh|custodian-reap.test.sh|s/\Qif [[ ! "\E\$\Qoid" =~ ^[0-9a-f]{40}\E\$\Q ]]; then\E/if false; then/
+reap-bad-head-reason-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$badhead_prs" \]; then/elif false; then/
+reap-compare-ahead-refused|custodian-reap.sh|custodian-reap.test.sh|s/\Q      ahead|identical)\E/      identical)/
+reap-compare-diverged-contained|custodian-reap.sh|custodian-reap.test.sh|s/\Q      behind|diverged) ;;\E/      behind) ;;\n      diverged) contained_prs=\$n;;/
+reap-compare-failure-contained|custodian-reap.sh|custodian-reap.test.sh|s/\*\) unverified_prs="\$unverified_prs\$\{unverified_prs:\+,\}\$n";;/*) contained_prs=\$n;;/
+reap-local-head-ignored|custodian-reap.sh|custodian-reap.test.sh|s/if git -C "\$REPO_ROOT" cat-file -e "\$oid\^\{commit\}" 2>\/dev\/null; then/if false; then/
+reap-unverified-reason-dead|custodian-reap.sh|custodian-reap.test.sh|s/elif \[ -n "\$unverified_prs" \]; then/elif false; then/
 backup-copy-failure-ignored|custodian-backup.sh|custodian-backup.test.sh|s/\|\| \{ echo "copy failed: \$original" >&2; failed=\$\(\(failed \+ 1\)\); \}/|| true/
 backup-manifest-despite-partial|custodian-backup.sh|custodian-backup.test.sh|s/if \[ "\$failed" -gt 0 \]; then/if false; then/
 backup-seq-fixed|custodian-backup.sh|custodian-backup.test.sh|s/seq=\$\(\( \$\{seq:-0\} \+ 1 \)\)/seq=1/
@@ -284,6 +319,12 @@ undo-moves-into-real-dir|custodian-backup.sh|custodian-backup.test.sh|s/\{ \[ -L
 undo-follows-parent-link|custodian-backup.sh|custodian-backup.test.sh|s/if ! parent_unmoved "\$original"; then/if false; then/
 undo-deletes-backup|custodian-backup.sh|custodian-backup.test.sh|s/(\n  \[ "\$failed" -eq 0 \] \|\| exit 1\n\})/\n  rm -rf "\$bdir"$1/
 reap-repo-env-beats-flag|custodian-reap.sh|custodian-reap.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
+lint-char-len-counts-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/char_len\(\) \{ printf '%s' "\$1" \| LC_ALL=C tr -d '[^']*' \| wc -c \| tr -d ' '; \}/char_len() { printf '%s' "\${#1}"; }/
+lint-desc-len-off-by-one|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$desc_len" -le "\$DESC_MAX" \]/[ "\$desc_len" -lt "\$DESC_MAX" ]/
+lint-desc-msg-reports-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/description is \$desc_len chars/description is \${#desc} chars/
+lint-disc-tokens-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/est_str_tokens\(\) \{ echo \$\(\( \$\(char_len "\$1"\) \/ 4 \)\); \}/est_str_tokens() { echo \$(( \${#1} \/ 4 )); }/
+lint-name-len-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$name_len" -le/[ "\${#name}" -le/
+lint-compat-len-bytes|custodian-skill-lint.sh|custodian-skill-lint.test.sh|s/\[ "\$compat_len" -le/[ "\${#compat}" -le/
 lsa-repo-env-beats-flag|loop-state-audit.sh|loop-state-audit.test.sh|s/REPO_ROOT="\$\{REPO_FLAG:-\$\{REPO_ROOT:-/REPO_ROOT="\${REPO_ROOT:-\${REPO_FLAG:-/
 cite-gone-preferred-roots-only|custodian-cite-check.sh|custodian-cite-check.test.sh|s/every_root "\$\{roots\[/printf '%s\\n' "\${roots[/
 cite-gone-errored-root-uncounted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ "\$note" = errored \] && errored=1/:/

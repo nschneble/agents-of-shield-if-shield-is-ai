@@ -10,6 +10,7 @@ set -euo pipefail
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="${INDEX:-$CUSTODIAN_HOME/history-index.jsonl}"
+SCRIPTS=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,7 +23,8 @@ done
 
 [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
 
-jq -rn --arg index "$INDEX" '
+jq -rn -L "$SCRIPTS" --arg index "$INDEX" '
+  include "custodian-index";
   def txt: ((.summary // "") + " " + (.verdict // ""));
   def is_class:
     (txt | test("prettier"; "i"))
@@ -32,7 +34,7 @@ jq -rn --arg index "$INDEX" '
     (txt | test("prettier --check fail|fails prettier|failed prettier --check|still failed prettier|silently no-op"; "i"));
 
   # archived gate lines are never re-audited (decision 32)
-  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)]) as $rows
+  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)] | distinct) as $rows
   | ($rows | length)                          as $n
   | ($rows | map(select(is_class)))           as $class
   | ($class | map(select(is_viol)))           as $viol

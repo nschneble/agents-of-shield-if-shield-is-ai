@@ -191,10 +191,32 @@
 # scripts/custodian-experiments.sh before proposing, Phase D's step 5
 # says the orchestrator writes each finished experiment's report, and
 # artifacts.md defines the record. Also carn joins the repo list.
+#
+# +121 always on custodian-run: phase-detail.md's Phase A now says a
+# merged PR whose head contains the local tip counts, decided locally or
+# by GitHub's compare API, keeps when the compare can't decide, and is
+# skipped for a tip already in the default so a reused name's old PR
+# never reaps new work.
+#
+# +151 always / +102 conditional on custodian-run: ingest now keys a
+# line on its cite and content, so phase-detail.md says how it reports
+# CHANGED and VANISHED lines and that readers take the newest record per
+# cite (artifacts.md says so too), and history-verb.md stops sending an
+# ingest gap to a hand fix.
+#
+# +139 always / -18 conditional on custodian-run: readers stopped taking
+# the newest record per cite, which a deletion shifts, so phase-detail.md
+# says they count each distinct line once by content, that ingest's key
+# keeps false apart from null, and when CHANGED or VANISHED fires; the
+# history-verb.md rebuild-for-false caveat no longer holds and is gone.
+#
+# +42 always on custodian-run: phase-detail.md names the reap reason for
+# a merged PR head that is not a commit id, and says readers count lines
+# by indexed content rather than calling such lines identical.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21517	7515
+custodian-run	21970	7599
 defend-run	8086	0
 declutter-run	6661	0

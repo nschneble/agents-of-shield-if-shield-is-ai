@@ -8,6 +8,7 @@ set -euo pipefail
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="${INDEX:-$CUSTODIAN_HOME/history-index.jsonl}"
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # exit 2 for usage errors, since exit 1 means "violations found" here
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
@@ -27,7 +28,8 @@ done
 [ -s "$INDEX" ] || { echo "empty or missing index: $INDEX" >&2; exit 2; }
 
 # one JSON object out, so an indexed field can't inject a fake total
-analysis=$(jq -n --arg index "$INDEX" '
+analysis=$(jq -n -L "$HERE" --arg index "$INDEX" '
+  include "custodian-index";
   def legacy: (has("verified_by") | not);
 
   def g1_applicable: (.verdict != null);
@@ -44,7 +46,7 @@ analysis=$(jq -n --arg index "$INDEX" '
      or ((.summary // "") | test("\\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\\b")));
 
   # archived gate lines are never re-audited (decision 32)
-  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)]) as $rows
+  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)] | distinct) as $rows
   | ($rows | length) as $n
   | ($rows | map(select(legacy | not)) | length) as $modern
   | ($rows | map(select(legacy)) | length) as $legacyn
