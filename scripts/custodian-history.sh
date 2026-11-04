@@ -17,7 +17,7 @@
 set -euo pipefail
 
 REPOS_ROOT="${REPOS_ROOT:-$HOME/Developer/Repos}"
-REPOS=(linklater tuffgal tuffgal-action agents-of-shield-if-shield-is-ai rss-reader)
+REPOS=(linklater tuffgal tuffgal-action agents-of-shield-if-shield-is-ai rss-reader carn)
 CUSTODIAN_HOME="${CUSTODIAN_HOME:-$REPOS_ROOT/agents-of-shield-if-shield-is-ai/local/custodian}"
 INDEX="$CUSTODIAN_HOME/history-index.jsonl"
 

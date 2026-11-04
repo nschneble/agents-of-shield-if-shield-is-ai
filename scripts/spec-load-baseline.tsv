@@ -186,10 +186,15 @@
 # now re-run a reviewer's "this test is red" outside the sandbox before
 # it gates. All 3 wrong overrides in a 936-verdict replay were sandboxed
 # runs, and one sent out a needless corrective.
+#
+# +326 always on custodian-run: the experiment record. Phase E checks
+# scripts/custodian-experiments.sh before proposing, Phase D's step 5
+# says the orchestrator writes each finished experiment's report, and
+# artifacts.md defines the record. Also carn joins the repo list.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21191	7515
+custodian-run	21517	7515
 defend-run	8086	0
 declutter-run	6661	0
