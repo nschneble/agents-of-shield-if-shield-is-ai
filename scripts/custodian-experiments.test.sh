@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# custodian-experiments.test — record validates and appends, list filters.
-# Hermetic: CUSTODIAN_HOME points at a temp dir.
+# custodian-experiments.test — record and status validate and append, list
+# shows the newest verdict. Hermetic: CUSTODIAN_HOME points at a temp dir.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 runner="$here/custodian-experiments.sh"
@@ -76,6 +76,44 @@ check "LIST: one readable line per experiment" $?
 
 CUSTODIAN_HOME="$temp_dir/empty" "$runner" list >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 0 ]; check "LIST: an empty record exits 0 (got $rc)" $?
+
+export CUSTODIAN_HOME="$temp_dir/status"
+log="$CUSTODIAN_HOME/experiments.jsonl"
+st() { "$runner" status "$@" >/dev/null 2>"$temp_dir/err"; rc=$?; }
+lines() { wc -l < "$log" | tr -d ' '; }
+rec --issue 101 --item E-6 --verdict follow-up --report "$report" --summary "reaper gap"
+rec --issue 102 --item E-6 --verdict rejected --report "$report" --summary "other issue"
+
+st --issue 101 --item E-7 --verdict adopted --note "PR #1"
+[ "$rc" -eq 2 ]; check "STATUS: an unrecorded item exits 2 (got $rc)" $?
+grep -q 'not recorded: #101 E-7' "$temp_dir/err"; check "STATUS: says why" $?
+[ "$(lines)" -eq 2 ]; check "STATUS: nothing appended for an unrecorded item" $?
+st --issue 103 --item E-6 --verdict adopted --note "PR #1"
+[ "$rc" -eq 2 ]; check "STATUS: the same item on an unrecorded issue exits 2 (got $rc)" $?
+
+st --issue 101 --item E-6 --verdict maybe --note "PR #1"
+[ "$rc" -eq 2 ]; check "STATUS: a verdict outside the enum exits 2 (got $rc)" $?
+st --issue 101 --item E-6 --verdict adopted --note ""
+[ "$rc" -eq 2 ]; check "STATUS: an empty note exits 2 (got $rc)" $?
+[ "$(lines)" -eq 2 ]; check "STATUS: nothing appended on bad input" $?
+
+st --issue 101 --item E-6 --verdict inconclusive --note "first" --date 2026-11-05
+[ "$rc" -eq 0 ]; check "STATUS: a recorded item exits 0 (got $rc)" $?
+st --issue 101 --item E-6 --verdict adopted --note "PR #107" --date 2026-11-06
+[ "$(lines)" -eq 4 ]; check "STATUS: each status appends one line, none rewritten" $?
+jq -se '.[0].verdict == "follow-up" and .[3].type == "status"' "$log" >/dev/null
+check "STATUS: the record line is left as it was" $?
+
+out=$("$runner" list)
+printf '%s\n' "$out" | grep -qx '#101 E-6  2026-11-06  adopted  reaper gap  (was follow-up: PR #107)'
+check "LIST: the newest status gives the verdict, date and note" $?
+printf '%s\n' "$out" | grep -qx '#102 E-6  2026-[0-9-]*  rejected  other issue'
+check "LIST: a status on one issue leaves another issue's item alone" $?
+[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -eq 2 ]
+check "LIST: a status line is not listed as an experiment" $?
+
+rec --issue 101 --item E-6 --verdict adopted --report "$report" --summary "again"
+[ "$rc" -eq 2 ]; check "DUPLICATE: still refused after a status (got $rc)" $?
 
 echo
 if [ "$fails" -eq 0 ]; then echo "all $checks custodian-experiments test(s) passed"; exit 0
