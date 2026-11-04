@@ -5,9 +5,12 @@ set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 runner="$here/custodian-experiments.sh"
 
-temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/experiments-test.XXXXXX") \
-  || { echo "FATAL: mktemp -d failed" >&2; exit 2; }
-[ -d "$temp_dir" ] || { echo "FATAL: mktemp -d gave no directory" >&2; exit 2; }
+die_temp() { echo "FATAL: $1; refusing to run" >&2; exit 2; }
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/looper-suite.XXXXXX") \
+  || die_temp "mktemp -d exited nonzero (TMPDIR=${TMPDIR:-unset})"
+[ -n "$temp_dir" ] \
+  || die_temp "mktemp -d exited 0 with no path (TMPDIR=${TMPDIR:-unset})"
+[ -d "$temp_dir" ] || die_temp "mktemp -d gave a non-directory: $temp_dir"
 trap 'rm -rf "$temp_dir"' EXIT
 export CUSTODIAN_HOME="$temp_dir/custodian"
 log="$CUSTODIAN_HOME/experiments.jsonl"
