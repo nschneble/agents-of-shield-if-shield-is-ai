@@ -557,7 +557,7 @@ check "G-h: both spellings of a self-cite agree" "$result"
 [ "$sig_self" = "0|" ] && result=0 || result=1
 check "G-h: and they agree on silence — a file citing itself is not a chain" "$result"
 
-# ── Length in characters on both sides of the locale axis ─────────────────────
+# ── Length in characters on both sides of the locale axis ────────────────
 
 # a two-byte `é` repeated N times: N characters, 2N bytes
 repeat_e() { local n="$1" out=""; while [ "$n" -gt 0 ]; do out="${out}é"; n=$((n - 1)); done; printf '%s' "$out"; }

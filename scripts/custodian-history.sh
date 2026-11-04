@@ -4,8 +4,8 @@
 # grafting the ctx pattern onto looper structured log.
 #
 # Subcommands:
-#   ingest            append a gates.jsonl line unlike its cite's last record;
-#                     print CHANGED/VANISHED for indexed lines the file lost
+#   ingest            append a line unlike its cite's last record;
+#                     print CHANGED/VANISHED for indexed lines now lost
 #   rebuild           wipe + re-derive from live dirs; loses reaped dirs' records
 #   rebuild --include-archive
 #                     same, then local/loops/.archive/<date>/<dir>; keeps them

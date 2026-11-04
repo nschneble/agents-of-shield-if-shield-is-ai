@@ -5,5 +5,5 @@ def log_path: (.cite // "") | tostring | sub(":[0-9]+$"; "");
 
 def current: reduce .[] as $r ({}; .[$r.cite | tostring] = $r) | [.[]];
 
-# a cite is a line number, so it is no identity once a deletion shifts lines
+# a cite is a line number, no identity once a deletion shifts lines
 def distinct: reduce .[] as $r ({}; .[[$r.repo, ($r | log_path), ($r | exact_key)] | tojson] = $r) | [.[]];

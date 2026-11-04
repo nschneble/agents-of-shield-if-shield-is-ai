@@ -326,7 +326,7 @@ has $'keep\tlocaldiv\tkept (unmerged)'; check "CONTAIN: a local head not contain
 has $'reap\tsame\tmerged (PR #68)'; check "CONTAIN: a compare reporting identical reaps" $?
 has $'keep\tbadhead\tkept (merge unverifiable — PR #69 head is not a commit id)'
 check "CONTAIN: a head that is not a commit id keeps, and says why" $?
-# a reused name restarted on an older main commit: the old PR's head contains it
+# a reused name restarted on older main: the old PR's head contains it
 gitq commit -q --allow-empty -m newer && gitq update-ref refs/remotes/origin/main main \
   && gitq branch stale main~1 && gitq branch stalelocal main~1 || die_temp "stale branches failed"
 for b in stale stalelocal; do mkdir -p "$loops/$b"; echo '{"queue":[{"wave":1,"status":"in_progress"}]}' > "$loops/$b/run-state.json"; done
@@ -339,7 +339,7 @@ has $'keep\tstalelocal\tkept (merged tip, no recorded commit)'
 check "CONTAIN: a tip already on main stays kept on the local path too" $?
 has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: the gate leaves a tip off main to containment" $?
 
-# --- the real ingest, then reap: a rewrite blocks the reap until ingested ---
+# --- real ingest, then reap: a rewrite blocks the reap until ingested ---
 case=e2e; mkdir -p "$temp_dir/$case"; : > "$temp_dir/$case/gh.tsv"
 repo="$temp_dir/$case/rss-reader"; home="$temp_dir/$case/custodian"; loops="$repo/local/loops"
 mkdir -p "$repo" "$home" && git init -q -b main "$repo" || die_temp "e2e init failed"
@@ -378,7 +378,7 @@ run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'
 check "E2E: ingest indexes that rewrite, and the dir reaps" $?
 
-# --- each guard field on its own: a rewrite changing only it is kept, then indexed ---
+# --- each guard field alone: a rewrite of only it keeps, then indexes ---
 base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
 for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
   '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)'; do
