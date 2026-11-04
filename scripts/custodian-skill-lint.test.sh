@@ -611,5 +611,13 @@ for loc in C ${utf8_locale:+"$utf8_locale"}; do
   check "LEN[$loc]: compatibility of 501 chars flagged with its char count" $?
 done
 
+disc_at_budget=$(len_fixture disc-in description 396)
+disc_over_budget=$(len_fixture disc-ox description 400)
+out=$(LC_ALL=C "$linter" "$disc_at_budget" "$disc_over_budget")
+! printf '%s\n' "$out" | grep -q 'adv-discovery-budget.*disc-in'
+check "LEN[C]: discovery tokens of 396 chars in 792 bytes estimate by chars" $?
+printf '%s\n' "$out" | grep -q 'adv-discovery-budget.*disc-ox.*~101 tokens'
+check "LEN[C]: discovery tokens one over the budget in chars are flagged" $?
+
 printf '\n%d failure(s)\n' "$fails"
 [ "$fails" -eq 0 ]

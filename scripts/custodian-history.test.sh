@@ -131,10 +131,10 @@ printf "$g1" bad2 > "$gloops/g/gates.jsonl"; gingest
 check "HISTORY: a revert to a counted version counts it once" $?
 { printf "$g1ok" twin; printf "$g1ok" twin; } > "$gloops/h/gates.jsonl"; gingest
 [ "$(total_of "$gidx")" = 4 ]
-check "TWINS: two identical lines in one log collapse to one" $?
+check "TWINS: two lines with the same indexed content in one log collapse to one" $?
 printf "$g1ok" twin > "$gloops/i/gates.jsonl"; gingest
 [ "$(total_of "$gidx")" = 5 ]
-check "TWINS: the same line in another log counts on its own" $?
+check "TWINS: the same indexed content in another log counts on its own" $?
 
 # --- ingest indexes a rewrite that only flips false, null or presence ---
 kbase='{"wave":1,"kind":"crew","agent":"x","verdict":"ok","verified_by":"executable","blockers":0,"summary":"s"}'

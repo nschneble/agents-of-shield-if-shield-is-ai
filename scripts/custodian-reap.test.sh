@@ -302,16 +302,18 @@ repo="$temp_dir/$case/repo"; home="$temp_dir/$case/custodian"; loops="$repo/loca
 mkdir -p "$repo" "$home" && git init -q -b main "$repo" && gitq commit -q --allow-empty -m seed \
   && gitq remote add origin "$temp_dir/no-such-origin.git" && gitq update-ref refs/remotes/origin/main main \
   && gitq symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || die_temp "contain repo failed"
-for b in botfix split gone404 odd localhead localdiv; do branch_commit "$b" || die_temp "branch $b failed"; done
-for b in botfix split gone404 odd localhead localdiv; do record "$b" "$(sha "$b")"; done
+for b in botfix split gone404 odd localhead localdiv same badhead; do branch_commit "$b" || die_temp "branch $b failed"; done
+for b in botfix split gone404 odd localhead localdiv same badhead; do record "$b" "$(sha "$b")"; done
 remote_head() { printf '%040d' "$1"; }
 local_child() { gitq commit-tree -p "$1" -m bot "$(gitq rev-parse "$1^{tree}")"; }
 lh=$(local_child "$(sha localhead)") && ld=$(local_child "$(sha main)") || die_temp "local heads failed"
 { printf 'merged\tbotfix\t60\t%s\n' "$(remote_head 1)"; printf 'merged\tsplit\t61\t%s\n' "$(remote_head 2)"
   printf 'merged\tgone404\t62\t%s\n' "$(remote_head 3)"; printf 'merged\todd\t63\t%s\n' "$(remote_head 4)"
-  printf 'merged\tlocalhead\t64\t%s\nmerged\tlocaldiv\t65\t%s\n' "$lh" "$ld"; } > "$temp_dir/$case/gh.tsv"
+  printf 'merged\tlocalhead\t64\t%s\nmerged\tlocaldiv\t65\t%s\n' "$lh" "$ld"
+  printf 'merged\tsame\t68\t%s\nmerged\tbadhead\t69\tnot-a-sha\n' "$(remote_head 6)"; } > "$temp_dir/$case/gh.tsv"
 { printf '%s\t%s\tahead\n' "$(sha botfix)" "$(remote_head 1)"; printf '%s\t%s\tdiverged\n' "$(sha split)" "$(remote_head 2)"
-  printf '%s\t%s\tbogus\n' "$(sha odd)" "$(remote_head 4)"; } > "$temp_dir/$case/compare.tsv"
+  printf '%s\t%s\tbogus\n' "$(sha odd)" "$(remote_head 4)"; printf '%s\t%s\tidentical\n' "$(sha same)" "$(remote_head 6)"
+  printf '%s\tnot-a-sha\tahead\n' "$(sha badhead)"; } > "$temp_dir/$case/compare.tsv"
 run "$runner"
 has $'reap\tbotfix\tmerged (PR #60)'; check "CONTAIN: a merged head ahead of the local tip reaps" $?
 has $'keep\tsplit\tkept (unmerged)'; check "CONTAIN: a merged head diverged from the local tip keeps" $?
@@ -321,8 +323,12 @@ has $'keep\todd\tkept (merge unverifiable — PR #63 compare failed)'
 check "CONTAIN: an unknown compare status keeps, and says so" $?
 has $'reap\tlocalhead\tmerged (PR #64)'; check "CONTAIN: a local head is decided by local ancestry" $?
 has $'keep\tlocaldiv\tkept (unmerged)'; check "CONTAIN: a local head not containing the tip keeps" $?
+has $'reap\tsame\tmerged (PR #68)'; check "CONTAIN: a compare reporting identical reaps" $?
+has $'keep\tbadhead\tkept (merge unverifiable — PR #69 head is not a commit id)'
+check "CONTAIN: a head that is not a commit id keeps, and says why" $?
 # a reused name restarted on an older main commit: the old PR's head contains it
-gitq branch stale main~0 && gitq branch stalelocal main~0 || die_temp "stale branches failed"
+gitq commit -q --allow-empty -m newer && gitq update-ref refs/remotes/origin/main main \
+  && gitq branch stale main~1 && gitq branch stalelocal main~1 || die_temp "stale branches failed"
 for b in stale stalelocal; do mkdir -p "$loops/$b"; echo '{"queue":[{"wave":1,"status":"in_progress"}]}' > "$loops/$b/run-state.json"; done
 { printf 'merged\tstale\t66\t%s\n' "$(remote_head 5)"; printf 'merged\tstalelocal\t67\t%s\n' "$lh"; } >> "$temp_dir/$case/gh.tsv"
 printf '%s\t%s\tahead\n' "$(sha stale)" "$(remote_head 5)" >> "$temp_dir/$case/compare.tsv"

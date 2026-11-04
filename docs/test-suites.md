@@ -102,10 +102,11 @@ directions, and a line rewritten to `ran` false must reach G1 without a
 rebuild.
 
 `query` and the guardrail replay count each distinct line a log has ever
-held once, by content: after a mid-file deletion the tail counts once and
-the deleted line still counts; a violation rewritten clean still counts,
-and a revert adds nothing. Two identical lines in one log count as one,
-the same line in another log counts on its own. A property check builds
+held once, by indexed content: after a mid-file deletion the tail counts
+once and the deleted line still counts; a violation rewritten clean still
+counts, and a revert adds nothing. Two lines in one log with the same
+indexed content count as one, the same content in another log counts on
+its own. A property check builds
 records varying each guard field and requires that any two the reap
 guard's projection, read from `custodian-reap.sh`, tells apart, ingest's
 key does too, and that ingest's key tells `ran` false from null where the
@@ -240,9 +241,12 @@ the exact-spelling check), so removing any one leaves the arm green.
 A PR merged into a feature branch, for a live or a deleted branch, must not
 reap; the `gh` stub reports a `baseRefName`, `main` unless a row names one.
 A merged PR whose head is not the tip reaps only when that head contains
-it: a head absent locally goes to the stub's `gh api` compare (`ahead`
-reaps; `diverged`, a 404, or an unknown status keeps), and a head present
+it: a head absent locally goes to the stub's `gh api` compare (`ahead` or
+`identical` reaps; `diverged`, a 404, or an unknown status keeps), a head
+that is not a full commit id keeps with no compare, and a head present
 locally is decided by `git merge-base`, with no compare row to fall back on.
+A tip already on main, rooted at an older main commit, never reaps by
+containment on either path.
 The E2E arm runs the real `custodian-history.sh` ingest, then reap: a
 `gates.jsonl` rewritten under reused cites must be kept until the next
 ingest, then reap, including one that differs only in `blockers`, `ran` or
@@ -288,7 +292,9 @@ The name, description and compatibility limits are counted in characters, as
 the Agent Skills spec states them, under `LC_ALL=C` and under a UTF-8 locale
 alike: a two-byte-character value exactly at each limit passes and one
 character over fails with its character count in the message. The C side is
-any caller without a UTF-8 locale, where `${#var}` counts bytes.
+any caller without a UTF-8 locale, where `${#var}` counts bytes. Under
+`LC_ALL=C` the discovery-token estimate counts characters too: a two-byte
+description at the budget stays silent and one token over is flagged.
 
 ## doc-bloat-scan
 

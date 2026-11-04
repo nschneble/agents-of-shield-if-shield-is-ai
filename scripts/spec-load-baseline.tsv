@@ -209,10 +209,14 @@
 # says they count each distinct line once by content, that ingest's key
 # keeps false apart from null, and when CHANGED or VANISHED fires; the
 # history-verb.md rebuild-for-false caveat no longer holds and is gone.
+#
+# +42 always on custodian-run: phase-detail.md names the reap reason for
+# a merged PR head that is not a commit id, and says readers count lines
+# by indexed content rather than calling such lines identical.
 orchestrator-run	26114	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	21928	7599
+custodian-run	21970	7599
 defend-run	8086	0
 declutter-run	6661	0
