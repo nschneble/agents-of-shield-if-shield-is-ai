@@ -60,10 +60,10 @@ string both misses real evidence and accepts a typed claim.
 `~/.claude/scripts/loop-receipts.sh` checks a wave's `executable` claim against it,
 run over each kept dir by the custodian's Phase A.
 
-A receipt carries no exit code, and that is not an omission: the
-PostToolUse payload exposes none. The event fires on tool SUCCESS —
-failures route to `PostToolUseFailure` — so a receipt's EXISTENCE is the
-success signal, and `interrupted` is the one recorded qualifier.
+A receipt carries no exit code: the PostToolUse payload exposes none.
+Failures fire `PostToolUseFailure`, recorded as `outcome: "failed"`. Only
+a receipt neither `interrupted` nor failed is evidence; one with no
+`outcome` predates the field and reads as a success.
 
 **G3 was deliberately NOT rewritten to read receipts.** Receipts begin
 when the hook is installed and every archived run predates them, so

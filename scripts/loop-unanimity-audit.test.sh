@@ -229,6 +229,19 @@ check "both arms really do carry the same 2 lines (got $rc)" $?
 printf '%s\n' "$out" | grep -q '2 deduped · 2 crew'
 check "4 corpus lines collapse to 2 on cite, not 4" $?
 
+# --- a failed receipt is not corroboration; an outcome-less one still is
+{ printf '{"command":"npm test","outcome":"failed","interrupted":false}\n'
+  printf '{"command":"npm test","interrupted":false}\n'; } > "$live/receipts.jsonl"
+out=$("$check_sh" --no-index --census "$temp_dir/root" 2>&1)
+printf '%s\n' "$out" | grep -q 'branch has 1 uninterrupted, unfailed receipt'
+check "corroboration counts the old-shape receipt and not the failed one" $?
+
+printf '{"command":"npm test","outcome":"failed","interrupted":false}\n' > "$live/receipts.jsonl"
+out=$("$check_sh" --no-index --census "$temp_dir/root" 2>&1)
+printf '%s\n' "$out" | grep -q 'branch has 0 uninterrupted, unfailed receipt'
+check "a branch with only failed receipts reports zero corroboration" $?
+rm -f "$live/receipts.jsonl"
+
 # --- on a cite collision the live row wins, not the index snapshot -----
 stale="$temp_dir/root-stale"
 mkdir -p "$stale/r/local/loops/b" || die_temp "cannot build $stale"
@@ -321,7 +334,7 @@ out=$("$check_sh" --index "$index" --census "$empty_root" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'NOTHING CHECKED'
 check "a wholly unparseable corpus exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=46
+EXPECTED_CHECKS=48
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

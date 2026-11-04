@@ -2,7 +2,7 @@
 # loop-receipts.test.sh — both-directions test for the receipt check, and
 # for the hook that writes what it reads.
 #
-# Fixtures are a live PostToolUse payload, dumped not hand-written.
+# Success fixtures: a live PostToolUse dump; failure fixture: docs-sourced.
 # Background: docs/test-suites.md#loop-receipts
 set -uo pipefail
 
@@ -58,6 +58,17 @@ printf '{"command":"npm test","interrupted":false,"stdout_sha":"y","stderr_sha":
 out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'runtime evidence'
 check "an executable claim with an uninterrupted receipt passes (got $rc)" $?
+
+# --- a failed run is a receipt, never evidence --------------------------
+printf '{"command":"npm test","outcome":"failed","interrupted":false,"error_sha":"e","ts":"t"}\n' > "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
+[ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -q 'VIOLATION'
+check "an executable claim with only failed receipts = exit 1 (got $rc)" $?
+
+printf '{"command":"npm test","outcome":"ok","interrupted":false,"ts":"t"}\n' >> "$receipts"
+out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q '2 recorded, 1 uninterrupted'
+check "an ok receipt beside a failed one backs the claim (got $rc)" $?
 
 # --- no claim, no obligation -------------------------------------------
 printf '{"wave":1,"kind":"crew","ran":true,"verified_by":"llm","verdict":"x"}\n' > "$gates"
@@ -161,20 +172,117 @@ bash "$hook" < "$payload"
 [ ! -e "$temp_dir/local/loops" ]
 check "a cwd outside any git repo writes nothing" $?
 
-# a long command is truncated, and its full identity survives as a digest
-long=$(python3 -c "print('echo ' + 'y'*900)")
-python3 - "$repo" "$long" > "$payload" <<'PY2'
+# top-level keys as captured from a live PostToolUse call
+repo_head=$(git -C "$repo" rev-parse HEAD)
+repo_tree=$(git -C "$repo" rev-parse 'HEAD^{tree}')
+cat > "$payload" <<JSON
+{"session_id":"s-1","transcript_path":"/t.jsonl","cwd":"$repo","permission_mode":"default","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"echo ok"},"tool_response":{"interrupted":false,"isImage":false,"noOutputExpected":false,"stdout":"ok","stderr":""},"tool_use_id":"toolu_1","duration_ms":5}
+JSON
+bash "$hook" < "$payload"
+last=$(tail -1 "$written")
+[ "$(printf '%s' "$last" | jq -r '.outcome')" = "ok" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.error_sha')" = "null" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.stdout_sha')" != "null" ]
+check "a PostToolUse event records outcome ok and no error digest" $?
+
+[ "$(printf '%s' "$last" | jq -r '.session_id')" = "s-1" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.agent_id')" = "null" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.cwd')" = "$repo" ]
+check "a main-session call records its session, a null agent, and cwd" $?
+
+[ "$(printf '%s' "$last" | jq -r '.head')" = "$repo_head" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.tree')" = "$repo_tree" ]
+check "a receipt records the repo's HEAD commit and tree" $?
+
+jq -c '.agent_id = "a-7" | .agent_type = "Explore"' "$payload" > "$payload.sub"
+bash "$hook" < "$payload.sub"
+[ "$(tail -1 "$written" | jq -r '.agent_id')" = "a-7" ]
+check "a subagent call records its agent_id" $?
+
+# docs-sourced, not captured: a failure has error + is_interrupt only
+error_text='Exit code 1
+Error: Cannot find module'
+python3 - "$repo" "$error_text" false > "$payload" <<'PY2'
 import json,sys
-print(json.dumps({"tool_name":"Bash","cwd":sys.argv[1],
-                  "tool_input":{"command":sys.argv[2]},
-                  "tool_response":{"interrupted":False,"stdout":"","stderr":""}}))
+print(json.dumps({"session_id":"s-1","cwd":sys.argv[1],
+                  "hook_event_name":"PostToolUseFailure","tool_name":"Bash",
+                  "tool_input":{"command":"npm test"},"tool_use_id":"toolu_2",
+                  "error":sys.argv[2],"is_interrupt":sys.argv[3] == "true"}))
 PY2
 bash "$hook" < "$payload"
 last=$(tail -1 "$written")
-[ "$(printf '%s' "$last" | jq -r '.command | length')" -le 200 ] \
-  && [ "$(printf '%s' "$last" | jq -r '.command_len')" -gt 200 ] \
-  && [ -n "$(printf '%s' "$last" | jq -r '.command_sha')" ]
-check "a long command is truncated but keeps its length and digest" $?
+want_sha=$(printf '%s' "$error_text" | shasum -a 256 | cut -d' ' -f1)
+[ "$(printf '%s' "$last" | jq -r '.outcome')" = "failed" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.error_sha')" = "$want_sha" ]
+check "a PostToolUseFailure event records outcome failed and the error digest" $?
+
+[ "$(printf '%s' "$last" | jq -r '.stdout_sha')" = "null" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.interrupted')" = "false" ]
+check "a failure records no stdout digest it never saw" $?
+
+python3 - "$repo" "aborted" true > "$payload" <<'PY2'
+import json,sys
+print(json.dumps({"cwd":sys.argv[1],"hook_event_name":"PostToolUseFailure",
+                  "tool_name":"Bash","tool_input":{"command":"sleep 9"},
+                  "error":sys.argv[2],"is_interrupt":sys.argv[3] == "true"}))
+PY2
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.interrupted')" = "true" ]
+check "a failure with is_interrupt records interrupted" $?
+
+cat > "$payload" <<JSON
+{"cwd":"$repo","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo pre"}}
+JSON
+before=$(grep -c . "$written")
+bash "$hook" < "$payload"
+[ "$(grep -c . "$written")" -eq "$before" ]
+check "an event other than PostToolUse/Failure writes no receipt" $?
+
+bare="$temp_dir/bare"
+mkdir -p "$bare" && git -C "$bare" init -q . 2>/dev/null
+cat > "$payload" <<JSON
+{"cwd":"$bare","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"true"},"tool_response":{"stdout":""}}
+JSON
+bash "$hook" < "$payload"
+bare_log=$(find "$bare/local/loops" -name receipts.jsonl 2>/dev/null | head -1)
+[ -n "$bare_log" ] && [ "$(tail -1 "$bare_log" | jq -r '.head')" = "null" ] \
+  && [ "$(tail -1 "$bare_log" | jq -r '.tree')" = "null" ]
+check "a repo with no commit records null head and tree, still writes" $?
+
+long_payload() { # length of the y-run
+  python3 - "$repo" "$1" > "$payload" <<'PY2'
+import json,sys
+print(json.dumps({"tool_name":"Bash","cwd":sys.argv[1],
+                  "tool_input":{"command":"echo " + "y"*int(sys.argv[2])},
+                  "tool_response":{"interrupted":False,"stdout":"","stderr":""}}))
+PY2
+}
+
+long_payload 900
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command | length')" -eq 905 ]
+check "a 905-char command is stored whole" $?
+
+long_payload 5000
+bash "$hook" < "$payload"
+last=$(tail -1 "$written")
+full_sha=$(jq -j '.tool_input.command' "$payload" | shasum -a 256 | cut -d' ' -f1)
+[ "$(printf '%s' "$last" | jq -r '.command | length')" -eq 4096 ] \
+  && [ "$(printf '%s' "$last" | jq -r '.command_len')" -eq 5005 ] \
+  && [ "$(printf '%s' "$last" | jq -r '.command_sha')" = "$full_sha" ]
+check "a command past the cap is cut to 4096 with a full-command digest" $?
+
+RECEIPT_CMD_KEEP=50 bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command | length')" -eq 50 ]
+check "RECEIPT_CMD_KEEP overrides the cap" $?
+
+RECEIPT_CMD_KEEP=+50 bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command | length')" -eq 4096 ]
+check "a signed RECEIPT_CMD_KEEP keeps the default cap" $?
+
+RECEIPT_CMD_KEEP=0 bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command | length')" -eq 4096 ]
+check "a zero RECEIPT_CMD_KEEP keeps the default cap" $?
 
 # a short command is stored whole — truncation must not be unconditional
 cat > "$payload" <<JSON
@@ -207,7 +315,7 @@ out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "a wholly unparseable gates file exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=22
+EXPECTED_CHECKS=37
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \
