@@ -46,7 +46,7 @@ analysis=$(jq -n -L "$HERE" --arg index "$INDEX" '
      or ((.summary // "") | test("\\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\\b")));
 
   # archived gate lines are never re-audited (decision 32)
-  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)] | current) as $rows
+  ([inputs | select((.cite // "") | tostring | contains("/local/loops/.archive/") | not)] | distinct) as $rows
   | ($rows | length) as $n
   | ($rows | map(select(legacy | not)) | length) as $modern
   | ($rows | map(select(legacy)) | length) as $legacyn

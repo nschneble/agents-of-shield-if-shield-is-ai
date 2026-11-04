@@ -191,7 +191,7 @@ aloops="$archroot/linklater/local/loops"; aday="$aloops/.archive/2026-10-01"
 g2line='{"wave":1,"kind":"crew","agent":"the-stickler","task_tool_available":true,"ran":true,"verdict":"clean","outcome":null,"verified_by":null,"blockers":0,"summary":"reviewed"}'
 mkdir -p "$aloops/live" "$aday/foo" "$aday/foo.2" "$aday/x.2" "$aday/fix/auth" "$archhome"
 for d in "$aloops/live" "$aday/foo" "$aday/foo.2" "$aday/x.2" "$aday/fix/auth"; do
-  printf '%s\n%s\n' "$g2line" "$g2line" > "$d/gates.jsonl"
+  printf '%s\n%s\n' "$g2line" "${g2line/reviewed/re-reviewed}" > "$d/gates.jsonl"
 done
 archindex="$archhome/history-index.jsonl"
 arebuild() { REPOS_ROOT="$archroot" CUSTODIAN_HOME="$archhome" "$histscript" "$@" >/dev/null 2>&1; }

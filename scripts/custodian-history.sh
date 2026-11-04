@@ -4,7 +4,7 @@
 # grafting the ctx pattern onto looper structured log.
 #
 # Subcommands:
-#   ingest            append gates.jsonl lines whose cite + content is new;
+#   ingest            append a gates.jsonl line unlike its cite's last record;
 #                     print CHANGED/VANISHED for indexed lines the file lost
 #   rebuild           wipe + re-derive from live dirs; loses reaped dirs' records
 #   rebuild --include-archive
@@ -90,7 +90,8 @@ archived_branch() {  # archived_dir name_under_date -> branch on stdout
 ingest() {
   local include_archive="${1:-0}"
   mkdir -p "$CUSTODIAN_HOME"; touch "$INDEX"
-  local cand new walked gates branch rel dir repo rr n report changed vanished
+  local gates branch rel dir repo rr n report changed vanished
+  trap 'rm -f "${cand:-}" "${new:-}" "${walked:-}"' EXIT
   # || cand="" so set -e cannot abort before the named-failure check below
   cand=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || cand=""
   new=$(mktemp "${TMPDIR:-/tmp}/custodian-history.XXXXXX") || new=""
@@ -121,19 +122,22 @@ ingest() {
   done
   jq -c -n -L "$HERE" --slurpfile idx "$INDEX" --slurpfile cand "$cand" '
     include "custodian-index";
-    ($idx | current | map({key: .cite, value: gate_key}) | from_entries) as $cur
-    | $cand[] | select($cur[.cite] != gate_key)
+    ($idx | current | map({key: .cite, value: exact_key}) | from_entries) as $cur
+    | $cand[] | select($cur[.cite] != exact_key)
   ' > "$new"
   report=$(jq -r -n -L "$HERE" --slurpfile idx "$INDEX" --slurpfile cand "$cand" \
     --rawfile walked "$walked" '
     include "custodian-index";
+    def held: map({key: (log_path + "\t" + exact_key), value: true}) | from_entries;
     ($walked | split("\n") | map({key: ., value: true}) | from_entries) as $files
-    | ($cand | map({key: .cite, value: gate_key}) | from_entries) as $now
-    | $idx | current[]
-    | select($files[.cite | sub(":[0-9]+$"; "")] // false)
-    | if $now[.cite] == null then "VANISHED \(.cite)"
-      elif $now[.cite] != gate_key then "CHANGED \(.cite)"
-      else empty end')
+    | ($cand | map({key: .cite, value: exact_key}) | from_entries) as $now
+    | ($cand | held) as $kept
+    | ($idx | current | map(select($files[log_path] // false))) as $last
+    | ($last | held) as $was
+    | $last[]
+    | select($kept[log_path + "\t" + exact_key] | not)
+    | if $now[.cite] != null and ($was[log_path + "\t" + $now[.cite]] | not)
+      then "CHANGED \(.cite)" else "VANISHED \(.cite)" end')
   [ -z "$report" ] || printf '%s\n' "$report"
   changed=$(printf '%s\n' "$report" | grep -c '^CHANGED ' || true)
   vanished=$(printf '%s\n' "$report" | grep -c '^VANISHED ' || true)
@@ -142,7 +146,6 @@ ingest() {
   # || true, not || echo 0: grep -c already prints 0 before exiting 1
   echo "ingested ${n:-0} new record(s); $changed changed, $vanished vanished;" \
        "index now $(grep -c . "$INDEX" || true) line(s) at $INDEX"
-  rm -f "$cand" "$new" "$walked"
 }
 
 rebuild() {
@@ -177,7 +180,7 @@ query() {
     --argjson blocked "$blocked" --argjson limit "$limit" '
     include "custodian-index";
     def ci($s): ($s // "") | ascii_downcase;
-    [ [inputs] | current[]
+    [ [inputs] | distinct[]
       | select($q=="" or (ci(.summary+" "+(.agent//"")+" "+(.verdict//"")+" "+(.kind//"")) | contains(ci($q))))
       | select($agent==""   or (ci(.agent)   | contains(ci($agent))))
       | select($verdict=="" or (ci(.verdict) | contains(ci($verdict))))

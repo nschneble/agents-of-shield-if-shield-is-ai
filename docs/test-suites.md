@@ -89,18 +89,27 @@ Pure bash + jq, self-contained fixtures.
 Both-directions test for `custodian-history.sh ingest` and the readers of
 its index.
 
-Ingest keys a line on its cite and content, so the fixture rewrites one
-line, deletes a line mid-file and appends after it, and truncates a file.
-Each must report `CHANGED` or `VANISHED`, append the new content beside the
-old record, and leave every earlier record byte-identical; an unchanged
-re-ingest adds and reports nothing. `CHANGED` reports once and a line
-reverted to older content is re-appended once. An archived or deleted
-source reports nothing. `query` and the guardrail replay must count a cite
-once, as its newest record, in both directions: a violation rewritten
-clean stops counting, one rewritten twice counts once. The last check
-diffs `custodian-index.jq`'s projection against the reap guard's, the
-textual half of the agreement whose behavioral half is custodian-reap's
-field arms.
+Ingest compares a line with its cite's last record, so the fixture rewrites
+one line, deletes a line mid-file and appends after it, and truncates a
+file. A rewrite reports `CHANGED` once; a deleted or truncated line reports
+`VANISHED` and a line that only moved reports nothing. New content is
+appended beside the old record and every earlier record stays
+byte-identical; an unchanged re-ingest adds and reports nothing, and a
+line reverted to older content is re-appended once. An archived or deleted
+source reports nothing. `false` must be told apart from `null` and from a
+missing key, and a missing `verified_by` or `outcome` from `null`, in both
+directions, and a line rewritten to `ran` false must reach G1 without a
+rebuild.
+
+`query` and the guardrail replay count each distinct line a log has ever
+held once, by content: after a mid-file deletion the tail counts once and
+the deleted line still counts; a violation rewritten clean still counts,
+and a revert adds nothing. Two identical lines in one log count as one,
+the same line in another log counts on its own. A property check builds
+records varying each guard field and requires that any two the reap
+guard's projection, read from `custodian-reap.sh`, tells apart, ingest's
+key does too, and that ingest's key tells `ran` false from null where the
+guard does not. A failed ingest must leave no temp file.
 
 ## custodian-log-recall
 
