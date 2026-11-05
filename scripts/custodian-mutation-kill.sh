@@ -364,6 +364,18 @@ outcome-arm-strings-only|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.o
 outcome-arm-no-truncation|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$v\[0:57\] \+ "\.\.\."/\$v/
 outcome-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_outcome/skip "\$bad_outcome/
 outcome-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 7:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
+disp-arm-drops-dropped|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"waived", "dropped")\E/"waived")/
+disp-arm-token-check-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.disposition | IN("cleared", "refuted", "waived", "dropped") | not)\E/false/
+disp-arm-any-finding|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\.finding \| test\("\^gates[^)]*\) \| not\)//
+disp-arm-line-zero|loop-finding-audit.sh|loop-finding-audit.test.sh|s/jsonl:\[1-9\]\[0-9\]\*/jsonl:[0-9][0-9]*/
+disp-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.finding | type) != "string" or \E//
+disp-arm-no-object-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/if type != "object" then "is not an object"\s+elif/if/
+disp-arm-allows-empty|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q or (.dispositions | length) == 0\E//
+disp-arm-every-line|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qselect(.pass == "re-crew" and .ran != false)\E/select(.ran != false)/
+disp-arm-unrun-owes|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.pass == "re-crew" and .ran != false\E/.pass == "re-crew"/
+disp-arm-every-entry|loop-finding-audit.sh|loop-finding-audit.test.sh|s{\Q| first // empty\E}{| .[]}
+disp-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_recrew/skip "\$bad_recrew/
+disp-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 8:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
 TABLE
 }
 

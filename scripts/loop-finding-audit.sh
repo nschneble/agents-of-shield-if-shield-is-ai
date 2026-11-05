@@ -158,6 +158,27 @@ done < <(jq -r '
   | "wave \(.wave) \(.agent // "?") carries outcome \(if ($v | length) > 60 then $v[0:57] + "..." else $v end)"
 ' "$GATES")
 
+# arm 8: a re-crew settles each finding it re-checked, cited by log line
+checked=$((checked + 1))
+while IFS= read -r bad_recrew; do
+  [ -n "$bad_recrew" ] || continue
+  flag "$bad_recrew"
+done < <(jq -r '
+  def problem:
+    if type != "object" then "is not an object"
+    elif (.finding | type) != "string" or (.finding | test("^gates\\.jsonl:[1-9][0-9]*$") | not)
+      then "needs finding as gates.jsonl:<line> of the gating finding"
+    elif (.disposition | IN("cleared", "refuted", "waived", "dropped") | not)
+      then "needs disposition cleared|refuted|waived|dropped"
+    else empty end;
+  select(.pass == "re-crew" and .ran != false)
+  | (if (.dispositions | type) != "array" or (.dispositions | length) == 0
+     then "has no dispositions — list one {finding, disposition} per finding it re-checked"
+     else [.dispositions | to_entries[] | "disposition \(.key + 1) \(.value | problem)"] | first // empty
+     end) as $why
+  | "wave \(.wave) \(.agent // "?") re-crew \($why)"
+' "$GATES")
+
 echo
 for note in ${notes+"${notes[@]}"}; do echo "  $note"; done
 [ ${#notes[@]} -eq 0 ] || echo

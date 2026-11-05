@@ -18,6 +18,7 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
   "gates": false, // true = this line's finding blocks the wave and earns a corrective
   "gated_by": null, // one class from SKILL.md `## Finding severity floor`; null unless gates is true
   "contract_ref": null, // goal_contract ask id ("A2") or `path:Lstart-Lend` in the run's diff; null unless gates is true
+  "dispositions": null, // re-crew lines only: [{ "finding": "gates.jsonl:7", "disposition": "cleared" }], see below; else null
   "blockers": 0,
   "summary": "one line, cited from agent output"
 }
@@ -35,6 +36,15 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
 
 `outcome: "batch"` is the refutation-posture reviewer's own way of saying the same thing — a defensible defect it can cite, below the floor. It exists because a binary `refute|promote` forces a reviewer to either block on a nit or stay silent about it, and the first is what produced four consecutive `refute` verdicts on a one-line CSS fix.
 
+`dispositions` is how a re-crew settles each finding it re-checked, one entry per finding. `finding` is `gates.jsonl:<N>`, the line of that gating crew finding in this same log: the history index's `cite` ends in the same suffix, so the pair still joins once the run dir is reaped. `disposition` takes one of four tokens:
+
+- `cleared`: fixed, and the re-check confirms it
+- `refuted`: the finding was wrong
+- `waived`: accepted without a fix, by the user or a recorded decision
+- `dropped`: the requirement it guarded left the contract or plan
+
+`verdict` stays the human summary. A finding the re-crew did not clear has no token yet: the run stops on it (`SKILL.md` `## Corrective budget`) and the line records the user's ruling at that stop. A re-crew with `ran: false` settled nothing and carries none.
+
 ## Provenance lint
 
 ```
@@ -45,7 +55,7 @@ jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialis
 
 The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope in SKILL.md `## Gate artifacts`); the `outcome` check is crew-refutation-only. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt.
 
-Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over seven arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, the interim crew size, the closed `kind` enum, and the closed `outcome` enum. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other five read the log alone. Neither enum arm is era-gated, unlike the lint above: re-auditing a log older than an arm can fail it.
+Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over eight arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, the interim crew size, the closed `kind` enum, the closed `outcome` enum, and a well-formed `dispositions` list on every re-crew line that ran. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other six read the log alone. None of the last three arms is era-gated, unlike the lint above: re-auditing a log older than an arm can fail it.
 
 ### Receipts: the half `verified_by` cannot prove
 

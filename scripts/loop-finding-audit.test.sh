@@ -84,8 +84,8 @@ run() { out=$("$runner" --dir "$1" 2>&1); rc=$?; }
 # --- GREEN: one corrective, one justified gating finding. -------------
 g="$temp_dir/green"; mkrun "$g"
 run "$g"
-printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 7 check(s)'
-check "GREEN: a justified run reports zero violations over all 7 arms" $?
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
+check "GREEN: a justified run reports zero violations over all 8 arms" $?
 agree "GREEN:"
 ! printf '%s\n' "$out" | grep -q 'VIOLATION'
 check "GREEN: no arm prints a VIOLATION line" $?
@@ -167,6 +167,38 @@ red "a false outcome is caught, not read as null" 'VIOLATION  wave 1 the-diamant
 m_long_outcome() { jq -c 'if .gates == true then .outcome = ("x" * 200 + "TAIL") else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"; }
 red "a long free-text outcome is truncated in the report" 'VIOLATION  wave 1 .* carries outcome "x*\.\.\. — outcome takes' m_long_outcome
 
+recrew() { # dir, jq expression for the re-crew line's dispositions
+  jq -c --argjson d "$2" 'if .wave == "1-corrective-1" and .agent == "the-diamantaire"
+    then .pass = "re-crew" | if $d == "absent" then . else .dispositions = $d end
+    else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"
+}
+recrew_head='VIOLATION  wave 1-corrective-1 the-diamantaire re-crew'
+
+# arm 8 — a re-crew line written without the field at all
+m_no_disp() { recrew "$1" '"absent"'; }
+red "a re-crew line with no dispositions is caught" "$recrew_head has no dispositions" m_no_disp
+
+m_empty_disp() { recrew "$1" '[]'; }
+red "an empty dispositions list is caught" "$recrew_head has no dispositions" m_empty_disp
+
+m_prose_finding() { recrew "$1" '[{"finding": "the cut -c bug", "disposition": "cleared"}]'; }
+red "a finding that is not a gate-log line is caught" "$recrew_head disposition 1 needs finding as gates.jsonl:<line>" m_prose_finding
+
+m_zero_finding() { recrew "$1" '[{"finding": "gates.jsonl:0", "disposition": "cleared"}]'; }
+red "a gate-log line 0 is not a line" "$recrew_head disposition 1 needs finding" m_zero_finding
+
+m_number_finding() { recrew "$1" '[{"finding": 1, "disposition": "cleared"}]'; }
+red "a bare line number is not a finding" "$recrew_head disposition 1 needs finding" m_number_finding
+
+m_string_entry() { recrew "$1" '["gates.jsonl:1 cleared"]'; }
+red "an entry that is not an object is caught" "$recrew_head disposition 1 is not an object" m_string_entry
+
+m_bad_token() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "fixed"},
+  {"finding": "nope", "disposition": "cleared"}]'; }
+red "an off-enum disposition names its entry" "$recrew_head disposition 1 needs disposition cleared|refuted|waived|dropped" m_bad_token
+[ "$(printf '%s\n' "$out" | grep -c 'VIOLATION')" -eq 1 ]
+check "RED: two bad entries on one re-crew line report once" $?
+
 # --- GREEN counterparts for the arms whose RED is a threshold. --------
 # A cap check that fired on everything would pass every RED above while
 # being useless, so each threshold arm needs its permissive direction.
@@ -203,9 +235,21 @@ jq -c 'if .gates == true then .outcome = "refute"
        elif .agent == "the-chemist" then del(.outcome)
        else . end' "$t/gates.jsonl" > "$t/g" && mv "$t/g" "$t/gates.jsonl"
 run "$t"
-printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 7 check(s)'
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
 check "GREEN: each outcome token, null and an absent outcome all pass" $?
 agree "GREEN-outcome-tokens:"
+
+r="$temp_dir/dispositions"; mkrun "$r"
+recrew "$r" '[{"finding": "gates.jsonl:1", "disposition": "cleared"},
+  {"finding": "gates.jsonl:2", "disposition": "refuted"},
+  {"finding": "gates.jsonl:3", "disposition": "waived"},
+  {"finding": "gates.jsonl:40", "disposition": "dropped"}]'
+jq -c '.pass = "re-crew" | .ran = false | .task_tool_available = false' \
+  <<< "$(gate 1-corrective-1 the-auditor false "" "")" >> "$r/gates.jsonl"
+run "$r"
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
+check "GREEN: each disposition token passes, and a re-crew that never ran owes none" $?
+agree "GREEN-dispositions:"
 
 o="$temp_dir/override"; mkrun "$o"
 gate 1-corrective-2 the-diamantaire false "" "" >> "$o/gates.jsonl"
@@ -253,6 +297,6 @@ echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter. Pegged at the
 # exact arm count, not a round number under it.
-[ "$checks" -eq 51 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 51\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 68 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 68\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-finding-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-finding-audit test(s) FAILED"; exit 1; fi
