@@ -24,6 +24,8 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
 }
 ```
 
+Shown wrapped and commented for reading. On disk each line is one compact JSON object, and the audit flags a value split across lines.
+
 `kind` is a CLOSED enum of exactly nine tokens: `crew`, `pre-build-specialist`, `wave-retry`, `stale-skip`, `executor-handback`, `usage-window`, `finding-audit`, `pr-finalization`, `orchestration-incident`. Anything else is a write bug, and the audit fails on it.
 
 **The variant belongs in `pass`, never in `kind`.** This is the whole reason the enum is enforced rather than merely documented. Every consumer selects on `.kind == "crew"`, so a line spelled `crew-interim`, `crew-final`, `crew-final-summary` or `crew-final-all-seven` is not a stricter label — it is a line the audit cannot see. One real run logged 31 distinct spellings across ~50 lines, and its crew coverage was invisible to `loop-finding-audit.sh` for every one of them that was not exactly `crew`. A closed enum plus a separate `pass` field is what makes a crew line countable.
@@ -44,7 +46,7 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
 - `dropped`: the requirement it guarded left the contract or plan
 - `open`: not settled; valid only on a line whose `verdict` starts with `NOT-CLEARED`
 
-`verdict` stays the human summary. A re-crew that did not clear a finding writes its line at once, `verdict` starting with `NOT-CLEARED` and that finding `open`, and the run stops on it (`SKILL.md` `## Corrective budget`). The user's ruling is a later line of kind `orchestration-incident`, `pass: "re-crew"`, `agent: "user"`, settling each `open` finding with one of the other four tokens; a later entry for a finding supersedes an earlier one. A re-crew with `ran: false` settled nothing and carries none.
+`verdict` stays the human summary. A re-crew that did not clear a finding writes its line at once, `verdict` starting with `NOT-CLEARED` and that finding `open`, and the run stops on it (`SKILL.md` `## Corrective budget`). The user's ruling is a later line of kind `orchestration-incident`, `pass: "re-crew"`, `agent: "user"`, `ran: true`, settling each `open` finding with one of the other four tokens; a later entry for a finding supersedes an earlier one. A line with `ran: false` settled nothing, and the audit fails one that carries `dispositions`.
 
 ## Provenance lint
 
@@ -56,7 +58,7 @@ jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialis
 
 The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope in SKILL.md `## Gate artifacts`); the `outcome` check is crew-refutation-only. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt.
 
-Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over eight arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, the interim crew size, the closed `kind` enum, the closed `outcome` enum, and a well-formed `dispositions` list, citing gating crew lines, on every re-crew line that ran. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other six read the log alone. None of the last three arms is era-gated, unlike the lint above: re-auditing a log older than an arm can fail it.
+Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over eight arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, the interim crew size, the closed `kind` enum, the closed `outcome` enum, and a well-formed `dispositions` list, citing gating crew lines, on every re-crew line that ran and on no line that did not. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other six read the log alone. None of the last three arms is era-gated, unlike the lint above: re-auditing a log older than an arm can fail it.
 
 ### Receipts: the half `verified_by` cannot prove
 

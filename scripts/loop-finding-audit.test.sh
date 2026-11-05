@@ -237,6 +237,12 @@ m_split_line() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "clea
   gate 1 the-chemist false "" "" | jq . >> "$1/gates.jsonl"; }
 red "a log value split across lines is caught" "VIOLATION  gates.jsonl:6 is not one JSON line" m_split_line
 
+m_ruling_not_run() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "cleared"}]'
+  gate 1-corrective-1 the-diamantaire false "" "" | jq -c '.kind = "orchestration-incident"
+    | .pass = "re-crew" | .agent = "user" | .ran = false
+    | .dispositions = [{finding: "gates.jsonl:1", disposition: "waived"}]' >> "$1/gates.jsonl"; }
+red "a ruling line that did not run cannot carry dispositions" "VIOLATION  wave 1-corrective-1 user carries dispositions but did not run" m_ruling_not_run
+
 # --- GREEN counterparts for the arms whose RED is a threshold. --------
 # A cap check that fired on everything would pass every RED above while
 # being useless, so each threshold arm needs its permissive direction.
@@ -283,7 +289,7 @@ recrew "$r" '[{"finding": "gates.jsonl:1", "disposition": "cleared"},
   {"finding": "gates.jsonl:6", "disposition": "refuted"},
   {"finding": "gates.jsonl:7", "disposition": "waived"},
   {"finding": "gates.jsonl:8", "disposition": "dropped"}]'
-jq -c '.pass = "re-crew" | .ran = false | .task_tool_available = false' \
+jq -c '.pass = "re-crew" | .ran = false | .task_tool_available = false | .dispositions = null' \
   <<< "$(gate 1-corrective-1 the-auditor false "" "")" >> "$r/gates.jsonl"
 run "$r"
 printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
@@ -358,6 +364,6 @@ echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter. Pegged at the
 # exact arm count, not a round number under it.
-[ "$checks" -eq 90 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 90\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 92 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 92\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-finding-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-finding-audit test(s) FAILED"; exit 1; fi

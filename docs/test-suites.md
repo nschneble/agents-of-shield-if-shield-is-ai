@@ -372,10 +372,10 @@ Four properties the audit's honesty depends on:
   the run exits 2 even with every surviving arm green — a caller
   gating on `$?` must never read a half-run audit as a clean one.
 
-Arms 7 and 8 have no era gate, so a log older than either can fail it.
+Arms 6 to 8 have no era gate, so a log older than any of them can fail it.
 Arm 7 holds `outcome` to `refute|batch|promote` or null. Arm 8 wants a
-non-empty `dispositions` list on every re-crew line that ran (`ran: false`
-owes none). Each entry cites `gates.jsonl:<N>`, where physical line N
+non-empty `dispositions` list on every re-crew line that ran, and none on a
+`ran: false` line. Each entry cites `gates.jsonl:<N>`, where physical line N
 exists and is a `kind: "crew"` line with `gates: true`, names no finding
 already named on its own line, and is `open` only under a `NOT-CLEARED`
 verdict. A later line may re-name a settled finding: that is the user's

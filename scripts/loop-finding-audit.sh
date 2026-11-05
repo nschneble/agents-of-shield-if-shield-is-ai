@@ -194,7 +194,10 @@ done < <(jq -Rnr '
       else [$d | to_entries[] | .key as $k
             | "disposition \($k + 1) \(.value | problem($not_cleared; $d[0:$k]))"] | first // empty
       end) as $why
-   | "wave \(.wave) \(.agent // "?") re-crew \($why)")
+   | "wave \(.wave) \(.agent // "?") re-crew \($why)"),
+  ($log[] | objects
+   | select(.ran == false and .dispositions != null)
+   | "wave \(.wave) \(.agent // "?") carries dispositions but did not run")
 ' "$GATES")
 
 echo

@@ -395,6 +395,8 @@ cite-arm-twice-allowed|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.find
 cite-arm-twice-counts-self|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$d\[0:\$k\]/\$d/
 cite-arm-split-line-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q([.value | fromjson?] | length) == 0\E/false/
 cite-arm-blank-line-flagged|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.value | test(\E"[^"]*"\Q) | not) and \E//
+ran-false-disp-unchecked|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qselect(.ran == false and .dispositions != null)\E/select(false)/
+ran-false-disp-null-counts|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.ran == false and .dispositions != null\E/.ran == false and has("dispositions")/
 TABLE
 }
 
