@@ -179,6 +179,18 @@ run "$PB/scratch.md"
 has_row GONE path docs/kept-copy.md
 check "MOVED near miss: a hit only in gitignored scratch is not MOVED" $?
 
+# past ARG_MAX of gitignored hits, the real relocation must still be MOVED
+put "$R/beta/lib/bulk_home.sh" 'bulk_sym_q=1'
+bulk="$R/beta/local/bulk/$(printf 'd%.0s' $(seq 1 180))"
+mkdir -p "$bulk"
+(cd "$bulk" && seq 1 6000 | sed 's/$/.sh/' | xargs touch)
+for f in "$bulk"/*.sh; do printf 'bulk_sym_q=1\n' > "$f"; done
+put "$PB/bulk.md" '- `lib/bulk_gone.sh` holds `bulk_sym_q`'
+run "$PB/bulk.md"
+detail_is MOVED path lib/bulk_gone.sh "$R/beta/lib/bulk_home.sh"
+check "IGNORED: a relocation past ARG_MAX of ignored hits is still MOVED" $?
+rm -rf "$R/beta/local/bulk"
+
 # --- the 4-cell root table: memory location x cite form ---
 put "$PA/cells.md" '- home `~/.claude/skills/hs/SKILL.md`
 - home env `$HOME/.claude/skills/hs/SKILL.md`
