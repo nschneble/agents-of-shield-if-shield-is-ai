@@ -272,6 +272,16 @@ full_sha=$(jq -j '.tool_input.command' "$payload" | shasum -a 256 | cut -d' ' -f
   && [ "$(printf '%s' "$last" | jq -r '.command_sha')" = "$full_sha" ]
 check "a command past the cap is cut to 4096 with a full-command digest" $?
 
+python3 - "$repo" > "$payload" <<'PY3'
+import json, sys
+print(json.dumps({"tool_name":"Bash","cwd":sys.argv[1],
+                  "tool_input":{"command":"\n".join(["echo " + "z"*1995]*3)},
+                  "tool_response":{"interrupted":False,"stdout":"","stderr":""}}))
+PY3
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.command | length')" -eq 4096 ]
+check "a multi-line command past the cap is cut to 4096 in all" $?
+
 RECEIPT_CMD_KEEP=50 bash "$hook" < "$payload"
 [ "$(tail -1 "$written" | jq -r '.command | length')" -eq 50 ]
 check "RECEIPT_CMD_KEEP overrides the cap" $?
@@ -315,7 +325,7 @@ out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "a wholly unparseable gates file exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=37
+EXPECTED_CHECKS=38
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \

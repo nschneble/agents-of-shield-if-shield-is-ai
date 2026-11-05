@@ -57,7 +57,7 @@ sha_of() {
 }
 cmd_sha=$(sha_of "$cmd")
 if [ "$cmd_len" -gt "$CMD_KEEP" ]; then
-  cmd=$(printf '%s' "$cmd" | cut -c "1-$CMD_KEEP")
+  cmd=${cmd:0:$CMD_KEEP}
 fi
 
 out=$(printf '%s' "$payload" | jq -r '(.tool_response.stdout // "") | tostring')

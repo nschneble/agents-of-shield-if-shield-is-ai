@@ -92,7 +92,8 @@ hook-keep-zero-check-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh
 receipts-failed-counted|loop-receipts.sh|loop-receipts.test.sh|s/\Q and (.outcome \/\/ "ok") != "failed"\E//
 unanimity-failed-counted|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q and (.outcome \/\/ "ok") != "failed"\E//
 hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ "\$tool" = "Bash" \] \|\| exit 0/: /
-hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cut -c "1-\$CMD_KEEP"/cat/
+hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/:/
+hook-truncation-per-line|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/cmd=\$(printf \x27%s\x27 "\$cmd" | cut -c "1-\$CMD_KEEP")/
 hook-cmd-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd_sha=\$\(sha_of "\$cmd"\)/cmd_sha=""/
 hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
 ceiling-comparison-never-fires|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/if \[ "\$actual" -gt "\$ceiling" \]; then/if false; then/
