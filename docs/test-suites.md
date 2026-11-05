@@ -99,7 +99,9 @@ line reverted to older content is re-appended once. An archived or deleted
 source reports nothing. `false` must be told apart from `null` and from a
 missing key, and a missing `verified_by` or `outcome` from `null`, in both
 directions, and a line rewritten to `ran` false must reach G1 without a
-rebuild.
+rebuild. A `dispositions` list is indexed with its line, gaining, editing
+or dropping it reports `CHANGED`, and a missing list and `null` are the
+same record.
 
 `query` and the guardrail replay count each distinct line a log has ever
 held once, by indexed content: after a mid-file deletion the tail counts
@@ -369,6 +371,16 @@ Four properties the audit's honesty depends on:
 - EXIT 0 MEANS FULLY CHECKED. A missing snapshot skips two arms, so
   the run exits 2 even with every surviving arm green — a caller
   gating on `$?` must never read a half-run audit as a clean one.
+
+Arms 6 to 8 have no era gate, so a log older than any of them can fail it.
+Arm 7 holds `outcome` to `refute|batch|promote` or null. Arm 8 wants a
+non-empty `dispositions` list on every re-crew line that ran, and none on a
+`ran: false` line. Each entry cites `gates.jsonl:<N>`, where physical line N
+exists and is a `kind: "crew"` line with `gates: true`, names no finding
+already named on its own line, and is `open` only under a `NOT-CLEARED`
+verdict. A later line may re-name a settled finding: that is the user's
+ruling. A log value split across lines is flagged, since no cite can
+name it.
 
 ## loop-counters
 

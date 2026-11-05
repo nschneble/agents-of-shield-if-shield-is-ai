@@ -296,6 +296,11 @@ index-distinct-drops-path|custodian-index.jq|custodian-history.test.sh|s/\[\$r\.
 index-exact-key-folds-false|custodian-index.jq|custodian-history.test.sh|s/\Q.ran, .task_tool_available,\E/(.ran \/\/ null), (.task_tool_available \/\/ null),/
 index-key-drops-wave|custodian-index.jq|custodian-reap.test.sh|s/\Q[.wave, .kind,\E/[.kind,/
 index-key-drops-summary|custodian-index.jq|custodian-history.test.sh|s{\Q .summary,\E}{}
+index-key-drops-dispositions|custodian-index.jq|custodian-history.test.sh|s/\Q + [.dispositions | select(. != null)]\E//
+index-key-drops-dispositions-blocks-reap|custodian-index.jq|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//
+history-projection-drops-dispositions|custodian-history.sh|custodian-history.test.sh|s/\n\s*\+ \(if \.dispositions != null then \{dispositions\} else \{\} end\)//
+reap-guard-drops-dispositions|custodian-reap.sh|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//g
+reap-guard-dispositions-null-differs|custodian-reap.sh|custodian-reap.test.sh|s/\Q[.dispositions | select(. != null)]\E/(if has("dispositions") then [[.dispositions]] else [] end)/g
 guardrails-counts-by-cite|custodian-guardrails.sh|custodian-history.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
 replay-counts-by-cite|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
 history-mismatch-exits-nonzero|custodian-history.sh|custodian-history.test.sh|s/\[ -z "\$report" \] \|\| printf '%s\\n' "\$report"/[ -z "\$report" ]/
@@ -358,6 +363,40 @@ exp-status-oldest-wins|custodian-experiments.sh|custodian-experiments.test.sh|s/
 exp-status-ignored-by-list|custodian-experiments.sh|custodian-experiments.test.sh|s/\| \$newest\["[^"]*"\] as \$s/| null as \$s/
 exp-status-listed-as-record|custodian-experiments.sh|custodian-experiments.test.sh|s/\Q| .[] | select(.type != "status")\E/| .[] | select(true)/
 exp-status-key-drops-issue|custodian-experiments.sh|custodian-experiments.test.sh|s/\Qgroup_by([.issue, .item])\E\n(\s+\| map\(\{key: )"[^"]*"/group_by(.item)\n$1"\\(.[0].item)"/
+outcome-arm-accepts-any|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q| IN("refute", "batch", "promote") | not)\E/| IN("refute", "batch", "promote"))/
+outcome-arm-drops-batch|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"refute", "batch", "promote"\E/"refute", "promote"/
+outcome-arm-strings-only|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.outcome != null and\E/(.outcome | type) == "string" and/
+outcome-arm-no-truncation|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$v\[0:57\] \+ "\.\.\."/\$v/
+outcome-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_outcome/skip "\$bad_outcome/
+outcome-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 7:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
+disp-arm-drops-dropped|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"waived", "dropped", "open")\E/"waived", "open")/
+disp-arm-token-check-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.disposition | IN("cleared", "refuted", "waived", "dropped", "open") | not)\E/false/
+disp-arm-any-finding|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\.finding \| test\("\^gates[^)]*\) \| not\)//
+disp-arm-line-zero|loop-finding-audit.sh|loop-finding-audit.test.sh|s/jsonl:\[1-9\]\[0-9\]\*/jsonl:[0-9][0-9]*/
+disp-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.finding | type) != "string" or \E//
+disp-arm-no-object-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/if type != "object" then "is not an object"\s+elif/if/
+disp-arm-allows-empty|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\$d \| length\) == 0//
+disp-arm-every-line|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qselect(.pass == "re-crew" and .ran != false)\E/select(.ran != false)/
+disp-arm-unrun-owes|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.pass == "re-crew" and .ran != false\E/.pass == "re-crew"/
+disp-arm-every-entry|loop-finding-audit.sh|loop-finding-audit.test.sh|s{\Q| first // empty\E}{| .[]}
+disp-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_recrew/skip "\$bad_recrew/
+disp-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 8:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
+open-arm-drops-open|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"dropped", "open")\E/"dropped")/
+open-arm-anywhere|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.disposition == "open" and \(\$not_cleared \| not\)/false/
+open-arm-contains|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qstartswith("NOT-CLEARED")\E/contains("NOT-CLEARED")/
+open-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | type) == "string" and \E//
+open-arm-case-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | startswith(\E/(.verdict | ascii_upcase | startswith(/
+cite-arm-past-end-inclusive|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ > \(\$log \| length\)$/ >= (\$log | length)/m
+cite-arm-past-end-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ > \(\$log \| length\)$/ > 1e9/m
+cite-arm-line-off-by-one|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qtonumber) - 1]\E/tonumber)]/
+cite-arm-any-kind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qtype == "object" and .kind == "crew" and .gates == true\E/type == "object" and .gates == true/
+cite-arm-any-gates|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.kind == "crew" and .gates == true\E/.kind == "crew"/
+cite-arm-twice-allowed|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.finding == \$f\)/false)/
+cite-arm-twice-counts-self|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$d\[0:\$k\]/\$d/
+cite-arm-split-line-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q([.value | fromjson?] | length) == 0\E/false/
+cite-arm-blank-line-flagged|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.value | test(\E"[^"]*"\Q) | not) and \E//
+ran-false-disp-unchecked|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qselect(.ran == false and .dispositions != null)\E/select(false)/
+ran-false-disp-null-counts|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.ran == false and .dispositions != null\E/.ran == false and has("dispositions")/
 TABLE
 }
 
