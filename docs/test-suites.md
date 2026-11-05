@@ -452,8 +452,10 @@ dumped from a live PostToolUse call: tool_response carries interrupted,
 isImage, noOutputExpected, stderr, stdout — and no exit code, under any
 spelling. The PostToolUseFailure fixture (top-level `error` and
 `is_interrupt`, no tool_response) is taken from the Claude Code hooks
-reference and labelled docs-sourced in the suite, because no live failure
-payload has been dumped yet. An earlier version of this suite hand-wrote
+reference and checked against a live failure on 2026-11-05: the hook
+received `hook_event_name` PostToolUseFailure and a top-level `error`
+string of "Exit code 1" followed by the output. A live `is_interrupt`
+has not been seen yet. An earlier version of this suite hand-wrote
 `exit_code: 0`, asserted on it, and passed green while the check it covers
 could not reach its own clean arm on a single real branch. A fixture that
 manufactures the schema it validates proves nothing.

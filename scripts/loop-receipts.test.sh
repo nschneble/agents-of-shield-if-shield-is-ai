@@ -2,7 +2,7 @@
 # loop-receipts.test.sh — both-directions test for the receipt check, and
 # for the hook that writes what it reads.
 #
-# Success fixtures: a live PostToolUse dump; failure fixture: docs-sourced.
+# Success fixtures: a live PostToolUse dump; failure: docs, live-checked.
 # Background: docs/test-suites.md#loop-receipts
 set -uo pipefail
 
@@ -199,7 +199,7 @@ bash "$hook" < "$payload.sub"
 [ "$(tail -1 "$written" | jq -r '.agent_id')" = "a-7" ]
 check "a subagent call records its agent_id" $?
 
-# docs-sourced, not captured: a failure has error + is_interrupt only
+# a live failure carried error as "Exit code N" plus the output
 error_text='Exit code 1
 Error: Cannot find module'
 python3 - "$repo" "$error_text" false > "$payload" <<'PY2'
