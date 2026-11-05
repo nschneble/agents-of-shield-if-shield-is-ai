@@ -163,8 +163,10 @@ checked=$((checked + 1))
 while IFS= read -r bad_recrew; do
   [ -n "$bad_recrew" ] || continue
   flag "$bad_recrew"
-done < <(jq -r '
-  def problem($not_cleared):
+done < <(jq -Rnr '
+  [inputs] as $raw
+  | [$raw[] | fromjson? // null] as $log
+  | def problem($not_cleared; $earlier):
     if type != "object" then "is not an object"
     elif (.finding | type) != "string" or (.finding | test("^gates\\.jsonl:[1-9][0-9]*$") | not)
       then "needs finding as gates.jsonl:<line> of the gating finding"
@@ -172,14 +174,27 @@ done < <(jq -r '
       then "needs disposition cleared|refuted|waived|dropped|open"
     elif .disposition == "open" and ($not_cleared | not)
       then "is open, but the verdict does not start with NOT-CLEARED"
+    elif (.finding | ltrimstr("gates.jsonl:") | tonumber) > ($log | length)
+      then "names \(.finding), but the log ends at line \($log | length)"
+    elif $log[(.finding | ltrimstr("gates.jsonl:") | tonumber) - 1]
+         | (type == "object" and .kind == "crew" and .gates == true) | not
+      then "names \(.finding), which is not a gating crew line"
+    elif .finding as $f | any($earlier[] | objects; .finding == $f)
+      then "names \(.finding) a second time"
     else empty end;
-  select(.pass == "re-crew" and .ran != false)
-  | ((.verdict | type) == "string" and (.verdict | startswith("NOT-CLEARED"))) as $not_cleared
-  | (if (.dispositions | type) != "array" or (.dispositions | length) == 0
-     then "has no dispositions — list one {finding, disposition} per finding it re-checked"
-     else [.dispositions | to_entries[] | "disposition \(.key + 1) \(.value | problem($not_cleared))"] | first // empty
-     end) as $why
-  | "wave \(.wave) \(.agent // "?") re-crew \($why)"
+  ($raw | to_entries[]
+   | select((.value | test("^\\s*$") | not) and ([.value | fromjson?] | length) == 0)
+   | "gates.jsonl:\(.key + 1) is not one JSON line, so no disposition can cite it"),
+  ($log[] | objects
+   | select(.pass == "re-crew" and .ran != false)
+   | ((.verdict | type) == "string" and (.verdict | startswith("NOT-CLEARED"))) as $not_cleared
+   | .dispositions as $d
+   | (if ($d | type) != "array" or ($d | length) == 0
+      then "has no dispositions — list one {finding, disposition} per finding it re-checked"
+      else [$d | to_entries[] | .key as $k
+            | "disposition \($k + 1) \(.value | problem($not_cleared; $d[0:$k]))"] | first // empty
+      end) as $why
+   | "wave \(.wave) \(.agent // "?") re-crew \($why)")
 ' "$GATES")
 
 echo

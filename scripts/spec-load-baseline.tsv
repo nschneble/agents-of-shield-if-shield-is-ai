@@ -234,7 +234,11 @@
 # +23 always on custodian-run: phase-detail.md says index records carry a
 # re-crew's `dispositions` and the reap guard compares them, absent and
 # null alike.
-orchestrator-run	26544	1898
+#
+# +28 always on orchestrator-run: state-schemas.md says the dispositions
+# list is non-empty, names no finding twice on a line, and cites a physical
+# line holding a gating crew finding, which the eighth arm now checks.
+orchestrator-run	26572	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0

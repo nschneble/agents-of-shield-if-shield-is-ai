@@ -217,6 +217,26 @@ red "an open finding on a line with no verdict is caught" "$recrew_head disposit
 m_open_lower() { recrew "$1" "$open_entry"; verdict_is "$1" '"not-cleared: still truncates"'; }
 red "the NOT-CLEARED lead is matched in capitals only" "$recrew_head disposition 1 is open" m_open_lower
 
+m_past_end() { recrew "$1" '[{"finding": "gates.jsonl:99", "disposition": "cleared"}]'; }
+red "a finding past the end of the log is caught" "$recrew_head disposition 1 names gates.jsonl:99, but the log ends at line 5" m_past_end
+
+m_non_gating() { recrew "$1" '[{"finding": "gates.jsonl:5", "disposition": "cleared"}]'; }
+red "a finding on a crew line that did not gate is caught" "$recrew_head disposition 1 names gates.jsonl:5, which is not a gating crew line" m_non_gating
+
+m_not_crew() {
+  gate 1 the-diamantaire true correctness-regression A1 | jq -c '.kind = "pre-build-specialist"' >> "$1/gates.jsonl"
+  recrew "$1" '[{"finding": "gates.jsonl:6", "disposition": "cleared"}]'
+}
+red "a gating line that is not a crew line is caught" "$recrew_head disposition 1 names gates.jsonl:6, which is not a gating crew line" m_not_crew
+
+m_twice() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "cleared"},
+  {"finding": "gates.jsonl:1", "disposition": "refuted"}]'; }
+red "one line naming a finding twice is caught" "$recrew_head disposition 2 names gates.jsonl:1 a second time" m_twice
+
+m_split_line() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "cleared"}]'
+  gate 1 the-chemist false "" "" | jq . >> "$1/gates.jsonl"; }
+red "a log value split across lines is caught" "VIOLATION  gates.jsonl:6 is not one JSON line" m_split_line
+
 # --- GREEN counterparts for the arms whose RED is a threshold. --------
 # A cap check that fired on everything would pass every RED above while
 # being useless, so each threshold arm needs its permissive direction.
@@ -258,10 +278,11 @@ check "GREEN: each outcome token, null and an absent outcome all pass" $?
 agree "GREEN-outcome-tokens:"
 
 r="$temp_dir/dispositions"; mkrun "$r"
+for _ in 1 2 3; do gate 1 the-diamantaire true correctness-regression A1; done >> "$r/gates.jsonl"
 recrew "$r" '[{"finding": "gates.jsonl:1", "disposition": "cleared"},
-  {"finding": "gates.jsonl:2", "disposition": "refuted"},
-  {"finding": "gates.jsonl:3", "disposition": "waived"},
-  {"finding": "gates.jsonl:40", "disposition": "dropped"}]'
+  {"finding": "gates.jsonl:6", "disposition": "refuted"},
+  {"finding": "gates.jsonl:7", "disposition": "waived"},
+  {"finding": "gates.jsonl:8", "disposition": "dropped"}]'
 jq -c '.pass = "re-crew" | .ran = false | .task_tool_available = false' \
   <<< "$(gate 1-corrective-1 the-auditor false "" "")" >> "$r/gates.jsonl"
 run "$r"
@@ -270,8 +291,9 @@ check "GREEN: each disposition token passes, and a re-crew that never ran owes n
 agree "GREEN-dispositions:"
 
 n="$temp_dir/not-cleared"; mkrun "$n"
+gate 1 the-diamantaire true correctness-regression A1 >> "$n/gates.jsonl"
 recrew "$n" '[{"finding": "gates.jsonl:1", "disposition": "open"},
-  {"finding": "gates.jsonl:2", "disposition": "cleared"}]'
+  {"finding": "gates.jsonl:6", "disposition": "cleared"}]'
 verdict_is "$n" '"NOT-CLEARED: the cut -c bug still truncates"'
 jq -c '.kind = "orchestration-incident" | .pass = "re-crew" | .agent = "user"
   | .verdict = "waive it" | .dispositions = [{finding: "gates.jsonl:1", disposition: "waived"}]' \
@@ -280,6 +302,15 @@ run "$n"
 printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
 check "GREEN: a NOT-CLEARED line may leave a finding open, and the user's ruling settles it" $?
 agree "GREEN-not-cleared:"
+
+b="$temp_dir/blank-line"; mkrun "$b"
+recrew "$b" '[{"finding": "gates.jsonl:7", "disposition": "cleared"}]'
+{ head -1 "$b/gates.jsonl"; echo; tail -n +2 "$b/gates.jsonl"
+  gate 1 the-diamantaire true correctness-regression A1; } > "$b/g" && mv "$b/g" "$b/gates.jsonl"
+run "$b"
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
+check "GREEN: a blank line is skipped yet still counted, as the history index counts it" $?
+agree "GREEN-blank-line:"
 
 o="$temp_dir/override"; mkrun "$o"
 gate 1-corrective-2 the-diamantaire false "" "" >> "$o/gates.jsonl"
@@ -327,6 +358,6 @@ echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter. Pegged at the
 # exact arm count, not a round number under it.
-[ "$checks" -eq 78 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 78\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 90 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 90\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-finding-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-finding-audit test(s) FAILED"; exit 1; fi

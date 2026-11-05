@@ -375,7 +375,7 @@ disp-arm-any-finding|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\.
 disp-arm-line-zero|loop-finding-audit.sh|loop-finding-audit.test.sh|s/jsonl:\[1-9\]\[0-9\]\*/jsonl:[0-9][0-9]*/
 disp-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.finding | type) != "string" or \E//
 disp-arm-no-object-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/if type != "object" then "is not an object"\s+elif/if/
-disp-arm-allows-empty|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q or (.dispositions | length) == 0\E//
+disp-arm-allows-empty|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\$d \| length\) == 0//
 disp-arm-every-line|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qselect(.pass == "re-crew" and .ran != false)\E/select(.ran != false)/
 disp-arm-unrun-owes|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.pass == "re-crew" and .ran != false\E/.pass == "re-crew"/
 disp-arm-every-entry|loop-finding-audit.sh|loop-finding-audit.test.sh|s{\Q| first // empty\E}{| .[]}
@@ -386,6 +386,15 @@ open-arm-anywhere|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.dispositi
 open-arm-contains|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qstartswith("NOT-CLEARED")\E/contains("NOT-CLEARED")/
 open-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | type) == "string" and \E//
 open-arm-case-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | startswith(\E/(.verdict | ascii_upcase | startswith(/
+cite-arm-past-end-inclusive|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ > \(\$log \| length\)$/ >= (\$log | length)/m
+cite-arm-past-end-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ > \(\$log \| length\)$/ > 1e9/m
+cite-arm-line-off-by-one|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qtonumber) - 1]\E/tonumber)]/
+cite-arm-any-kind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qtype == "object" and .kind == "crew" and .gates == true\E/type == "object" and .gates == true/
+cite-arm-any-gates|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.kind == "crew" and .gates == true\E/.kind == "crew"/
+cite-arm-twice-allowed|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.finding == \$f\)/false)/
+cite-arm-twice-counts-self|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$d\[0:\$k\]/\$d/
+cite-arm-split-line-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q([.value | fromjson?] | length) == 0\E/false/
+cite-arm-blank-line-flagged|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.value | test(\E"[^"]*"\Q) | not) and \E//
 TABLE
 }
 
