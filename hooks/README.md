@@ -85,11 +85,9 @@ payload's `tool_response` carries only `interrupted`, `isImage`,
 failures fire `PostToolUseFailure` instead, with a top-level `error`
 string and an optional `is_interrupt`. Readers count a receipt with
 `outcome: "failed"` as no evidence, and a receipt with no `outcome` (one
-written before the field existed) as a success. Until the hook is
-registered for `PostToolUseFailure`, failed runs leave no receipt at all.
-An earlier version read `.tool_response.exit_code`, recorded null on all
-159 real receipts, and made `scripts/loop-receipts.sh`'s clean arm
-unreachable.
+written before the field existed) as a success. An earlier version read
+`.tool_response.exit_code`, recorded null on all 159 real receipts, and
+made `scripts/loop-receipts.sh`'s clean arm unreachable.
 
 Unlike the two guards it never blocks and never fails a call: every arm
 exits 0, and nothing is written for a non-Bash tool, an event other than
