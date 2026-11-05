@@ -447,13 +447,16 @@ The hook half matters as much as the check half: a hook that silently writes
 nothing makes every branch NOT EVALUABLE, which is a clean exit forever. So
 the writer is exercised against real payload shapes, not assumed.
 
-THE FIXTURES IN THIS SUITE ARE THE PAYLOAD THE RUNTIME ACTUALLY SENDS, dumped
-from a live PostToolUse call: tool_response carries interrupted, isImage,
-noOutputExpected, stderr, stdout — and no exit code, under any spelling. An
-earlier version of this suite hand-wrote `exit_code: 0`, asserted on it, and
-passed green while the check it covers could not reach its own clean arm on a
-single real branch. A fixture that manufactures the schema it validates proves
-nothing.
+THE SUCCESS FIXTURES IN THIS SUITE ARE THE PAYLOAD THE RUNTIME ACTUALLY SENDS,
+dumped from a live PostToolUse call: tool_response carries interrupted,
+isImage, noOutputExpected, stderr, stdout — and no exit code, under any
+spelling. The PostToolUseFailure fixture (top-level `error` and
+`is_interrupt`, no tool_response) is taken from the Claude Code hooks
+reference and labelled docs-sourced in the suite, because no live failure
+payload has been dumped yet. An earlier version of this suite hand-wrote
+`exit_code: 0`, asserted on it, and passed green while the check it covers
+could not reach its own clean arm on a single real branch. A fixture that
+manufactures the schema it validates proves nothing.
 
 ## loop-state-audit
 

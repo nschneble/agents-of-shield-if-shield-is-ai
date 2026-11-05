@@ -57,16 +57,23 @@ blind spots is one people route around.
 
 ## record-execution-receipt.sh
 
-`PostToolUse`, matcher `Bash`. Appends one receipt per shell execution to
-`local/loops/<branch>/receipts.jsonl` — the command, whether it was
-interrupted, digests of stdout and stderr, and a timestamp.
+`PostToolUse` and `PostToolUseFailure`, matcher `Bash`. Appends one
+receipt per shell execution to `local/loops/<branch>/receipts.jsonl`:
+the command, `outcome` (`ok` or `failed`), whether it was interrupted,
+digests of stdout and stderr (success) or of the error text (failure),
+`session_id`, `agent_id` (null in the main session; the runtime sends it
+only for a subagent), `cwd`, the repo's `head` commit and its `tree`, and a
+timestamp. `head` and `tree` are read after the call ran, so a command that
+commits records the new commit; they are null in a repo with no commit
+yet. `tree` is the commit's tree, not the working tree.
 
-The command is truncated to 200 characters (`RECEIPT_CMD_KEEP`), with
-`command_sha` and `command_len` carrying its full identity. Nothing reads
-the text — the check uses the receipt's existence and `interrupted` — so
-storing it whole bought nothing and made the log a verbatim transcript of
-every shell command in the repo: 123KB of a 158KB log on one branch in
-one day, one entry an 8695-character heredoc.
+The stored command is capped at 4096 characters (`RECEIPT_CMD_KEEP`
+overrides it; a value that is not a positive integer falls back to 4096),
+with `command_sha` and `command_len` covering the full command. Of 18021
+receipts across six repos on 2026-11-04, 40% ran past the old
+200-character cap and 0.2% past 4096. The cap stays bounded because the
+text is a verbatim record of what ran, heredoc bodies and inline tokens
+included.
 
 It exists because `verified_by` on a gate line is free text the audited
 agent types, so a rule reading it asks that agent to grade itself. A
@@ -74,19 +81,24 @@ receipt is written by the runtime and no agent authors it.
 
 There is no exit code in it, and that is not an omission: the PostToolUse
 payload's `tool_response` carries only `interrupted`, `isImage`,
-`noOutputExpected`, `stderr`, `stdout`. The event fires on tool SUCCESS —
-failures route to `PostToolUseFailure`, which nothing here subscribes to
-— so a receipt's existence is the success signal. An earlier version read
-`.tool_response.exit_code`, recorded null on all 159 real receipts, and
-made `scripts/loop-receipts.sh`'s clean arm unreachable.
+`noOutputExpected`, `stderr`, `stdout`. The event fires on tool SUCCESS;
+failures fire `PostToolUseFailure` instead, with a top-level `error`
+string and an optional `is_interrupt`. Readers count a receipt with
+`outcome: "failed"` as no evidence, and a receipt with no `outcome` (one
+written before the field existed) as a success. Until the hook is
+registered for `PostToolUseFailure`, failed runs leave no receipt at all.
+An earlier version read `.tool_response.exit_code`, recorded null on all
+159 real receipts, and made `scripts/loop-receipts.sh`'s clean arm
+unreachable.
 
 Unlike the two guards it never blocks and never fails a call: every arm
-exits 0, and nothing is written for a non-Bash tool or a cwd outside a
-git repo. `local/` is gitignored, so receipts are scratch.
+exits 0, and nothing is written for a non-Bash tool, an event other than
+the two above, or a cwd outside a git repo. `local/` is gitignored, so
+receipts are scratch.
 
-Read by `scripts/loop-receipts.sh`; tested by
-`scripts/loop-receipts.test.sh`, which covers both the writer and the
-check (this hook has no sibling `*.test.sh` of its own).
+Read by `scripts/loop-receipts.sh` and `scripts/loop-unanimity-audit.sh`;
+tested by `scripts/loop-receipts.test.sh`, which covers both the writer
+and the check (this hook has no sibling `*.test.sh` of its own).
 
 ## Deployment
 
@@ -101,7 +113,8 @@ ln -sfn "$PWD/hooks/record-execution-receipt.sh" ~/.claude/hooks/record-executio
 
 The wiring itself lives in `~/.claude/settings.json`, which is not
 versioned here. Both guards sit under the one `PreToolUse` `Bash` matcher
-and run in order; the receipt writer sits under `PostToolUse`:
+and run in order; the receipt writer sits under both `PostToolUse` and
+`PostToolUseFailure`:
 
 ```json
 { "hooks": {
@@ -110,6 +123,9 @@ and run in order; the receipt writer sits under `PostToolUse`:
     { "type": "command", "command": "~/.claude/hooks/guard-pr-template.sh" }
   ] } ],
   "PostToolUse": [ { "matcher": "Bash", "hooks": [
+    { "type": "command", "command": "~/.claude/hooks/record-execution-receipt.sh" }
+  ] } ],
+  "PostToolUseFailure": [ { "matcher": "Bash", "hooks": [
     { "type": "command", "command": "~/.claude/hooks/record-execution-receipt.sh" }
   ] } ]
 } }

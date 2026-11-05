@@ -216,8 +216,8 @@ else
     if [ ! -s "$rlog" ]; then
       corrob="NOT EVALUABLE (no receipts log on this branch)"
     else
-      up=$(jq -Rn '[inputs | fromjson? // empty | select((.interrupted // false) != true)] | length' "$rlog")
-      corrob="branch has $up uninterrupted receipt(s) — branch-granular only, receipts carry no wave"
+      up=$(jq -Rn '[inputs | fromjson? // empty | select((.interrupted // false) != true and (.outcome // "ok") != "failed")] | length' "$rlog")
+      corrob="branch has $up uninterrupted, unfailed receipt(s) — branch-granular only, receipts carry no wave"
     fi
     printf '    %s/%s wave %s pass %s · %s reviewer(s) ran of %s crew line(s) logged, all clean\n' \
       "$repo" "$branch" "$wave" "$pass" "$agents" "$dispatched"

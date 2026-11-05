@@ -76,8 +76,24 @@ ciwiring-accept-any-mention|validate-looper-config.sh|validate-looper-config.tes
 po-tail-counted-as-p2|custodian-phase-order.sh|custodian-phase-order.test.sh|s/\(\$nob \| map\(select\(\.priorb == 0\)\)\)/(\$nob)/
 po-segment-marker-dead|custodian-phase-order.sh|custodian-phase-order.test.sh|s/if \$l\.obj\.phase == "resume" then \.seg \+= 1/if false then .seg += 1/
 receipts-era-gate-off|loop-receipts.sh|loop-receipts.test.sh|s/if \[ ! -s "\$receipts" \]; then/if false; then/
+hook-failure-arm-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\QPostToolUseFailure) outcome=failed ;;\E/PostToolUseFailure) outcome=ok ;;/
+hook-event-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\Q*) exit 0 ;;\E/*) outcome=ok ;;/
+hook-error-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/error_sha=\$\(sha_of /error_sha=\$\(true /
+hook-ok-only-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/if \$outcome == "ok" then \$v else null end/\$v/
+hook-is-interrupt-ignored|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s#\Q // .is_interrupt\E##
+hook-session-id-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\Qsession_id: (.session_id | str_or_null)\E/session_id: null/
+hook-agent-id-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\Qagent_id: (.agent_id | str_or_null)\E/agent_id: null/
+hook-cwd-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cwd: \$cwd,/cwd: null,/
+hook-head-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/head: \(\$head \| str_or_null\)/head: null/
+hook-tree-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/tree: \(\$tree \| str_or_null\)/tree: null/
+hook-cap-default-200|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/default_keep=4096/default_keep=200/
+hook-keep-syntax-check-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\Q''|*[!0-9]*) CMD_KEEP=\E/''|zzz) CMD_KEEP=/
+hook-keep-zero-check-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\Q-gt 0 ] || CMD_KEEP=\E/-ge 0 ] || CMD_KEEP=/
+receipts-failed-counted|loop-receipts.sh|loop-receipts.test.sh|s/\Q and (.outcome \/\/ "ok") != "failed"\E//
+unanimity-failed-counted|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/\Q and (.outcome \/\/ "ok") != "failed"\E//
 hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ "\$tool" = "Bash" \] \|\| exit 0/: /
-hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cut -c "1-\$CMD_KEEP"/cat/
+hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/:/
+hook-truncation-per-line|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/cmd=\$(printf \x27%s\x27 "\$cmd" | cut -c "1-\$CMD_KEEP")/
 hook-cmd-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd_sha=\$\(sha_of "\$cmd"\)/cmd_sha=""/
 hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
 ceiling-comparison-never-fires|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/if \[ "\$actual" -gt "\$ceiling" \]; then/if false; then/

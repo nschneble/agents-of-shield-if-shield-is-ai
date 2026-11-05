@@ -53,14 +53,14 @@ if [ ! -s "$receipts" ]; then
   exit 1
 fi
 
-# one uninterrupted receipt is the bar: no gate line names its command
-passing=$(count_matching "$receipts" '(.interrupted // false) != true')
+# one ok, uninterrupted receipt is the bar: no gate line names its command
+passing=$(count_matching "$receipts" '(.interrupted // false) != true and (.outcome // "ok") != "failed"')
 total=$(count_matching "$receipts" 'true')
-echo "  receipts: $total recorded, $passing uninterrupted"
+echo "  receipts: $total recorded, $passing uninterrupted and not failed"
 
 if [ "$claims" -gt 0 ] && [ "$passing" -eq 0 ]; then
   echo "  VIOLATION  $claims line(s) claim executable verification and the runtime"
-  echo "             recorded no uninterrupted command on this branch at all."
+  echo "             recorded no uninterrupted, unfailed command on this branch."
   exit 1
 fi
 

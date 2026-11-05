@@ -774,6 +774,15 @@ lost`. A run killed before F produces no verdict at all — the check's
     — and storing it whole made the log a verbatim transcript of every shell
     command in the repo: 123KB of a 158KB log on one branch in one day.
 
+    **Revised when receipts had to back a claim check (issue #101).** They
+    carried no session or agent id, 40% of stored commands were cut at 200
+    characters, and failed runs left no receipt. The hook now also records
+    `session_id`, `agent_id`, `cwd`, `head`, `tree` and `outcome`, handles
+    `PostToolUseFailure` with a digest of the error text, and caps the text
+    at 4096 characters instead of 200. Existence alone is no longer the
+    success signal: readers count `outcome: "failed"` out, and a receipt
+    with no `outcome` reads as the success it was.
+
 28. **An advisory nobody can satisfy is not a guard.** The skill lint reports
     the published ~5000-token body budget as INFO. `looper-custodian` cannot
     reach it — a five-phase unattended cron spec is not a 5000-token
