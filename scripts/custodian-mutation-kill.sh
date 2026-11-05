@@ -364,8 +364,8 @@ outcome-arm-strings-only|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.o
 outcome-arm-no-truncation|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$v\[0:57\] \+ "\.\.\."/\$v/
 outcome-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_outcome/skip "\$bad_outcome/
 outcome-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 7:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
-disp-arm-drops-dropped|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"waived", "dropped")\E/"waived")/
-disp-arm-token-check-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.disposition | IN("cleared", "refuted", "waived", "dropped") | not)\E/false/
+disp-arm-drops-dropped|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"waived", "dropped", "open")\E/"waived", "open")/
+disp-arm-token-check-off|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.disposition | IN("cleared", "refuted", "waived", "dropped", "open") | not)\E/false/
 disp-arm-any-finding|loop-finding-audit.sh|loop-finding-audit.test.sh|s/ or \(\.finding \| test\("\^gates[^)]*\) \| not\)//
 disp-arm-line-zero|loop-finding-audit.sh|loop-finding-audit.test.sh|s/jsonl:\[1-9\]\[0-9\]\*/jsonl:[0-9][0-9]*/
 disp-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.finding | type) != "string" or \E//
@@ -376,6 +376,11 @@ disp-arm-unrun-owes|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.pass =
 disp-arm-every-entry|loop-finding-audit.sh|loop-finding-audit.test.sh|s{\Q| first // empty\E}{| .[]}
 disp-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_recrew/skip "\$bad_recrew/
 disp-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 8:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
+open-arm-drops-open|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"dropped", "open")\E/"dropped")/
+open-arm-anywhere|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\.disposition == "open" and \(\$not_cleared \| not\)/false/
+open-arm-contains|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Qstartswith("NOT-CLEARED")\E/contains("NOT-CLEARED")/
+open-arm-no-type-guard|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | type) == "string" and \E//
+open-arm-case-blind|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q(.verdict | startswith(\E/(.verdict | ascii_upcase | startswith(/
 TABLE
 }
 

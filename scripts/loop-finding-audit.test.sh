@@ -195,9 +195,27 @@ red "an entry that is not an object is caught" "$recrew_head disposition 1 is no
 
 m_bad_token() { recrew "$1" '[{"finding": "gates.jsonl:1", "disposition": "fixed"},
   {"finding": "nope", "disposition": "cleared"}]'; }
-red "an off-enum disposition names its entry" "$recrew_head disposition 1 needs disposition cleared|refuted|waived|dropped" m_bad_token
+red "an off-enum disposition names its entry" "$recrew_head disposition 1 needs disposition cleared|refuted|waived|dropped|open" m_bad_token
 [ "$(printf '%s\n' "$out" | grep -c 'VIOLATION')" -eq 1 ]
 check "RED: two bad entries on one re-crew line report once" $?
+
+verdict_is() { # dir, verdict json for the re-crew line
+  jq -c --argjson v "$2" 'if .wave == "1-corrective-1" and .agent == "the-diamantaire"
+    then .verdict = $v else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"
+}
+open_entry='[{"finding": "gates.jsonl:1", "disposition": "open"}]'
+
+m_open_cleared() { recrew "$1" "$open_entry"; verdict_is "$1" '"CLEARED at abc1234"'; }
+red "an open finding on a CLEARED line is caught" "$recrew_head disposition 1 is open, but the verdict does not start with NOT-CLEARED" m_open_cleared
+
+m_open_midword() { recrew "$1" "$open_entry"; verdict_is "$1" '"two of three NOT-CLEARED"'; }
+red "NOT-CLEARED must lead the verdict, not appear in it" "$recrew_head disposition 1 is open" m_open_midword
+
+m_open_null() { recrew "$1" "$open_entry"; verdict_is "$1" 'null'; }
+red "an open finding on a line with no verdict is caught" "$recrew_head disposition 1 is open" m_open_null
+
+m_open_lower() { recrew "$1" "$open_entry"; verdict_is "$1" '"not-cleared: still truncates"'; }
+red "the NOT-CLEARED lead is matched in capitals only" "$recrew_head disposition 1 is open" m_open_lower
 
 # --- GREEN counterparts for the arms whose RED is a threshold. --------
 # A cap check that fired on everything would pass every RED above while
@@ -251,6 +269,18 @@ printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
 check "GREEN: each disposition token passes, and a re-crew that never ran owes none" $?
 agree "GREEN-dispositions:"
 
+n="$temp_dir/not-cleared"; mkrun "$n"
+recrew "$n" '[{"finding": "gates.jsonl:1", "disposition": "open"},
+  {"finding": "gates.jsonl:2", "disposition": "cleared"}]'
+verdict_is "$n" '"NOT-CLEARED: the cut -c bug still truncates"'
+jq -c '.kind = "orchestration-incident" | .pass = "re-crew" | .agent = "user"
+  | .verdict = "waive it" | .dispositions = [{finding: "gates.jsonl:1", disposition: "waived"}]' \
+  <<< "$(gate 1-corrective-1 the-diamantaire false "" "")" >> "$n/gates.jsonl"
+run "$n"
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 8 check(s)'
+check "GREEN: a NOT-CLEARED line may leave a finding open, and the user's ruling settles it" $?
+agree "GREEN-not-cleared:"
+
 o="$temp_dir/override"; mkrun "$o"
 gate 1-corrective-2 the-diamantaire false "" "" >> "$o/gates.jsonl"
 out=$("$runner" --dir "$o" --max-per-wave 2 2>&1); rc=$?
@@ -297,6 +327,6 @@ echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter. Pegged at the
 # exact arm count, not a round number under it.
-[ "$checks" -eq 68 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 68\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 78 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 78\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-finding-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-finding-audit test(s) FAILED"; exit 1; fi

@@ -164,17 +164,20 @@ while IFS= read -r bad_recrew; do
   [ -n "$bad_recrew" ] || continue
   flag "$bad_recrew"
 done < <(jq -r '
-  def problem:
+  def problem($not_cleared):
     if type != "object" then "is not an object"
     elif (.finding | type) != "string" or (.finding | test("^gates\\.jsonl:[1-9][0-9]*$") | not)
       then "needs finding as gates.jsonl:<line> of the gating finding"
-    elif (.disposition | IN("cleared", "refuted", "waived", "dropped") | not)
-      then "needs disposition cleared|refuted|waived|dropped"
+    elif (.disposition | IN("cleared", "refuted", "waived", "dropped", "open") | not)
+      then "needs disposition cleared|refuted|waived|dropped|open"
+    elif .disposition == "open" and ($not_cleared | not)
+      then "is open, but the verdict does not start with NOT-CLEARED"
     else empty end;
   select(.pass == "re-crew" and .ran != false)
+  | ((.verdict | type) == "string" and (.verdict | startswith("NOT-CLEARED"))) as $not_cleared
   | (if (.dispositions | type) != "array" or (.dispositions | length) == 0
      then "has no dispositions — list one {finding, disposition} per finding it re-checked"
-     else [.dispositions | to_entries[] | "disposition \(.key + 1) \(.value | problem)"] | first // empty
+     else [.dispositions | to_entries[] | "disposition \(.key + 1) \(.value | problem($not_cleared))"] | first // empty
      end) as $why
   | "wave \(.wave) \(.agent // "?") re-crew \($why)"
 ' "$GATES")

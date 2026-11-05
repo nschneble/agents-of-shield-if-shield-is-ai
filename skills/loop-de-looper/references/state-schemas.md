@@ -36,14 +36,15 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
 
 `outcome: "batch"` is the refutation-posture reviewer's own way of saying the same thing — a defensible defect it can cite, below the floor. It exists because a binary `refute|promote` forces a reviewer to either block on a nit or stay silent about it, and the first is what produced four consecutive `refute` verdicts on a one-line CSS fix.
 
-`dispositions` is how a re-crew settles each finding it re-checked, one entry per finding. `finding` is `gates.jsonl:<N>`, the line of that gating crew finding in this same log: the history index's `cite` ends in the same suffix, so the pair still joins once the run dir is reaped. `disposition` takes one of four tokens:
+`dispositions` is how a re-crew settles each finding it re-checked, one entry per finding. `finding` is `gates.jsonl:<N>`, the line of that gating crew finding in this same log: the history index's `cite` ends in the same suffix, so the pair still joins once the run dir is reaped. `disposition` takes one of five tokens:
 
 - `cleared`: fixed, and the re-check confirms it
 - `refuted`: the finding was wrong
 - `waived`: accepted without a fix, by the user or a recorded decision
 - `dropped`: the requirement it guarded left the contract or plan
+- `open`: not settled; valid only on a line whose `verdict` starts with `NOT-CLEARED`
 
-`verdict` stays the human summary. A finding the re-crew did not clear has no token yet: the run stops on it (`SKILL.md` `## Corrective budget`) and the line records the user's ruling at that stop. A re-crew with `ran: false` settled nothing and carries none.
+`verdict` stays the human summary. A re-crew that did not clear a finding writes its line at once, `verdict` starting with `NOT-CLEARED` and that finding `open`, and the run stops on it (`SKILL.md` `## Corrective budget`). The user's ruling is a later line of kind `orchestration-incident`, `pass: "re-crew"`, `agent: "user"`, settling each `open` finding with one of the other four tokens; a later entry for a finding supersedes an earlier one. A re-crew with `ran: false` settled nothing and carries none.
 
 ## Provenance lint
 

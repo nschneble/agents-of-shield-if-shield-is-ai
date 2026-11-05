@@ -226,7 +226,11 @@
 # line's `dispositions` (the finding key, four tokens, the not-cleared and
 # never-ran cases) and the eighth arm that enforces it; the re-crew rule
 # in protocol-detail.md requires one entry per finding.
-orchestrator-run	26461	1898
+#
+# +83 always on orchestrator-run: state-schemas.md adds the fifth token,
+# `open`, valid only under a NOT-CLEARED verdict, and the line that records
+# the user's later ruling on it.
+orchestrator-run	26544	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
