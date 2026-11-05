@@ -60,7 +60,8 @@ blind spots is one people route around.
 `PostToolUse` and `PostToolUseFailure`, matcher `Bash`. Appends one
 receipt per shell execution to `local/loops/<branch>/receipts.jsonl`:
 the command, `outcome` (`ok` or `failed`), whether it was interrupted,
-digests of stdout and stderr (success) or of the error text (failure),
+digests of stdout and stderr (success) or of the error text (failure,
+null when there is none),
 `session_id`, `agent_id` (null in the main session; the runtime sends it
 only for a subagent), `cwd`, the repo's `head` commit and its `tree`, and a
 timestamp. `head` and `tree` are read after the call ran, so a command that

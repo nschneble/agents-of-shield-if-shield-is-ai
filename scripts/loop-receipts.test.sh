@@ -231,6 +231,28 @@ bash "$hook" < "$payload"
 check "a failure with is_interrupt records interrupted" $?
 
 cat > "$payload" <<JSON
+{"cwd":"$repo","hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_input":{"command":"false"}}
+JSON
+bash "$hook" < "$payload"
+[ "$(tail -1 "$written" | jq -r '.outcome + " " + (.error_sha | tostring)')" = "failed null" ]
+check "a failure with no error text records a null error digest" $?
+
+python3 - "$repo" > "$payload" <<'PY2'
+import json,sys
+print(json.dumps({"cwd":sys.argv[1],"hook_event_name":"PostToolUseFailure",
+                  "tool_name":"Bash","tool_input":{"command":"make\n\n"},
+                  "error":"Exit code 2\nboom\n"}))
+PY2
+bash "$hook" < "$payload"
+last=$(tail -1 "$written")
+want_cmd=$(printf 'make\n\n' | shasum -a 256 | cut -d' ' -f1)
+want_err=$(printf 'Exit code 2\nboom\n' | shasum -a 256 | cut -d' ' -f1)
+[ "$(printf '%s' "$last" | jq -r '.command_len')" -eq 6 ] \
+  && [ "$(printf '%s' "$last" | jq -r '.command_sha')" = "$want_cmd" ] \
+  && [ "$(printf '%s' "$last" | jq -r '.error_sha')" = "$want_err" ]
+check "trailing newlines count toward the command and error digests" $?
+
+cat > "$payload" <<JSON
 {"cwd":"$repo","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo pre"}}
 JSON
 before=$(grep -c . "$written")
@@ -325,7 +347,7 @@ out=$("$check_sh" --dir "$dir" 2>&1); rc=$?
 [ "$rc" -eq 2 ]
 check "a wholly unparseable gates file exits 2 (got $rc)" $?
 
-EXPECTED_CHECKS=38
+EXPECTED_CHECKS=40
 ran=$(grep -c . "$results"); fails=$(grep -c '^FAIL$' "$results")
 echo
 [ "$ran" -eq "$EXPECTED_CHECKS" ] \
