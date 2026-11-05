@@ -34,7 +34,9 @@ tree=$(cd "$repo_root" && git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)
 dir="$repo_root/local/loops/$branch"
 mkdir -p "$dir" || exit 0
 
-cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // ""')
+# command substitution strips trailing newlines; the x sentinel keeps them
+raw() { printf '%s' "$payload" | jq -j "$1"; printf x; }
+cmd=$(raw '.tool_input.command // ""'); cmd=${cmd%x}
 [ -n "$cmd" ] || exit 0
 
 default_keep=4096
@@ -64,7 +66,8 @@ out=$(printf '%s' "$payload" | jq -r '(.tool_response.stdout // "") | tostring')
 err=$(printf '%s' "$payload" | jq -r '(.tool_response.stderr // "") | tostring')
 error_sha=""
 if [ "$outcome" = failed ]; then
-  error_sha=$(sha_of "$(printf '%s' "$payload" | jq -r '(.error // "") | tostring')")
+  error_text=$(raw '(.error // "") | tostring'); error_text=${error_text%x}
+  [ -z "$error_text" ] || error_sha=$(sha_of "$error_text")
 fi
 
 printf '%s' "$payload" | jq -c \

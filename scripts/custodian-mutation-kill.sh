@@ -94,6 +94,8 @@ unanimity-failed-counted|loop-unanimity-audit.sh|loop-unanimity-audit.test.sh|s/
 hook-nonbash-gate-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ "\$tool" = "Bash" \] \|\| exit 0/: /
 hook-truncation-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/:/
 hook-truncation-per-line|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\{cmd:0:\$CMD_KEEP\}/cmd=\$(printf \x27%s\x27 "\$cmd" | cut -c "1-\$CMD_KEEP")/
+hook-cmd-newlines-stripped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd=\$\(raw '\.tool_input\.command \/\/ ""'\); cmd=\$\{cmd%x\}/cmd=\$(printf '%s' "\$payload" | jq -r '.tool_input.command \/\/ ""')/
+hook-empty-error-digested|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\[ -z "\$error_text" \] \|\| error_sha=/error_sha=/
 hook-cmd-digest-dropped|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/cmd_sha=\$\(sha_of "\$cmd"\)/cmd_sha=""/
 hook-interrupted-normalizer-off|hooks/record-execution-receipt.sh|loop-receipts.test.sh|s/\*\) interrupted=false ;;/*) interrupted=null ;;/
 ceiling-comparison-never-fires|skill-body-ceiling.sh|skill-body-ceiling.test.sh|s/if \[ "\$actual" -gt "\$ceiling" \]; then/if false; then/
@@ -347,6 +349,7 @@ cite-gone-errored-root-uncounted|custodian-cite-check.sh|custodian-cite-check.te
 cite-empty-repo-set-unguarded|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\|\| \{ echo "no git repos under/|| true || { echo "no git repos under/
 cite-outside-root-resolves|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\[ -n "\$r" \] \|\| \{ emit UNRESOLVED/[ -n "\$r" ] || [ -e "\$abs" ] || { emit UNRESOLVED/
 cite-route-extracted|custodian-cite-check.sh|custodian-cite-check.test.sh|s/\Q && seg[2] in top\E//
+cite-ignored-list-as-arg|custodian-cite-check.sh|custodian-cite-check.test.sh|s/grep -vxF -f <\(printf '%s\\n' "\$ignored"\)/grep -vxF -e "\$ignored"/
 exp-duplicate-unguarded|custodian-experiments.sh|custodian-experiments.test.sh|s/die "already recorded: #\$issue \$item"/:/
 exp-verdict-unchecked|custodian-experiments.sh|custodian-experiments.test.sh|s/\|\| die "--verdict must be one of: \$VERDICTS"//
 exp-list-unfiltered|custodian-experiments.sh|custodian-experiments.test.sh|s/select\(\$i == "" or/select(true or/

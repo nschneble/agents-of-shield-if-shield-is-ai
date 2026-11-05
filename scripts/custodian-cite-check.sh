@@ -75,7 +75,7 @@ drop_ignored() { # root, hits
   if git -C "$1" rev-parse --git-dir >/dev/null 2>&1; then
     ignored=$(printf '%s\n' "$2" | git -C "$1" check-ignore --stdin 2>/dev/null)
     if [ -n "$ignored" ]; then
-      printf '%s\n' "$2" | grep -vxF -e "$ignored" | sort
+      printf '%s\n' "$2" | grep -vxF -f <(printf '%s\n' "$ignored") | sort
       return 0
     fi
   fi
