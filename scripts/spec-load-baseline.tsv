@@ -230,10 +230,14 @@
 # +83 always on orchestrator-run: state-schemas.md adds the fifth token,
 # `open`, valid only under a NOT-CLEARED verdict, and the line that records
 # the user's later ruling on it.
+#
+# +23 always on custodian-run: phase-detail.md says index records carry a
+# re-crew's `dispositions` and the reap guard compares them, absent and
+# null alike.
 orchestrator-run	26544	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	22041	7599
+custodian-run	22064	7599
 defend-run	8086	0
 declutter-run	6661	0

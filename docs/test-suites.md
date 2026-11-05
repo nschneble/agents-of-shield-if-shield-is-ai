@@ -99,7 +99,9 @@ line reverted to older content is re-appended once. An archived or deleted
 source reports nothing. `false` must be told apart from `null` and from a
 missing key, and a missing `verified_by` or `outcome` from `null`, in both
 directions, and a line rewritten to `ran` false must reach G1 without a
-rebuild.
+rebuild. A `dispositions` list is indexed with its line, gaining, editing
+or dropping it reports `CHANGED`, and a missing list and `null` are the
+same record.
 
 `query` and the guardrail replay count each distinct line a log has ever
 held once, by indexed content: after a mid-file deletion the tail counts

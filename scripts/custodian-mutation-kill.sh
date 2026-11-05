@@ -296,6 +296,11 @@ index-distinct-drops-path|custodian-index.jq|custodian-history.test.sh|s/\[\$r\.
 index-exact-key-folds-false|custodian-index.jq|custodian-history.test.sh|s/\Q.ran, .task_tool_available,\E/(.ran \/\/ null), (.task_tool_available \/\/ null),/
 index-key-drops-wave|custodian-index.jq|custodian-reap.test.sh|s/\Q[.wave, .kind,\E/[.kind,/
 index-key-drops-summary|custodian-index.jq|custodian-history.test.sh|s{\Q .summary,\E}{}
+index-key-drops-dispositions|custodian-index.jq|custodian-history.test.sh|s/\Q + [.dispositions | select(. != null)]\E//
+index-key-drops-dispositions-blocks-reap|custodian-index.jq|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//
+history-projection-drops-dispositions|custodian-history.sh|custodian-history.test.sh|s/\n\s*\+ \(if \.dispositions != null then \{dispositions\} else \{\} end\)//
+reap-guard-drops-dispositions|custodian-reap.sh|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//g
+reap-guard-dispositions-null-differs|custodian-reap.sh|custodian-reap.test.sh|s/\Q[.dispositions | select(. != null)]\E/(if has("dispositions") then [[.dispositions]] else [] end)/g
 guardrails-counts-by-cite|custodian-guardrails.sh|custodian-history.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
 replay-counts-by-cite|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
 history-mismatch-exits-nonzero|custodian-history.sh|custodian-history.test.sh|s/\[ -z "\$report" \] \|\| printf '%s\\n' "\$report"/[ -z "\$report" ]/
