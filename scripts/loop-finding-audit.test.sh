@@ -84,8 +84,8 @@ run() { out=$("$runner" --dir "$1" 2>&1); rc=$?; }
 # --- GREEN: one corrective, one justified gating finding. -------------
 g="$temp_dir/green"; mkrun "$g"
 run "$g"
-printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 6 check(s)'
-check "GREEN: a justified run reports zero violations over all 6 arms" $?
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 7 check(s)'
+check "GREEN: a justified run reports zero violations over all 7 arms" $?
 agree "GREEN:"
 ! printf '%s\n' "$out" | grep -q 'VIOLATION'
 check "GREEN: no arm prints a VIOLATION line" $?
@@ -155,6 +155,18 @@ m_wide_interim() {
 }
 red "an interim crew wider than the cap is caught" 'interim crew on wave 1 ran 5 agents' m_wide_interim
 
+# arm 7 — an outcome outside the three tokens
+m_bad_outcome() { jq -c 'if .gates == true then .outcome = "fixed" else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"; }
+red "an off-enum outcome is caught and pointed at verdict" 'VIOLATION  wave 1 the-diamantaire carries outcome "fixed" — .*`verdict` or `summary`' m_bad_outcome
+
+# arm 7 — a falsy value is still a value, not an absent outcome
+m_false_outcome() { jq -c 'if .gates == true then .outcome = false else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"; }
+red "a false outcome is caught, not read as null" 'VIOLATION  wave 1 the-diamantaire carries outcome false' m_false_outcome
+
+# arm 7 — a pasted review is cut short in the report
+m_long_outcome() { jq -c 'if .gates == true then .outcome = ("x" * 200 + "TAIL") else . end' "$1/gates.jsonl" > "$1/g" && mv "$1/g" "$1/gates.jsonl"; }
+red "a long free-text outcome is truncated in the report" 'VIOLATION  wave 1 .* carries outcome "x*\.\.\. — outcome takes' m_long_outcome
+
 # --- GREEN counterparts for the arms whose RED is a threshold. --------
 # A cap check that fired on everything would pass every RED above while
 # being useless, so each threshold arm needs its permissive direction.
@@ -183,6 +195,17 @@ run "$l"
 printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations'
 check "GREEN: a path:Lstart-Lend citation justifies a gating finding" $?
 agree "GREEN-line-ref:"
+
+t="$temp_dir/outcome-tokens"; mkrun "$t"
+jq -c 'if .gates == true then .outcome = "refute"
+       elif .wave == "1" and .agent == "the-chemist" then .outcome = "batch"
+       elif .agent == "the-auditor" then .outcome = "promote"
+       elif .agent == "the-chemist" then del(.outcome)
+       else . end' "$t/gates.jsonl" > "$t/g" && mv "$t/g" "$t/gates.jsonl"
+run "$t"
+printf '%s\n' "$out" | grep -q 'FINDING AUDIT: 0 violations across 7 check(s)'
+check "GREEN: each outcome token, null and an absent outcome all pass" $?
+agree "GREEN-outcome-tokens:"
 
 o="$temp_dir/override"; mkrun "$o"
 gate 1-corrective-2 the-diamantaire false "" "" >> "$o/gates.jsonl"
@@ -230,6 +253,6 @@ echo
 # an assertion floor: a suite that silently stopped asserting still
 # prints "all tests passed" off a zero failure counter. Pegged at the
 # exact arm count, not a round number under it.
-[ "$checks" -eq 43 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 43\n' "$checks"; fails=$((fails + 1)); }
+[ "$checks" -eq 51 ] || { printf 'FAIL  %d assertion(s) ran, expected exactly 51\n' "$checks"; fails=$((fails + 1)); }
 if [ "$fails" -eq 0 ]; then echo "all loop-finding-audit tests passed ($checks assertions)"; exit 0
 else echo "$fails loop-finding-audit test(s) FAILED"; exit 1; fi

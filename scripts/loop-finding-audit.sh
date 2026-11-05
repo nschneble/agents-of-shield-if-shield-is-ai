@@ -147,6 +147,17 @@ while IFS= read -r bad_kind; do
 done < <(jq -r '.kind // empty' "$GATES" 2>/dev/null | sort -u | grep -vxE \
   'crew|pre-build-specialist|wave-retry|stale-skip|executor-handback|usage-window|finding-audit|pr-finalization|orchestration-incident')
 
+# arm 7: outcome is a closed enum too; free text there defeats its query
+checked=$((checked + 1))
+while IFS= read -r bad_outcome; do
+  [ -n "$bad_outcome" ] || continue
+  flag "$bad_outcome — outcome takes refute|batch|promote or null; put free text in \`verdict\` or \`summary\`"
+done < <(jq -r '
+  select(.outcome != null and (.outcome | IN("refute", "batch", "promote") | not))
+  | (.outcome | tojson) as $v
+  | "wave \(.wave) \(.agent // "?") carries outcome \(if ($v | length) > 60 then $v[0:57] + "..." else $v end)"
+' "$GATES")
+
 echo
 for note in ${notes+"${notes[@]}"}; do echo "  $note"; done
 [ ${#notes[@]} -eq 0 ] || echo

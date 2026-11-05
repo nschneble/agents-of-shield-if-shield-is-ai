@@ -355,6 +355,12 @@ exp-status-oldest-wins|custodian-experiments.sh|custodian-experiments.test.sh|s/
 exp-status-ignored-by-list|custodian-experiments.sh|custodian-experiments.test.sh|s/\| \$newest\["[^"]*"\] as \$s/| null as \$s/
 exp-status-listed-as-record|custodian-experiments.sh|custodian-experiments.test.sh|s/\Q| .[] | select(.type != "status")\E/| .[] | select(true)/
 exp-status-key-drops-issue|custodian-experiments.sh|custodian-experiments.test.sh|s/\Qgroup_by([.issue, .item])\E\n(\s+\| map\(\{key: )"[^"]*"/group_by(.item)\n$1"\\(.[0].item)"/
+outcome-arm-accepts-any|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q| IN("refute", "batch", "promote") | not)\E/| IN("refute", "batch", "promote"))/
+outcome-arm-drops-batch|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q"refute", "batch", "promote"\E/"refute", "promote"/
+outcome-arm-strings-only|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\Q.outcome != null and\E/(.outcome | type) == "string" and/
+outcome-arm-no-truncation|loop-finding-audit.sh|loop-finding-audit.test.sh|s/\$v\[0:57\] \+ "\.\.\."/\$v/
+outcome-arm-flags-as-skip|loop-finding-audit.sh|loop-finding-audit.test.sh|s/flag "\$bad_outcome/skip "\$bad_outcome/
+outcome-arm-uncounted|loop-finding-audit.sh|loop-finding-audit.test.sh|s/(# arm 7:[^\n]*\n)checked=\$\(\(checked \+ 1\)\)/$1:/
 TABLE
 }
 

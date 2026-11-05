@@ -13,7 +13,7 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
   "task_tool_available": true, // false = orchestrator could NOT invoke; rules in SKILL.md `## Gate artifacts`
   "ran": true, // false when task_tool_available is false
   "verdict": "MERGE-READY", // agent's own words, verbatim — no paraphrase
-  "outcome": "promote", // refutation-posture reviewers only: "refute" | "batch" | "promote"; else null
+  "outcome": "promote", // refutation-posture reviewers only: "refute" | "batch" | "promote"; else null — the audit rejects anything else
   "verified_by": "llm", // provenance: "executable" | "llm" | null
   "gates": false, // true = this line's finding blocks the wave and earns a corrective
   "gated_by": null, // one class from SKILL.md `## Finding severity floor`; null unless gates is true
@@ -45,7 +45,7 @@ jq -c 'select(.ran == true and (.kind == "crew" or .kind == "pre-build-specialis
 
 The `verified_by` check spans both verdict-bearing kinds (matching the field's crew-or-specialist scope in SKILL.md `## Gate artifacts`); the `outcome` check is crew-refutation-only. Each run's `gates.jsonl` is branch-keyed and fresh, so a run created after this schema landed has no legacy lines to trip it; older logs predate the fields and are exempt.
 
-Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over five arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, and the interim crew size. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other three read the log alone.
+Admissibility is checked separately by `~/.claude/scripts/loop-finding-audit.sh` over seven arms: the `gates` / `gated_by` / `contract_ref` triple, whether a cited ask resolves, whether every corrective was paid for by a justified gating finding, the per-wave corrective cap, the interim crew size, the closed `kind` enum, and the closed `outcome` enum. It reads `run-state.json` alongside the log because two arms need the contract's ask ids and the corrective counter; the other five read the log alone. Neither enum arm is era-gated, unlike the lint above: re-auditing a log older than an arm can fail it.
 
 ### Receipts: the half `verified_by` cannot prove
 
