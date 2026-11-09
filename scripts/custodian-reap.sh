@@ -84,7 +84,7 @@ indexed=""
 if [ -s "$INDEX" ]; then
   # cite plus every field ingest stores; // null keeps old false-as-null rows
   indexed=$(jq -r 'select(.cite != null)
-    | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] | tojson)' "$INDEX" 2>/dev/null) \
+    | .cite + "\t" + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] + [.dispositions | select(. != null)] | tojson)' "$INDEX" 2>/dev/null) \
     || indexed=""
 fi
 
@@ -142,7 +142,7 @@ uncited_count() { # gates path, branch -> lines whose cite is not indexed
   local cites
   cites=$(terminated "$1" | jq -r --arg cbase "$repo_name/local/loops/$2/gates.jsonl" \
     '$cbase + ":" + (input_line_number | tostring) + "\t"
-      + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] | tojson)' 2>/dev/null) || return 1
+      + ([.wave, .kind, .agent, .verdict, (.blockers // 0), (.ran // null), (.task_tool_available // null), (.summary // ""), (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] + [.dispositions | select(. != null)] | tojson)' 2>/dev/null) || return 1
   [ -n "$cites" ] || { echo 0; return 0; }
   awk 'NR == FNR { seen[$0] = 1; next } !($0 in seen)' \
     <(printf '%s\n' "$indexed") <(printf '%s\n' "$cites") | grep -c . || true

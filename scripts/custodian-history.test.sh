@@ -164,11 +164,32 @@ REPOS_ROOT="$xin" CUSTODIAN_HOME="$xin/home" "$hist" ingest >/dev/null 2>&1
 [ "$(g1_of "$xin/home/history-index.jsonl")" = 1 ]
 check "EXACT: a line rewritten to ran false reaches G1 without a rebuild" $?
 
+# --- dispositions are indexed; absent and null are the same record ---
+din="$temp_dir/disp"; dlog="$din/linklater/local/loops/d/gates.jsonl"; didx="$din/home/history-index.jsonl"
+mkdir -p "${dlog%/*}" "$din/home" || die_temp "cannot build dispositions fixture"
+dingest() { dout=$(REPOS_ROOT="$din" CUSTODIAN_HOME="$din/home" "$hist" ingest 2>/dev/null); }
+dlist='[{"finding":"gates.jsonl:1","disposition":"open"}]'
+printf '%s\n' "$kbase" > "$dlog"; dingest
+jq -c '.dispositions = null' <<< "$kbase" > "$dlog"; dingest
+printf '%s\n' "$dout" | grep -q '^ingested 0 new record(s); 0 changed, 0 vanished; '
+check "DISP: a rewrite from no dispositions to null indexes and reports nothing" $?
+jq -c --argjson d "$dlist" '.dispositions = $d' <<< "$kbase" > "$dlog"; dingest
+printf '%s\n' "$dout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; ' \
+  && [ "$(tail -1 "$didx" | jq -c .dispositions)" = "$(jq -c . <<< "$dlist")" ]
+check "DISP: a line gaining dispositions is indexed with them and reported" $?
+jq -c --argjson d "$dlist" '.dispositions = $d | .dispositions[0].disposition = "waived"' <<< "$kbase" > "$dlog"; dingest
+printf '%s\n' "$dout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; '
+check "DISP: an edit to one disposition is indexed and reported" $?
+jq -c '.dispositions = null' <<< "$kbase" > "$dlog"; dingest
+printf '%s\n' "$dout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; '
+check "DISP: and dropping them back to null is too" $?
+
 # --- ingest's key is at least as fine as the reap guard's ---
 rk=$(grep -oE '\[\.wave, \.kind.*\] \| tojson' "$here/custodian-reap.sh" | sort -u)
 records_jq='
   {wave: 1, kind: "crew", agent: "a", verdict: "ok", blockers: 0, ran: true,
-   task_tool_available: true, summary: "s", verified_by: "e", outcome: "o"} as $b
+   task_tool_available: true, summary: "s", verified_by: "e", outcome: "o",
+   dispositions: [{finding: "gates.jsonl:1", disposition: "cleared"}]} as $b
   | [$b] + [($b | keys_unsorted[]) as $f
       | ((null, false, true, 0, 2, "", "s") as $v | $b | .[$f] = $v), ($b | del(.[$f]))]'
 coarser=$(jq -n -L "$here" 'include "custodian-index"; def guard: '"$rk"';'"$records_jq"'

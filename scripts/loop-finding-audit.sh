@@ -147,6 +147,59 @@ while IFS= read -r bad_kind; do
 done < <(jq -r '.kind // empty' "$GATES" 2>/dev/null | sort -u | grep -vxE \
   'crew|pre-build-specialist|wave-retry|stale-skip|executor-handback|usage-window|finding-audit|pr-finalization|orchestration-incident')
 
+# arm 7: outcome is a closed enum too; free text there defeats its query
+checked=$((checked + 1))
+while IFS= read -r bad_outcome; do
+  [ -n "$bad_outcome" ] || continue
+  flag "$bad_outcome — outcome takes refute|batch|promote or null; put free text in \`verdict\` or \`summary\`"
+done < <(jq -r '
+  select(.outcome != null and (.outcome | IN("refute", "batch", "promote") | not))
+  | (.outcome | tojson) as $v
+  | "wave \(.wave) \(.agent // "?") carries outcome \(if ($v | length) > 60 then $v[0:57] + "..." else $v end)"
+' "$GATES")
+
+# arm 8: a re-crew settles each finding it re-checked, cited by log line
+checked=$((checked + 1))
+while IFS= read -r bad_recrew; do
+  [ -n "$bad_recrew" ] || continue
+  flag "$bad_recrew"
+done < <(jq -Rnr '
+  [inputs] as $raw
+  | [$raw[] | fromjson? // null] as $log
+  | def problem($not_cleared; $earlier):
+    if type != "object" then "is not an object"
+    elif (.finding | type) != "string" or (.finding | test("^gates\\.jsonl:[1-9][0-9]*$") | not)
+      then "needs finding as gates.jsonl:<line> of the gating finding"
+    elif (.disposition | IN("cleared", "refuted", "waived", "dropped", "open") | not)
+      then "needs disposition cleared|refuted|waived|dropped|open"
+    elif .disposition == "open" and ($not_cleared | not)
+      then "is open, but the verdict does not start with NOT-CLEARED"
+    elif (.finding | ltrimstr("gates.jsonl:") | tonumber) > ($log | length)
+      then "names \(.finding), but the log ends at line \($log | length)"
+    elif $log[(.finding | ltrimstr("gates.jsonl:") | tonumber) - 1]
+         | (type == "object" and .kind == "crew" and .gates == true) | not
+      then "names \(.finding), which is not a gating crew line"
+    elif .finding as $f | any($earlier[] | objects; .finding == $f)
+      then "names \(.finding) a second time"
+    else empty end;
+  ($raw | to_entries[]
+   | select((.value | test("^\\s*$") | not) and ([.value | fromjson?] | length) == 0)
+   | "gates.jsonl:\(.key + 1) is not one JSON line, so no disposition can cite it"),
+  ($log[] | objects
+   | select(.pass == "re-crew" and .ran != false)
+   | ((.verdict | type) == "string" and (.verdict | startswith("NOT-CLEARED"))) as $not_cleared
+   | .dispositions as $d
+   | (if ($d | type) != "array" or ($d | length) == 0
+      then "has no dispositions — list one {finding, disposition} per finding it re-checked"
+      else [$d | to_entries[] | .key as $k
+            | "disposition \($k + 1) \(.value | problem($not_cleared; $d[0:$k]))"] | first // empty
+      end) as $why
+   | "wave \(.wave) \(.agent // "?") re-crew \($why)"),
+  ($log[] | objects
+   | select(.ran == false and .dispositions != null)
+   | "wave \(.wave) \(.agent // "?") carries dispositions but did not run")
+' "$GATES")
+
 echo
 for note in ${notes+"${notes[@]}"}; do echo "  $note"; done
 [ ${#notes[@]} -eq 0 ] || echo

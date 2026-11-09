@@ -74,7 +74,8 @@ index_gates() {  # repo_root repo gates_path branch cite_base >> stdout
     }
     # copied only if source has the key: feeds the legacy exemption
     + (if has("verified_by") then {verified_by} else {} end)
-    + (if has("outcome")     then {outcome}     else {} end)'
+    + (if has("outcome")     then {outcome}     else {} end)
+    + (if .dispositions != null then {dispositions} else {} end)'
 }
 
 # reap names a same-day repeat <branch>.<n> only beside an existing <branch>

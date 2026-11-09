@@ -217,10 +217,35 @@
 # +71 always on custodian-run: artifacts.md defines the experiment
 # record's status line, and Phase D's step 5 records a shipped follow-up
 # with `status`.
-orchestrator-run	26114	1898
+#
+# +67 always on orchestrator-run: state-schemas.md and rails.md say the
+# finding audit now rejects an off-enum `outcome`, and the arm list that
+# still said five names all seven.
+#
+# +280 always on orchestrator-run: state-schemas.md defines the re-crew
+# line's `dispositions` (the finding key, four tokens, the not-cleared and
+# never-ran cases) and the eighth arm that enforces it; the re-crew rule
+# in protocol-detail.md requires one entry per finding.
+#
+# +83 always on orchestrator-run: state-schemas.md adds the fifth token,
+# `open`, valid only under a NOT-CLEARED verdict, and the line that records
+# the user's later ruling on it.
+#
+# +23 always on custodian-run: phase-detail.md says index records carry a
+# re-crew's `dispositions` and the reap guard compares them, absent and
+# null alike.
+#
+# +28 always on orchestrator-run: state-schemas.md says the dispositions
+# list is non-empty, names no finding twice on a line, and cites a physical
+# line holding a gating crew finding, which the eighth arm now checks.
+#
+# +52 always on orchestrator-run: state-schemas.md says a ran: false line
+# may carry no dispositions, the ruling line carries ran: true, and each
+# gates.jsonl line on disk is one compact JSON object.
+orchestrator-run	26624	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	22041	7599
+custodian-run	22064	7599
 defend-run	8086	0
 declutter-run	6661	0
