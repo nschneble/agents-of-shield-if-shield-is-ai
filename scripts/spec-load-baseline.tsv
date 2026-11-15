@@ -242,7 +242,13 @@
 # +52 always on orchestrator-run: state-schemas.md says a ran: false line
 # may carry no dispositions, the ruling line carries ran: true, and each
 # gates.jsonl line on disk is one compact JSON object.
-orchestrator-run	26624	1898
+#
+# +535 always on orchestrator-run: three rules from a failed Linklater run.
+# The user may add or withdraw asks mid-run, cleanup follows a final crew
+# that is the run's first, and a fresh run archives a finished run's state.
+# Their bodies moved to references to fit the SKILL.md ceiling, but every
+# reference is always-loaded here, so the total is their real cost.
+orchestrator-run	27159	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
