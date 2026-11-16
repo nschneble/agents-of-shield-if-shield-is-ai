@@ -33,7 +33,12 @@ analysis=$(jq -n -L "$HERE" --arg index "$INDEX" '
   def legacy: (has("verified_by") | not);
 
   def g1_applicable: (.verdict != null);
-  def g1_violation:  ((.ran == false) or (.task_tool_available == false));
+  # a deliberate skip: tool available, fixed token, reason in summary
+  def g1_declared_skip: (.ran == false and .task_tool_available == true
+                         and .verdict == "not-applicable"
+                         and (.summary | type) == "string" and .summary != "");
+  def g1_violation:  ((.ran == false) or (.task_tool_available == false))
+                     and (g1_declared_skip | not);
 
   # reuses the state-schemas.md provenance lint; drift-checked by the tests
   def g2_applicable: (.ran == true and (.kind == "crew" or .kind == "pre-build-specialist"));
@@ -77,7 +82,7 @@ analysis=$(jq -n -L "$HERE" --arg index "$INDEX" '
     "  \($n) records · \($modern) modern (checked-era) · \($legacyn) legacy (exempt-era)",
     "",
     "G1  no verdict without a run",
-    "    (loop-de-looper ## Gate artifacts: task_tool_available:false ⇒ ran:false ⇒ no verdict)",
+    "    (loop-de-looper ## Gate artifacts: ran:false ⇒ no verdict, bar a declared not-applicable skip)",
     "    lines: checked \($g1checked | length) · legacy-exempt \($g1exempt) · violations \($v1)",
     ($g1viol[] | "    VIOLATION  \(.cite)  verdict=\(.verdict|tostring) ran=\(.ran|tostring) task_tool_available=\(.task_tool_available|tostring)"),
     "",

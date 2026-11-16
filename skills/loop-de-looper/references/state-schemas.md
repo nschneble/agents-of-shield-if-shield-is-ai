@@ -11,8 +11,8 @@ Field shapes + provenance lint for the loop's on-disk records. The governing rul
   "pass": "final", // crew lines only: "interim" | "final" | "re-crew"; else null
   "agent": "the-diamantaire", // crew member or specialist name
   "task_tool_available": true, // false = orchestrator could NOT invoke; rules in SKILL.md `## Gate artifacts`
-  "ran": true, // false when task_tool_available is false
-  "verdict": "MERGE-READY", // agent's own words, verbatim — no paraphrase
+  "ran": true, // false when task_tool_available is false, or for a declared skip
+  "verdict": "MERGE-READY", // agent's own words, verbatim; ran:false ⇒ null, or "not-applicable" for a declared skip
   "outcome": "promote", // refutation-posture reviewers only: "refute" | "batch" | "promote"; else null — the audit rejects anything else
   "verified_by": "llm", // provenance: "executable" | "llm" | null
   "gates": false, // true = this line's finding blocks the wave and earns a corrective
