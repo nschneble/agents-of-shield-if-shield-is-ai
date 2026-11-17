@@ -178,7 +178,7 @@ Concentrated risk survives because it is the one signal that record does NOT cov
 
 **EVERY pass is domain-matched by the diff's file globs — the final pass included.** Interim passes take three agents maximum; a corrective's re-crew is an interim pass under the same cap, narrower still (`## Corrective budget`). The roster, invoked in parallel via Agent tool, one call per agent, same message: `the-auditor` (a11y), `the-chemist` (test coverage), `the-chronicler` (doc drift), `the-diamantaire` (correctness), `the-ghostwriter` (voice on prose surfaces), `the-improver` (refactor opportunities), `the-stickler` (conventions).
 
-**An agent whose globs miss the diff is not dispatched — and is not silent either.** Log it to `gates.jsonl` with `ran: false` and the glob that missed, and name it in the report beside the ones that ran. "Report all seven by name with each verdict" is unchanged; what changes is that four of those verdicts may be `not-applicable` with a reason you can audit. An all-seven final pass on a diff with no UI, no tests, and no product prose is not thoroughness: an agent handed a domain the diff cannot contain does not return empty, it reaches, and a reaching finding is where a corrective wave comes from.
+**An agent whose globs miss the diff is not dispatched — and is not silent either.** Log it to `gates.jsonl` with `ran: false`, `verdict: "not-applicable"`, and the glob that missed in `summary`, and name it in the report beside the ones that ran. "Report all seven by name with each verdict" is unchanged; what changes is that four of those verdicts may be `not-applicable` with a reason you can audit. An all-seven final pass on a diff with no UI, no tests, and no product prose is not thoroughness: an agent handed a domain the diff cannot contain does not return empty, it reaches, and a reaching finding is where a corrective wave comes from.
 
 **Diff scope.** An interim pass reads the diff **since the last crew pass**; only the final pass reads the cumulative diff. Handing every interim the cumulative diff means wave ten pays to re-read wave one, once per agent, for code an earlier pass already cleared.
 
@@ -195,7 +195,7 @@ Write the gate artifact BEFORE looping back or resetting counters. Report all se
 
 **Cleanup batch wave.** After the queue drains and before the final crew, dispatch ONE `the-looper` over `cleanup_batch`, ordered by cost. Items that don't fit the wave stay in the report under `deferred_cleanup` for the user. This wave is where docs, comments, naming, test hygiene, and LOC findings get fixed — all at once, against a settled diff, instead of one corrective at a time against a moving one.
 
-**The final crew runs exactly once, and it runs last.** Cleanup batch wave, then final pass (`--next final` first), then terminate. A run that crews, then ships another wave, then crews again has not been careful — it has paid for the same pass twice and re-opened a diff it had already settled. Observed: a five-wave run whose log carries a full final pass, a polish wave after it, and a second all-seven pass after that. If a wave genuinely must ship after the final pass, the run is not at termination; fold it in before the pass, or the pass it invalidates is the one that mattered.
+**The final crew runs exactly once, and it runs last.** Cleanup batch wave, then final pass (`--next final`), then terminate. A run that crews, then ships another wave, then crews again has not been careful — it has paid for the same pass twice and re-opened a diff it had already settled. Observed: a five-wave run whose log carries a full final pass, a polish wave after it, and a second all-seven pass after that. If a wave genuinely must ship after the final pass, the run is not at termination; fold it in before the pass, or the pass it invalidates is the one that mattered.
 
 **The same holds when the final crew is the run's FIRST crew:** cleanup follows it, under `single-wave`'s limits (`references/protocol-detail.md` `## Step 3`).
 
@@ -205,7 +205,7 @@ Write the gate artifact BEFORE looping back or resetting counters. Report all se
 
 Loop terminates when:
 
-1. **Queue shipped** AND **cleanup batch worked** AND **final crew clean** (`--next final` clear) AND **section 5 empty** → goal-complete
+1. **Queue shipped** AND **cleanup batch worked** AND **final crew clean** AND **section 5 empty** → goal-complete
 2. **Stop condition fired** at any layer → escalate with state report
 3. **Queue shipped** AND **final crew clean** AND **section 5 non-empty** → cannot self-complete; surface the explicit list
 

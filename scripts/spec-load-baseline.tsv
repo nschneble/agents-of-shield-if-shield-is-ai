@@ -249,17 +249,22 @@
 # Their bodies moved to references to fit the SKILL.md ceiling, but every
 # reference is always-loaded here, so the total is their real cost.
 #
-# +186 always on orchestrator-run: state-schemas.md says --next queue,
+# +191 always on orchestrator-run / +15 on custodian-run: a gate that did
+# not run carries no verdict unless it is a declared skip (rails.md,
+# state-schemas.md, SKILL.md's crew step), and phase-detail.md's G1 line
+# names that one exemption. Two specs said opposite things before this.
+#
+# +180 always on orchestrator-run: state-schemas.md says --next queue,
 # cleanup and final STOP on an open gating finding read from gates.jsonl,
-# and SKILL.md's Step 3, Step 4 and governor say so.
+# and SKILL.md's Step 3 and governor say so.
 #
 # +32 always on custodian-run: phase-detail.md says index records carry a
 # gating line's gates, gated_by and contract_ref, and the reap guard
 # compares them.
-orchestrator-run	27345	1898
+orchestrator-run	27530	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	22096	7599
+custodian-run	22111	7599
 defend-run	8086	0
 declutter-run	6661	0

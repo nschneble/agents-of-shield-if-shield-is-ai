@@ -57,6 +57,10 @@ mutants() {
 g1-or-to-and|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q((.ran == false) or (.task_tool_available == false))\E/((.ran == false) and (.task_tool_available == false))/
 g1-drop-tool-disjunct|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q((.ran == false) or (.task_tool_available == false))\E/(.ran == false)/
 g1-drop-ran-disjunct|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q((.ran == false) or (.task_tool_available == false))\E/(.task_tool_available == false)/
+g1-skip-exempts-nothing|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q.verdict == "not-applicable"\E/false/
+g1-skip-any-verdict|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q.verdict == "not-applicable"\E/true/
+g1-skip-without-tool|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q.ran == false and .task_tool_available == true\E/.ran == false/
+g1-skip-without-reason|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Q and .summary != ""\E//
 g2-drop-outcome-arm|custodian-guardrails.sh|custodian-guardrails.test.sh|s/def g2_violation:\s+\(\.verified_by == null\s+or \(\.kind == "crew" and \.agent == "the-diamantaire" and \.outcome == null\)\);/def g2_violation:  (.verified_by == null);/
 g3-drop-kind-evidence|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Qtest("crew|ship|review")\E/test("nomatchzzz")/
 legacy-era-inverted|custodian-guardrails.sh|custodian-guardrails.test.sh|s/\Qdef legacy: (has("verified_by") | not);\E/def legacy: (has("verified_by"));/
