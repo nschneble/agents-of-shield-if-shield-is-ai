@@ -45,6 +45,12 @@ red="$temp_dir/red.jsonl"
   # task_tool_available==false ALONE (it ran, but could not reach the tool).
   # verified_by is set so this stays a G1-only violation, out of G2.
   echo '{"repo":"r","branch":"g1-tool","wave":1,"kind":"pre-build-specialist","agent":"accessibility-lead","task_tool_available":false,"ran":true,"verdict":"CLEAR","outcome":null,"verified_by":"executable","blockers":0,"summary":"ran without the tool","cite":"r/local/loops/g1-tool/gates.jsonl:1"}'
+  # the declared-skip exemption has three conditions; each row below misses
+  # exactly one, so dropping any of them leaves that row unflagged. g1-ran
+  # above misses the token (CLEAR). This one has the token but no tool.
+  echo '{"repo":"r","branch":"g1-na-tool","wave":1,"kind":"pre-build-specialist","agent":"the-chemist","task_tool_available":false,"ran":false,"verdict":"not-applicable","outcome":null,"verified_by":null,"blockers":0,"summary":"glob missed","cite":"r/local/loops/g1-na-tool/gates.jsonl:1"}'
+  # the token and the tool, but no auditable reason.
+  echo '{"repo":"r","branch":"g1-na-bare","wave":1,"kind":"pre-build-specialist","agent":"the-chemist","task_tool_available":true,"ran":false,"verdict":"not-applicable","outcome":null,"verified_by":null,"blockers":0,"summary":"","cite":"r/local/loops/g1-na-bare/gates.jsonl:1"}'
   # G2 violation: modern ran==true verdict-bearing gate with verified_by==null.
   # Uses pre-build-specialist (in G2 scope) not crew, so it is NOT a committed
   # post-build wave and stays isolated from G3.
@@ -81,13 +87,15 @@ printf '%s\n' "$out" | grep -q 'r/local/loops/g2/gates.jsonl:1'; check "RED: G2 
 printf '%s\n' "$out" | grep -q 'r/local/loops/g3/gates.jsonl:1'; check "RED: G3 cite reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g1-ran/gates.jsonl:1'; check "RED: G1 ran-only cite reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g1-tool/gates.jsonl:1'; check "RED: G1 tool-only cite reported" $?
+printf '%s\n' "$out" | grep -q 'r/local/loops/g1-na-tool/gates.jsonl:1'; check "RED: G1 not-applicable without the tool reported" $?
+printf '%s\n' "$out" | grep -q 'r/local/loops/g1-na-bare/gates.jsonl:1'; check "RED: G1 not-applicable without a reason reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g2-outcome/gates.jsonl:1'; check "RED: G2 outcome-arm cite reported" $?
 printf '%s\n' "$out" | grep -q 'r/local/loops/g3sha/gates.jsonl:1'; check "RED: G3 sha-only wave cite reported" $?
-printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 7'; check "RED: total is 7 (G1x3+G2x2+G3x2)" $?
+printf '%s\n' "$out" | grep -q 'TOTAL VIOLATIONS: 9'; check "RED: total is 9 (G1x5+G2x2+G3x2)" $?
 # The legacy line's cite must appear on NO VIOLATION line.
 ! printf '%s\n' "$out" | grep 'VIOLATION' | grep -q 'legacy'; check "RED: legacy line NOT a violation" $?
 # Per-guardrail counts, which the separating fixtures above moved off one.
-printf '%s\n' "$out" | grep -q 'G1 3 lines'; check "RED: G1 count in summary" $?
+printf '%s\n' "$out" | grep -q 'G1 5 lines'; check "RED: G1 count in summary" $?
 printf '%s\n' "$out" | grep -q 'G2 2 lines'; check "RED: G2 count in summary" $?
 printf '%s\n' "$out" | grep -q 'G3 2 waves'; check "RED: G3 count in summary" $?
 
@@ -100,6 +108,8 @@ green="$temp_dir/green.jsonl"
   echo '{"repo":"r","branch":"a","wave":1,"kind":"crew","agent":"the-diamantaire","task_tool_available":true,"ran":true,"verdict":"promote","outcome":"promote","verified_by":"llm","blockers":0,"summary":"reviewed","cite":"r/local/loops/a/gates.jsonl:2"}'
   # a pre-build gate that did NOT run (tta false) but carries NO verdict → G1 n/a.
   echo '{"repo":"r","branch":"a","wave":2,"kind":"pre-build-specialist","agent":"accessibility-lead","task_tool_available":false,"ran":false,"verdict":null,"outcome":null,"verified_by":null,"blockers":0,"summary":"not run","cite":"r/local/loops/a/gates.jsonl:3"}'
+  # a declared skip: domain match left it out, token + reason → G1 clean.
+  echo '{"repo":"r","branch":"a","wave":1,"kind":"crew","agent":"the-chemist","task_tool_available":true,"ran":false,"verdict":"not-applicable","outcome":null,"verified_by":null,"blockers":0,"summary":"glob **/*.test.* missed the diff","cite":"r/local/loops/a/gates.jsonl:4"}'
 } > "$green"
 
 out=$("$runner" --index "$green"); rc=$?
