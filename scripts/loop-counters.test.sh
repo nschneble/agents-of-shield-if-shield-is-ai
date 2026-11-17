@@ -44,6 +44,8 @@ run() { # counter-overrides-json, outcome-json, extra args...
         --claude-md "$no_md" "$@" 2>&1)
   rc=$?
 }
+# gate log lines query writes beside the snapshot
+qlog=""
 # the pre-dispatch query: writes $d, $out, $rc and leaves the snapshot alone
 query() { # counter-overrides-json, next-kind, [cleanup-batch-json], extra args...
   case_n=$((case_n + 1))
@@ -54,6 +56,7 @@ query() { # counter-overrides-json, next-kind, [cleanup-batch-json], extra args.
   case "${1:-}" in '['*) batch=$1; shift;; esac
   jq -n --argjson z "$zeros" --argjson over "$over" --argjson b "$batch" \
     '{counters: ($z + $over), cleanup_batch: $b}' > "$d/run-state.json"
+  printf '%s' "$qlog" > "$d/gates.jsonl"
   pristine=$(cat "$d/run-state.json")
   out=$("$runner" --state "$d/run-state.json" --next "$next" \
         --claude-md "$no_md" "$@" 2>&1)
@@ -253,12 +256,141 @@ run '{"corrective_waves":5}' "$gating_fix"
 printf '%s\n' "$out" | grep -q '^GOVERNOR: STOP'
 check "OUTRANK: a STOP rail outranks a rethink tripped beside it" $?
 
+# --- an open gating finding holds every dispatch but its fix ---
+hb='{"wave":1,"kind":"executor-handback","pass":null,"agent":"the-looper","ran":true,"gates":false}'
+clean_crew='{"wave":1,"kind":"crew","pass":"interim","agent":"the-diamantaire","ran":true,"gates":false}'
+gate_line() { # agent
+  jq -cn --arg a "$1" '{wave: 1, kind: "crew", pass: "interim", agent: $a, ran: true, gates: true,
+    gated_by: "correctness-regression", contract_ref: "A1"}'
+}
+settle() { # pass, ran, dispositions as finding=disposition...
+  local pass=$1 ran=$2; shift 2
+  printf '%s\n' "$@" | jq -cRn --arg p "$pass" --argjson r "$ran" '{wave: "1-corrective-1",
+    kind: "crew", pass: $p, agent: "the-diamantaire", ran: $r, gates: false,
+    dispositions: [inputs | split("=") | {finding: .[0], disposition: .[1]}]}'
+}
+log_of() { printf '%s\n' "$@"; }
+gate=$(gate_line the-diamantaire)
+corr='{"wave":"1-corrective-1","kind":"executor-handback","pass":null,"agent":"the-looper","ran":true,"gates":false}'
+stops_on() { # desc, cite
+  printf '%s\n' "$out" | grep -q '^GOVERNOR: STOP' && printf '%s\n' "$out" | grep -q "OPEN  $2 "
+  check "$1" $?
+}
+clears() { # desc
+  printf '%s\n' "$out" | grep -q '^GOVERNOR: clear' && ! printf '%s\n' "$out" | grep -q 'OPEN '
+  check "$1" $?
+}
+
+qlog=$(log_of "$hb" "$clean_crew")
+for k in queue cleanup final; do
+  query '{"total_waves":1}' "$k" '[{"wave":1}]'
+  clears "OPEN: a log with no gating finding leaves --next $k clear"
+done
+qlog=$(log_of "$hb" "$gate")
+for k in queue cleanup final; do
+  query '{"total_waves":1}' "$k" '[{"wave":1}]'
+  stops_on "OPEN: an unfixed gating finding stops --next $k, naming its cite" gates.jsonl:2
+  agree "OPEN --next $k:"
+done
+for k in corrective retry; do
+  query '{"total_waves":1}' "$k"
+  clears "OPEN: an unfixed gating finding leaves --next $k clear, since it is the fix"
+done
+qlog=$(log_of "$hb" "$gate" "$corr")
+query '{"total_waves":2}' queue
+stops_on "OPEN: a corrective never re-crewed leaves its finding open" gates.jsonl:2
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:2=cleared)")
+for k in queue cleanup final; do
+  query '{"total_waves":2}' "$k" '[{"wave":1}]'
+  clears "SETTLED: a re-crew that cleared the finding leaves --next $k clear"
+done
+for token in refuted waived dropped; do
+  qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew true "gates.jsonl:2=$token")")
+  query '{"total_waves":2}' final
+  clears "SETTLED: a finding $token by its re-crew is settled"
+done
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:2=open)")
+query '{"total_waves":2}' final
+stops_on "OPEN: a re-crew that left the finding open stops the final crew" gates.jsonl:2
+printf '%s\n' "$out" | grep -q 'last disposition open'
+check "OPEN: the stop line says the finding's last disposition" $?
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:2=open)" "$(settle re-crew true gates.jsonl:2=waived)")
+query '{"total_waves":2}' final
+clears "SETTLED: the user's later ruling settles a finding the re-crew left open"
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:2=cleared)" "$(settle re-crew true gates.jsonl:2=open)")
+query '{"total_waves":2}' final
+stops_on "OPEN: a later open entry supersedes an earlier cleared one" gates.jsonl:2
+qlog=$(log_of "$hb" "$gate" "$corr" "$(jq -c '.dispositions = null' <<< "$(settle re-crew true gates.jsonl:2=cleared)")")
+query '{"total_waves":2}' queue
+stops_on "OPEN: a re-crew with no dispositions settles nothing" gates.jsonl:2
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle re-crew false gates.jsonl:2=cleared)")
+query '{"total_waves":2}' queue
+stops_on "OPEN: a re-crew that did not run settles nothing" gates.jsonl:2
+qlog=$(log_of "$hb" "$gate" "$corr" "$(settle interim true gates.jsonl:2=cleared)")
+query '{"total_waves":2}' queue
+stops_on "OPEN: dispositions on a line that is not a re-crew settle nothing" gates.jsonl:2
+qlog=$(log_of "$(settle re-crew true gates.jsonl:2=cleared)" "$gate")
+query '{"total_waves":2}' queue
+stops_on "OPEN: a disposition logged before its finding does not settle it" gates.jsonl:2
+qlog=$(log_of "$hb" "$gate" "$(gate_line the-stickler)" "$corr" "$(settle re-crew true gates.jsonl:2=cleared)")
+query '{"total_waves":2}' queue
+stops_on "OPEN: of two findings, the one left unsettled stops the dispatch" gates.jsonl:3
+! printf '%s\n' "$out" | grep -q 'OPEN  gates.jsonl:2 '
+check "OPEN: and the settled one is not named" $?
+qlog=$(log_of "$hb" "$(jq -c '.kind = "pre-build-specialist"' <<< "$gate")")
+query '{"total_waves":1}' queue
+clears "OPEN: only a crew line is a gating finding"
+qlog=$(log_of "" "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:2=cleared)")
+query '{"total_waves":2}' queue
+stops_on "OPEN: a blank line still counts toward a finding's cite" gates.jsonl:3
+qlog=$(log_of "" "$hb" "$gate" "$corr" "$(settle re-crew true gates.jsonl:3=cleared)")
+query '{"total_waves":2}' queue
+clears "SETTLED: a re-crew citing that physical line settles it"
+qlog=$(log_of "$hb" "$gate")
+query '{"total_waves":1}' cleanup
+printf '%s\n' "$out" | grep -q '^GOVERNOR: STOP'
+check "OPEN: an open finding outranks an empty cleanup batch's skip" $?
+agree "OPEN over skip:"
+qlog=$(log_of "$hb" '{"wave":1,"kind":"crew","gates":tru' "$clean_crew")
+query '{"total_waves":1}' queue
+[ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'gates.jsonl:2 is not one JSON line' \
+  && ! printf '%s\n' "$out" | grep -q '^GOVERNOR'
+check "TORN: a log line that is not JSON refuses, exit 2, never clear (exit $rc)" $?
+qlog=""
+
+missing_log() { # counter-overrides-json, next-kind
+  case_n=$((case_n + 1))
+  d="$temp_dir/case-$case_n"
+  mkdir -p "$d"
+  jq -n --argjson z "$zeros" --argjson over "$1" '{counters: ($z + $over), cleanup_batch: [{wave: 1}]}' > "$d/run-state.json"
+  out=$("$runner" --state "$d/run-state.json" --next "$2" --claude-md "$no_md" 2>&1)
+  rc=$?
+}
+missing_log '{}' queue
+[ "$rc" -eq 0 ]
+check "NO LOG: before the first dispatch a missing gate log reads as empty (exit $rc)" $?
+for k in queue cleanup final; do
+  missing_log '{"total_waves":1}' "$k"
+  [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q 'no gate log beside a snapshot that has dispatched waves' \
+    && ! printf '%s\n' "$out" | grep -q '^GOVERNOR'
+  check "NO LOG: once a wave was dispatched, a missing gate log refuses --next $k (exit $rc)" $?
+done
+missing_log '{"total_waves":1}' corrective
+[ "$rc" -eq 0 ]
+check "NO LOG: --next corrective never reads the gate log (exit $rc)" $?
+missing_log '{"total_waves":1}' queue
+mkdir "$d/gates.jsonl"
+out=$("$runner" --state "$d/run-state.json" --next queue --claude-md "$no_md" 2>&1); rc=$?
+[ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -q '^GOVERNOR'
+check "UNREADABLE: a gate log jq cannot read refuses, exit 2 (exit $rc)" $?
+
 # --- one wave, several outcomes in a row, on the same snapshot ---
 fresh() {
   case_n=$((case_n + 1))
   d="$temp_dir/case-$case_n"
   mkdir -p "$d"
   jq -n --argjson z "$zeros" '{counters: $z, cleanup_batch: []}' > "$d/run-state.json"
+  : > "$d/gates.jsonl"
 }
 step() { # outcome-json, extra args...
   printf '%s\n' "$1" > "$d/outcome.json"

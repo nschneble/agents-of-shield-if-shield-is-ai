@@ -248,10 +248,18 @@
 # that is the run's first, and a fresh run archives a finished run's state.
 # Their bodies moved to references to fit the SKILL.md ceiling, but every
 # reference is always-loaded here, so the total is their real cost.
-orchestrator-run	27159	1898
+#
+# +186 always on orchestrator-run: state-schemas.md says --next queue,
+# cleanup and final STOP on an open gating finding read from gates.jsonl,
+# and SKILL.md's Step 3, Step 4 and governor say so.
+#
+# +32 always on custodian-run: phase-detail.md says index records carry a
+# gating line's gates, gated_by and contract_ref, and the reap guard
+# compares them.
+orchestrator-run	27345	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	22064	7599
+custodian-run	22096	7599
 defend-run	8086	0
 declutter-run	6661	0

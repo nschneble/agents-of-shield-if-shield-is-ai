@@ -184,12 +184,37 @@ jq -c '.dispositions = null' <<< "$kbase" > "$dlog"; dingest
 printf '%s\n' "$dout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; '
 check "DISP: and dropping them back to null is too" $?
 
+# --- a gating line's justification is indexed; absent, null and gates false are one record ---
+gin="$temp_dir/gating"; glog="$gin/linklater/local/loops/g/gates.jsonl"; gidx="$gin/home/history-index.jsonl"
+mkdir -p "${glog%/*}" "$gin/home" || die_temp "cannot build gating fixture"
+gingest() { gout=$(REPOS_ROOT="$gin" CUSTODIAN_HOME="$gin/home" "$hist" ingest 2>/dev/null); }
+gated='.gates = true | .gated_by = "correctness-regression" | .contract_ref = "src/p.ts:L10-L12"'
+printf '%s\n' "$kbase" > "$glog"; gingest
+jq -c '.gates = false | .gated_by = null | .contract_ref = null' <<< "$kbase" > "$glog"; gingest
+printf '%s\n' "$gout" | grep -q '^ingested 0 new record(s); 0 changed, 0 vanished; ' \
+  && [ "$(tail -1 "$gidx" | jq -c '[has("gates"), has("gated_by"), has("contract_ref")]')" = '[false,false,false]' ]
+check "GATING: a rewrite from no gating fields to gates false and nulls indexes and reports nothing" $?
+jq -c "$gated" <<< "$kbase" > "$glog"; gingest
+printf '%s\n' "$gout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; ' \
+  && [ "$(tail -1 "$gidx" | jq -c '[.gates, .gated_by, .contract_ref]')" = '[true,"correctness-regression","src/p.ts:L10-L12"]' ]
+check "GATING: a line turning gating is indexed with gates, gated_by and contract_ref and reported" $?
+for edit in '.contract_ref = "A1"' '.gated_by = "security"' '.gates = false'; do
+  jq -c "$gated | $edit" <<< "$kbase" > "$glog"; gingest
+  printf '%s\n' "$gout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; '
+  check "GATING: an edit $edit is indexed and reported" $?
+  jq -c "$gated" <<< "$kbase" > "$glog"; gingest
+done
+jq -c '.gates = false | .gated_by = null | .contract_ref = null' <<< "$kbase" > "$glog"; gingest
+printf '%s\n' "$gout" | grep -q '^ingested 1 new record(s); 1 changed, 0 vanished; '
+check "GATING: and dropping back to a non-gating line is too" $?
+
 # --- ingest's key is at least as fine as the reap guard's ---
 rk=$(grep -oE '\[\.wave, \.kind.*\] \| tojson' "$here/custodian-reap.sh" | sort -u)
 records_jq='
   {wave: 1, kind: "crew", agent: "a", verdict: "ok", blockers: 0, ran: true,
    task_tool_available: true, summary: "s", verified_by: "e", outcome: "o",
-   dispositions: [{finding: "gates.jsonl:1", disposition: "cleared"}]} as $b
+   dispositions: [{finding: "gates.jsonl:1", disposition: "cleared"}],
+   gates: true, gated_by: "security", contract_ref: "A1"} as $b
   | [$b] + [($b | keys_unsorted[]) as $f
       | ((null, false, true, 0, 2, "", "s") as $v | $b | .[$f] = $v), ($b | del(.[$f]))]'
 coarser=$(jq -n -L "$here" 'include "custodian-index"; def guard: '"$rk"';'"$records_jq"'
