@@ -248,10 +248,15 @@
 # that is the run's first, and a fresh run archives a finished run's state.
 # Their bodies moved to references to fit the SKILL.md ceiling, but every
 # reference is always-loaded here, so the total is their real cost.
-orchestrator-run	27159	1898
+#
+# +191 always on orchestrator-run / +15 on custodian-run: a gate that did
+# not run carries no verdict unless it is a declared skip (rails.md,
+# state-schemas.md, SKILL.md's crew step), and phase-detail.md's G1 line
+# names that one exemption. Two specs said opposite things before this.
+orchestrator-run	27350	1898
 pre-flight	2452	2617
 orchestrated-wave	17752	10317
 crew-agent	13738	0
-custodian-run	22064	7599
+custodian-run	22079	7599
 defend-run	8086	0
 declutter-run	6661	0
