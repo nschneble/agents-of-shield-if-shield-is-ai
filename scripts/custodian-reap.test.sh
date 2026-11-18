@@ -382,7 +382,8 @@ check "E2E: ingest indexes that rewrite, and the dir reaps" $?
 base_line='{"wave":1,"kind":"crew","agent":"the-stickler","verdict":"ok","blockers":0,"ran":true,"task_tool_available":true,"verified_by":"executable","outcome":"fixed","summary":"s"}'
 for change in '.wave = 2' '.kind = "k2"' '.agent = "a2"' '.verdict = "v2"' '.blockers = 3' '.ran = null' \
   '.task_tool_available = null' '.summary = "s2"' '.verified_by = "llm"' 'del(.verified_by)' '.outcome = "o2"' 'del(.outcome)' \
-  '.dispositions = [{"finding":"gates.jsonl:1","disposition":"cleared"}]'; do
+  '.dispositions = [{"finding":"gates.jsonl:1","disposition":"cleared"}]' '.gates = true' \
+  '.gated_by = "security"' '.contract_ref = "A1"'; do
   : > "$home/history-index.jsonl"
   printf '%s\n' "$base_line" > "$loops/fix-ci/gates.jsonl"; ingest || die_temp "field ingest failed"
   printf '%s\n' "$base_line" | jq -c "$change" > "$loops/fix-ci/gates.jsonl"
@@ -401,6 +402,13 @@ printf '%s\n' "$base_line" | jq -c '.dispositions = null' > "$loops/fix-ci/gates
 run "$runner"
 has $'reap\tfix-ci\tmerged (ancestry)'
 check "FIELD: a line given dispositions null still matches its record without them" $?
+
+: > "$home/history-index.jsonl"
+printf '%s\n' "$base_line" > "$loops/fix-ci/gates.jsonl"; ingest || die_temp "non-gating ingest failed"
+printf '%s\n' "$base_line" | jq -c '.gates = false | .gated_by = null | .contract_ref = null' > "$loops/fix-ci/gates.jsonl"
+run "$runner"
+has $'reap\tfix-ci\tmerged (ancestry)'
+check "FIELD: a line given gates false and null justification still matches its record without them" $?
 
 # --- ingest keeps false; an index written before it did still matches ---
 : > "$home/history-index.jsonl"

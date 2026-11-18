@@ -192,11 +192,27 @@ lc-per-wave-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating 
 lc-corrective-ignores-gating|loop-counters.sh|loop-counters.test.sh|s/\$o\.gating == true and at\("corrective_waves"\)/true and at("corrective_waves")/
 lc-total-gates-cleanup|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective","retry","cleanup")) and at/
 lc-total-skips-corrective|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","retry")) and at/
+lc-open-read-for-every-kind|loop-counters.sh|loop-counters.test.sh|s/if \[ "\$NEXT" != corrective \] && \[ "\$NEXT" != retry \]; then/if true; then/
+lc-open-final-unread|loop-counters.sh|loop-counters.test.sh|s/\[ "\$NEXT" != retry \]; then/[ "\$NEXT" != retry ] && [ "\$NEXT" != final ]; then/
+lc-open-cleanup-unread|loop-counters.sh|loop-counters.test.sh|s/\[ "\$NEXT" != retry \]; then/[ "\$NEXT" != retry ] && [ "\$NEXT" != cleanup ]; then/
+lc-open-earlier-entry-settles|loop-counters.sh|loop-counters.test.sh|s/select\(\.at > \$n and \.finding == \$cite\)/select(.finding == \$cite)/
+lc-open-first-entry-wins|loop-counters.sh|loop-counters.test.sh|s/\] \| last \| \.disposition\)/] | first | .disposition)/
+lc-open-open-token-settles|loop-counters.sh|loop-counters.test.sh|s/\QIN("cleared", "refuted", "waived", "dropped") | not)\E/IN("cleared", "refuted", "waived", "dropped", "open") | not)/
+lc-open-unrun-recrew-settles|loop-counters.sh|loop-counters.test.sh|s/\Qselect(.pass == "re-crew" and .ran != false and\E/select(.pass == "re-crew" and/
+lc-open-any-pass-settles|loop-counters.sh|loop-counters.test.sh|s/\Qselect(.pass == "re-crew" and .ran != false and\E/select(.ran != false and/
+lc-open-gates-ignored|loop-counters.sh|loop-counters.test.sh|s/\Qselect(.kind == "crew" and .gates == true)\E/select(.kind == "crew")/
+lc-open-kind-ignored|loop-counters.sh|loop-counters.test.sh|s/\Qselect(.kind == "crew" and .gates == true)\E/select(.gates == true)/
+lc-open-torn-line-ignored|loop-counters.sh|loop-counters.test.sh|s/if \$torn then error/if false then error/
+lc-open-blank-line-uncounted|loop-counters.sh|loop-counters.test.sh|s/\[inputs\] as \$raw/[inputs | select(length > 0)] as \$raw/
+lc-open-missing-log-clears|loop-counters.sh|loop-counters.test.sh|s/elif \[ "\$\(jq -r '\.counters\.total_waves \/\/ 0' "\$STATE"\)" != 0 \]; then/elif false; then/
+lc-open-missing-log-refuses|loop-counters.sh|loop-counters.test.sh|s/total_waves \/\/ 0' "\$STATE"\)" != 0 \]/total_waves \/\/ 0' "\$STATE")" != x ]/
+lc-open-skip-outranks-stop|loop-counters.sh|loop-counters.test.sh|s/\[ "\$verdict" = STOP \] \|\| verdict="skip"/verdict="skip"/
+lc-open-not-a-stop|loop-counters.sh|loop-counters.test.sh|s/  verdict="STOP"\ndone <<< "\$open"/  :\ndone <<< "\$open"/
 lc-total-skips-retry|loop-counters.sh|loop-counters.test.sh|s/IN\("queue","corrective","retry"\)\) and at/IN("queue","corrective")) and at/
 lc-retries-gate-any-dispatch|loop-counters.sh|loop-counters.test.sh|s/\$next == "retry" and at\("wave_retries"\)/true and at("wave_retries")/
 lc-no-progress-never-retries|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="STOP + escalate: retry spent, still thrashing"; verdict="STOP";;/
 lc-no-progress-retry-unbounded|loop-counters.sh|loop-counters.test.sh|s/consecutive_no_progress\)  retry_or_stop "[^"]*";;/consecutive_no_progress)  action="rethink: one 2b-retry on the next ranked alternate, then STOP"; verdict="rethink";;/
-lc-next-kind-unchecked|loop-counters.sh|loop-counters.test.sh|s/''\|queue\|corrective\|retry\|cleanup\) ;;/*) ;;/
+lc-next-kind-unchecked|loop-counters.sh|loop-counters.test.sh|s/''\|queue\|corrective\|retry\|cleanup\|final\) ;;/*) ;;/
 lc-next-outcome-not-exclusive|loop-counters.sh|loop-counters.test.sh|s/if \[ -n "\$OUTCOME" \] && \[ -n "\$NEXT" \]; then/if false; then/
 lc-next-rails-failure-ignored|loop-counters.sh|loop-counters.test.sh|s/ \|\| refuse "could not evaluate the dispatch rails"/ || true/
 lc-spec-thrash-wording|skills/loop-de-looper/SKILL.md|loop-counters.test.sh|s/then STOP \+ escalate: retry spent, still thrashing/then STOP + escalate: retry spent, still looping/
@@ -304,6 +320,12 @@ index-key-drops-dispositions|custodian-index.jq|custodian-history.test.sh|s/\Q +
 index-key-drops-dispositions-blocks-reap|custodian-index.jq|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//
 history-projection-drops-dispositions|custodian-history.sh|custodian-history.test.sh|s/\n\s*\+ \(if \.dispositions != null then \{dispositions\} else \{\} end\)//
 reap-guard-drops-dispositions|custodian-reap.sh|custodian-reap.test.sh|s/\Q + [.dispositions | select(. != null)]\E//g
+index-key-drops-gating|custodian-index.jq|custodian-history.test.sh|s/\Q + [{gates, gated_by, contract_ref} | with_entries(select(.value != null)) | select(. != {})]\E//
+history-projection-drops-contract-ref|custodian-history.sh|custodian-history.test.sh|s/\n\s*\+ \(if \.contract_ref != null then \{contract_ref\} else \{\} end\)//
+history-projection-drops-gated-by|custodian-history.sh|custodian-history.test.sh|s/\n\s*\+ \(if \.gated_by != null then \{gated_by\} else \{\} end\)//
+history-projection-keeps-gates-false|custodian-history.sh|custodian-history.test.sh|s/\Q(if .gates == true then {gates}\E/(if .gates != null then {gates}/
+reap-guard-drops-gating|custodian-reap.sh|custodian-reap.test.sh|s/\Q + [{gates: (if .gates == true then true else null end), gated_by, contract_ref} | with_entries(select(.value != null)) | select(. != {})]\E//g
+reap-guard-keeps-gates-false|custodian-reap.sh|custodian-reap.test.sh|s/\Q{gates: (if .gates == true then true else null end),\E/{gates,/g
 reap-guard-dispositions-null-differs|custodian-reap.sh|custodian-reap.test.sh|s/\Q[.dispositions | select(. != null)]\E/(if has("dispositions") then [[.dispositions]] else [] end)/g
 guardrails-counts-by-cite|custodian-guardrails.sh|custodian-history.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/
 replay-counts-by-cite|scripts/correction-gates/format-scope/replay.sh|correction-gates/format-scope/gate.test.sh|s/ \| distinct\) as \$rows/ | current) as \$rows/

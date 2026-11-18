@@ -101,7 +101,9 @@ missing key, and a missing `verified_by` or `outcome` from `null`, in both
 directions, and a line rewritten to `ran` false must reach G1 without a
 rebuild. A `dispositions` list is indexed with its line, gaining, editing
 or dropping it reports `CHANGED`, and a missing list and `null` are the
-same record.
+same record. So are a gating line's `gates`, `gated_by` and `contract_ref`,
+except that `gates` false is stored as absent, so a line rewritten to
+`gates` false and null justification reports nothing.
 
 `query` and the guardrail replay count each distinct line a log has ever
 held once, by indexed content: after a mid-file deletion the tail counts
@@ -439,11 +441,21 @@ Eight properties the governor's honesty depends on:
   too, so its budget line still lands.
 - THE RAIL ACTIONS MIRROR THE SKILL. Each tripped rail's printed action must
   appear in its `SKILL.md` governor row, so the two cannot drift apart.
+- AN OPEN GATING FINDING HOLDS EVERYTHING BUT ITS FIX. With a gating crew
+  line in `gates.jsonl` and no later re-crew settling it, `--next queue`,
+  `cleanup` and `final` read STOP and name its cite, while `corrective`
+  and `retry` read clear. Each of cleared, refuted, waived and dropped
+  settles it; `open`, a missing list, a re-crew that did not run, a line
+  that is not a re-crew, or an entry logged before the finding does not,
+  and a later entry outranks an earlier one. A blank line still counts
+  toward a cite, an open finding outranks an empty batch's skip, and a
+  torn line refuses. A missing log reads as empty only before the first
+  dispatch.
 
-Every assertion was watched fail: 67 declared mutants in
+Every assertion was watched fail: 83 declared mutants in
 `scripts/custodian-mutation-kill.sh`, one per increment, reset, rail
-comparison, rail condition, `--next` kind, override path and refusal
-guard, all killed. The first sweep
+comparison, rail condition, `--next` kind, override path, refusal
+guard and open-finding condition, all killed. The first sweep
 found 13 survivors. Twelve were one harness bug — a `$?` read after a
 command substitution in the check's own description, which made every
 counter assertion pass. The thirteenth was the STOP-outranks-rethink guard,

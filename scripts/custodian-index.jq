@@ -1,5 +1,5 @@
 # no // folds: unlike the reap guard, ingest must tell false from null
-def exact_key: ([.wave, .kind, .agent, .verdict, .blockers, .ran, .task_tool_available, .summary, (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] + [.dispositions | select(. != null)] | tojson);
+def exact_key: ([.wave, .kind, .agent, .verdict, .blockers, .ran, .task_tool_available, .summary, (if has("verified_by") then [.verified_by] else null end), (if has("outcome") then [.outcome] else null end)] + [.dispositions | select(. != null)] + [{gates, gated_by, contract_ref} | with_entries(select(.value != null)) | select(. != {})] | tojson);
 
 def log_path: (.cite // "") | tostring | sub(":[0-9]+$"; "");
 

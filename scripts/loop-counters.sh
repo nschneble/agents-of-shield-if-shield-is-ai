@@ -7,6 +7,7 @@ STATE=""
 OUTCOME=""
 NEXT=""
 CLAUDE_MD=""
+open=""
 
 needs_value() { [ "$2" -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }; }
 
@@ -19,7 +20,7 @@ while [ $# -gt 0 ]; do
     -h|--help)
       echo "usage: $0 --state PATH (--outcome FILE|- | --next KIND) [--claude-md PATH]" >&2
       echo "  --outcome applies a wave outcome to the counters, then checks the governor" >&2
-      echo "  --next queue|corrective|retry|cleanup checks the rails gating that dispatch" >&2
+      echo "  --next queue|corrective|retry|cleanup|final checks the rails gating that dispatch" >&2
       exit 0;;
     --*) echo "unknown flag: $1" >&2; exit 2;;
     *)   echo "unexpected arg: $1" >&2; exit 2;;
@@ -34,8 +35,8 @@ if [ -n "$OUTCOME" ] && [ -n "$NEXT" ]; then
 fi
 [ -n "$OUTCOME$NEXT" ] || { echo "--outcome or --next is required" >&2; exit 2; }
 case "$NEXT" in
-  ''|queue|corrective|retry|cleanup) ;;
-  *) echo "--next must be queue|corrective|retry|cleanup, got '$NEXT'" >&2; exit 2;;
+  ''|queue|corrective|retry|cleanup|final) ;;
+  *) echo "--next must be queue|corrective|retry|cleanup|final, got '$NEXT'" >&2; exit 2;;
 esac
 
 [ -s "$STATE" ] || refuse "empty or missing run-state: $STATE"
@@ -163,9 +164,34 @@ if [ -n "$NEXT" ]; then
     (if $next == "cleanup" and ((.cleanup_batch // []) | length) == 0 then "cleanup_batch_empty" else empty end),
     (if $next == "cleanup" and at("cleanup_waves") >= 1 then "cleanup_wave_ran" else empty end)
   ' "$STATE") || refuse "could not evaluate the dispatch rails"
+  if [ "$NEXT" != corrective ] && [ "$NEXT" != retry ]; then
+    GATES="$(dirname "$STATE")/gates.jsonl"
+    if [ -e "$GATES" ]; then
+      open=$(jq -Rnr '
+        [inputs] as $raw
+        | [$raw[] | fromjson? // null] as $log
+        | ([$raw | to_entries[]
+            | select((.value | test("^\\s*$") | not) and ([.value | fromjson?] | length) == 0)
+            | .key + 1] | first) as $torn
+        | if $torn then error("gates.jsonl:\($torn) is not one JSON line, so it may hide a gating finding") else . end
+        | [$log | to_entries[] | (.key + 1) as $at | .value | objects
+           | select(.pass == "re-crew" and .ran != false and (.dispositions | type) == "array")
+           | .dispositions[] | objects | {at: $at, finding, disposition}] as $settled
+        | $log | to_entries[] | (.key + 1) as $n | .value | objects
+        | select(.kind == "crew" and .gates == true)
+        | "gates.jsonl:\($n)" as $cite
+        | ([$settled[] | select(.at > $n and .finding == $cite)] | last | .disposition) as $last
+        | select($last | IN("cleared", "refuted", "waived", "dropped") | not)
+        | "\($cite)\t\(.wave)\t\(.agent // "?")\t\($last // "none")"
+      ' "$GATES" 2>&1) || refuse "could not read the gate log $GATES: $open"
+    elif [ "$(jq -r '.counters.total_waves // 0' "$STATE")" != 0 ]; then
+      refuse "no gate log beside a snapshot that has dispatched waves: $GATES"
+    fi
+  fi
   echo "loop-counters — before a $NEXT dispatch — $STATE"
   echo "  $limits"
   [ "$NEXT" != cleanup ] || echo "  the cleanup batch wave is not gated by max_total_waves"
+  [ "$NEXT" != final ] || echo "  the final crew is gated only by open gating findings"
   echo
   written="nothing written"
 else
@@ -229,13 +255,18 @@ retry_or_stop() { # stop-action
     [ "$verdict" = "STOP" ] || verdict="rethink"
   fi
 }
+while IFS=$'\t' read -r cite wave agent last; do
+  [ -n "$cite" ] || continue
+  echo "  OPEN  $cite — wave $wave $agent, last disposition $last — STOP: settle it first (a corrective + re-crew, or the user's ruling)"
+  verdict="STOP"
+done <<< "$open"
 while IFS=$'\t' read -r rail count limit wave_retried; do
   [ -n "$rail" ] || continue
   case "$rail" in
     cleanup_batch_empty|cleanup_wave_ran)
       [ "$rail" = cleanup_batch_empty ] && echo "  SKIP  cleanup_batch is empty — no cleanup wave; run the final crew"
       [ "$rail" = cleanup_wave_ran ] && echo "  SKIP  the run's one cleanup wave already ran — run the final crew"
-      verdict="skip"
+      [ "$verdict" = STOP ] || verdict="skip"
       continue;;
     max_correctives_per_wave) retry_or_stop "STOP + escalate: rethink again after the wave's one 2b-retry";;
     consecutive_no_progress)  retry_or_stop "STOP + escalate: retry spent, still thrashing";;
@@ -246,7 +277,7 @@ while IFS=$'\t' read -r rail count limit wave_retried; do
   esac
   echo "  TRIPPED  $rail $count/$limit — $action"
 done <<< "$tripped"
-[ -z "$tripped" ] || echo
+[ -z "$tripped$open" ] || echo
 
 echo "GOVERNOR: $verdict — $written"
 [ "$verdict" = "clear" ]

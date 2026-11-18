@@ -195,7 +195,7 @@ Write the gate artifact BEFORE looping back or resetting counters. Report all se
 
 **Cleanup batch wave.** After the queue drains and before the final crew, dispatch ONE `the-looper` over `cleanup_batch`, ordered by cost. Items that don't fit the wave stay in the report under `deferred_cleanup` for the user. This wave is where docs, comments, naming, test hygiene, and LOC findings get fixed — all at once, against a settled diff, instead of one corrective at a time against a moving one.
 
-**The final crew runs exactly once, and it runs last.** Cleanup batch wave, then final pass, then terminate. A run that crews, then ships another wave, then crews again has not been careful — it has paid for the same pass twice and re-opened a diff it had already settled. Observed: a five-wave run whose log carries a full final pass, a polish wave after it, and a second all-seven pass after that. If a wave genuinely must ship after the final pass, the run is not at termination; fold it in before the pass, or the pass it invalidates is the one that mattered.
+**The final crew runs exactly once, and it runs last.** Cleanup batch wave, then final pass (`--next final`), then terminate. A run that crews, then ships another wave, then crews again has not been careful — it has paid for the same pass twice and re-opened a diff it had already settled. Observed: a five-wave run whose log carries a full final pass, a polish wave after it, and a second all-seven pass after that. If a wave genuinely must ship after the final pass, the run is not at termination; fold it in before the pass, or the pass it invalidates is the one that mattered.
 
 **The same holds when the final crew is the run's FIRST crew:** cleanup follows it, under `single-wave`'s limits (`references/protocol-detail.md` `## Step 3`).
 
@@ -237,7 +237,7 @@ Resume mode (`/loop-de-looper resume`):
 
 The wave queue is bounded (scope caps it ≤15), but **corrective waves and stuck-wave retries are not**. That churn, not the queue, is the runaway shape. The governor rails on what the orchestrator can actually observe — NOT token spend, which a Skill-driven orchestrator has no reliable way to meter. No fake gauge.
 
-A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; the three corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave, which `--next cleanup` allows once, over a non-empty batch (`references/state-schemas.md` `## loop-counters outcome`):
+A rail trips at its limit, never on a unit that succeeded. `loop-counters.sh --outcome` checks the finished unit in step 2c, after the finding audit and before the crew trigger; the three corrective rails need a gating finding pending. `max_total_waves` and `max_wave_retries` gate the next dispatch instead (`--next`), never the cleanup batch wave, which `--next cleanup` allows once, over a non-empty batch, no gating finding open (`references/state-schemas.md` `## loop-counters outcome`):
 
 | Rail                           | Default | Hit →                                                                                                    |
 | ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
